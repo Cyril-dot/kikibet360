@@ -5,7 +5,6 @@ import { publicMatches } from '../../utils/api';
 import type { Match } from '../../utils/api';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import ScheduleIcon from '@mui/icons-material/Schedule';
-import SearchIcon from '@mui/icons-material/Search';
 
 
 // ---------------------------------------------------------------------------
@@ -134,24 +133,66 @@ const LIGUE_1_TEAMS = new Set([
   'Angers', 'Auxerre', 'Saint-Etienne',
 ]);
 
+// Champions League teams: all top-6 league teams combined
+const CHAMPIONS_LEAGUE_TEAMS = new Set([
+  ...PREMIER_LEAGUE_TEAMS,
+  ...LA_LIGA_TEAMS,
+  ...BUNDESLIGA_TEAMS,
+  ...SERIE_A_TEAMS,
+  ...LIGUE_1_TEAMS,
+]);
+
 const LEAGUE_TEAM_MAP: Record<string, Set<string>> = {
   'Premier League':   PREMIER_LEAGUE_TEAMS,
   'La Liga':          LA_LIGA_TEAMS,
   'Bundesliga':       BUNDESLIGA_TEAMS,
   'Serie A':          SERIE_A_TEAMS,
   'Ligue 1':          LIGUE_1_TEAMS,
+  'Champions League': CHAMPIONS_LEAGUE_TEAMS,
 };
 
-function isTop6Match(m: EnrichedMatch): boolean {
-  return TOP_6_LABELS.has(m.league ?? '');
+// ---------------------------------------------------------------------------
+// NEW: Check if a match truly belongs to a top-6 league by verifying teams
+// ---------------------------------------------------------------------------
+function hasVerifiedTeam(m: EnrichedMatch, leagueLabel: string): boolean {
+  const teamSet = LEAGUE_TEAM_MAP[leagueLabel];
+  if (!teamSet) return true; // no team-set defined → always accept
+  return teamSet.has(m.homeTeam ?? '') || teamSet.has(m.awayTeam ?? '');
 }
 
+/**
+ * Returns true only when the match's league name matches AND at least one
+ * team is a verified member of that league's known roster.
+ * Champions League is accepted purely on league name (no team check).
+ */
 function matchBelongsToLeague(m: EnrichedMatch, leagueLabel: string): boolean {
   if ((m.league ?? '') !== leagueLabel) return false;
   if (leagueLabel === 'Champions League') return true;
-  const teamSet = LEAGUE_TEAM_MAP[leagueLabel];
-  if (!teamSet) return true;
-  return teamSet.has(m.homeTeam ?? '') || teamSet.has(m.awayTeam ?? '');
+  return hasVerifiedTeam(m, leagueLabel);
+}
+
+/**
+ * Returns true when a match's league name is one of the top-6 labels AND
+ * the teams are verified — i.e. it's a genuine top-6 match.
+ */
+function isTop6Match(m: EnrichedMatch): boolean {
+  const league = m.league ?? '';
+  if (!TOP_6_LABELS.has(league)) return false;
+  if (league === 'Champions League') return true;
+  return hasVerifiedTeam(m, league);
+}
+
+/**
+ * When grouping matches for display, if a match's league name collides with
+ * a top-6 label but the teams aren't verified, relabel it "Other Leagues"
+ * so it doesn't pollute the named section.
+ */
+function getDisplayLeagueName(m: EnrichedMatch): string {
+  const league = m.league ?? 'Other';
+  if (!TOP_6_LABELS.has(league)) return league;
+  if (league === 'Champions League') return league;
+  if (hasVerifiedTeam(m, league)) return league;
+  return 'Other Leagues';
 }
 
 function leagueSortKey(leagueName: string): string {
@@ -160,7 +201,7 @@ function leagueSortKey(leagueName: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// FinishedMatchRow — dedicated row showing final score prominently
+// FinishedMatchRow
 // ---------------------------------------------------------------------------
 function FinishedMatchRow({ match }: { match: EnrichedMatch }) {
   const navigate = useNavigate();
@@ -175,7 +216,6 @@ function FinishedMatchRow({ match }: { match: EnrichedMatch }) {
       onClick={() => navigate(`/match/${match.id}`)}
       className="flex items-center gap-3 p-3 border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors last:border-b-0"
     >
-      {/* Home team */}
       <div className="flex flex-1 items-center gap-1.5 min-w-0 justify-end">
         <span className={`text-sm truncate text-right ${homeWon ? 'font-bold text-slate-900 dark:text-slate-100' : 'font-medium text-slate-500 dark:text-slate-400'}`}>
           {match.homeTeam}
@@ -185,7 +225,6 @@ function FinishedMatchRow({ match }: { match: EnrichedMatch }) {
         )}
       </div>
 
-      {/* Score block */}
       <div className="flex flex-col items-center shrink-0 min-w-[64px]">
         <div className="flex items-center gap-1.5">
           <span className={`text-lg font-bold tabular-nums ${homeWon ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`}>
@@ -201,7 +240,6 @@ function FinishedMatchRow({ match }: { match: EnrichedMatch }) {
         </span>
       </div>
 
-      {/* Away team */}
       <div className="flex flex-1 items-center gap-1.5 min-w-0">
         {match.awayLogo && (
           <img src={match.awayLogo} alt={match.awayTeam} className="w-5 h-5 object-contain shrink-0" />
@@ -215,7 +253,7 @@ function FinishedMatchRow({ match }: { match: EnrichedMatch }) {
 }
 
 // ---------------------------------------------------------------------------
-// MatchRow — live / upcoming / today
+// MatchRow
 // ---------------------------------------------------------------------------
 function MatchRow({ match, isUpcomingLayout = false }: { match: EnrichedMatch; isUpcomingLayout?: boolean }) {
   const navigate = useNavigate();
@@ -470,21 +508,15 @@ type MatchCategory = 'live' | 'today' | 'upcoming' | 'finished';
 
 function categorise(match: Match): MatchCategory {
   const status = match.status ?? '';
-
-  // Check finished BEFORE live — terminal status always wins
   if (FINISHED_STATUSES.has(status)) return 'finished';
   if (LIVE_STATUSES.has(status)) return 'live';
-
   if (match.kickoffAt) {
     const kickoff = new Date(match.kickoffAt);
     const now = new Date();
     if (kickoff.toDateString() === now.toDateString()) return 'today';
     if (kickoff > now) return 'upcoming';
-    // Kickoff was in the past but status is unknown — treat as finished
     return 'finished';
   }
-
-  // Unknown status and no kickoff — safer to treat as finished than upcoming
   return 'finished';
 }
 
@@ -495,7 +527,6 @@ export default function MatchList() {
   const [allMatches, setAllMatches] = useState<EnrichedMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [teamFilter, setTeamFilter] = useState('');
   const [activeLeague, setActiveLeague] = useState<string | null>(null);
   const [showFinished, setShowFinished] = useState(true);
   const genRef = useRef(0);
@@ -540,25 +571,14 @@ export default function MatchList() {
   }, []);
 
   const { leagueMatches, otherMatches } = useMemo(() => {
-    let base = allMatches;
-
-    if (teamFilter.trim()) {
-      const lower = teamFilter.toLowerCase();
-      base = base.filter(
-        (m) =>
-          (m.homeTeam ?? '').toLowerCase().includes(lower) ||
-          (m.awayTeam ?? '').toLowerCase().includes(lower),
-      );
-    }
-
     if (!activeLeague) {
-      return { leagueMatches: base, otherMatches: [] as EnrichedMatch[] };
+      return { leagueMatches: allMatches, otherMatches: [] as EnrichedMatch[] };
     }
 
     const inLeague: EnrichedMatch[] = [];
     const outside: EnrichedMatch[] = [];
 
-    for (const m of base) {
+    for (const m of allMatches) {
       if (matchBelongsToLeague(m, activeLeague)) {
         inLeague.push(m);
       } else {
@@ -567,7 +587,7 @@ export default function MatchList() {
     }
 
     return { leagueMatches: inLeague, otherMatches: outside };
-  }, [allMatches, teamFilter, activeLeague]);
+  }, [allMatches, activeLeague]);
 
   const grouped = useMemo(() => {
     const cats: Record<MatchCategory, EnrichedMatch[]> = {
@@ -598,13 +618,20 @@ export default function MatchList() {
   // ---------------------------------------------------------------------------
   // Rendering helpers
   // ---------------------------------------------------------------------------
+
+  /**
+   * Groups matches by their display league name.
+   * Matches whose league name collides with a top-6 label but whose teams
+   * aren't verified get bucketed under "Other Leagues" automatically.
+   */
   function groupByLeague(matches: EnrichedMatch[]): Map<string, EnrichedMatch[]> {
     const map = new Map<string, EnrichedMatch[]>();
     for (const m of matches) {
-      const key = m.league ?? 'Other';
+      const key = getDisplayLeagueName(m);
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(m);
     }
+    // Sort: verified top-6 names first, "Other Leagues" / unknowns last
     return new Map(
       [...map.entries()].sort(([a], [b]) =>
         leagueSortKey(a).localeCompare(leagueSortKey(b))
@@ -613,10 +640,12 @@ export default function MatchList() {
   }
 
   function renderLeagueCard(league: string, lm: EnrichedMatch[], isUpcoming: boolean, isFinishedSection = false) {
+    // Use the first match's leagueLogo only if the league name is a genuine top-6 league
+    const showLogo = TOP_6_LABELS.has(league) && league !== 'Other Leagues';
     return (
       <div key={league} className="card mb-2 overflow-hidden">
         <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
-          {lm[0]?.leagueLogo && (
+          {showLogo && lm[0]?.leagueLogo && (
             <img src={lm[0].leagueLogo} alt={league} className="w-4 h-4 object-contain" />
           )}
           <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">
@@ -642,6 +671,9 @@ export default function MatchList() {
   ) {
     if (matches.length === 0) return null;
 
+    // In "All" view: split into genuine top-6 matches vs everything else.
+    // In a filtered league view: all matches are already verified, so
+    // top6 = all and others = [] which preserves the existing divider behaviour.
     const top6 = matches.filter(isTop6Match);
     const others = matches.filter((m) => !isTop6Match(m));
 
@@ -671,10 +703,12 @@ export default function MatchList() {
 
         {isFinishedSection && !showFinished ? null : (
           <>
+            {/* Genuine top-6 league cards */}
             {[...groupByLeague(top6).entries()].map(([league, lm]) =>
               renderLeagueCard(league, lm, isUpcoming, isFinishedSection)
             )}
 
+            {/* Divider shown only when both sections have content */}
             {top6.length > 0 && others.length > 0 && (
               <div className="flex items-center gap-2 my-3">
                 <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
@@ -685,6 +719,8 @@ export default function MatchList() {
               </div>
             )}
 
+            {/* Non-top-6 matches — impostor league names are already relabelled
+                to "Other Leagues" by getDisplayLeagueName inside groupByLeague */}
             {[...groupByLeague(others).entries()].map(([league, lm]) =>
               renderLeagueCard(league, lm, isUpcoming, isFinishedSection)
             )}
@@ -694,9 +730,9 @@ export default function MatchList() {
     );
   }
 
-  // -----------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Render
-  // -----------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   if (error) {
     return (
       <div className="px-4 mt-6">
@@ -714,20 +750,6 @@ export default function MatchList() {
 
   return (
     <div className="px-4 mt-4">
-      {/* Search */}
-      <div className="mb-3">
-        <div className="relative">
-          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" sx={{ fontSize: 18 }} />
-          <input
-            type="text"
-            placeholder="Search team..."
-            value={teamFilter}
-            onChange={(e) => setTeamFilter(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-        </div>
-      </div>
-
       {/* League filter tabs */}
       <div className="flex gap-1.5 overflow-x-auto pb-2 mb-4 scrollbar-hide">
         <button
