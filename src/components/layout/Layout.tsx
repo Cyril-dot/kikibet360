@@ -12,9 +12,9 @@ export default function Layout() {
     <div className={theme === 'dark' ? 'dark' : ''}>
       <div className="min-h-screen bg-surface-light dark:bg-surface-dark transition-colors">
         <Header />
-        <div className="flex">
+        <div className="flex max-w-[1440px] mx-auto w-full">
           <Sidebar />
-          <main className="flex-1 min-h-[calc(100vh-4rem)] pb-20 lg:pb-4">
+          <main className="flex-1 min-w-0 min-h-[calc(100vh-4rem)] pb-20 lg:pb-4">
             <Outlet />
           </main>
         </div>

@@ -14,6 +14,9 @@ import PromosPage from './pages/PromosPage';
 import AffiliatePage from './pages/AffiliatePage';
 import AdminModal from './pages/AdminModal';
 
+// GameRunner lives at  src/games/GameRunner.tsx
+import GameRunner from './games/GameRunner';
+
 function App() {
   return (
     <BrowserRouter>
@@ -31,6 +34,9 @@ function App() {
           <Route path="/casino" element={<CasinoPage />} />
           <Route path="/promos" element={<PromosPage />} />
           <Route path="/affiliate" element={<AffiliatePage />} />
+
+          {/* All games resolved via slug → GameRunner */}
+          <Route path="/games/:slug" element={<GameRunner />} />
         </Route>
       </Routes>
       <AdminModal />

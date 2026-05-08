@@ -1,128 +1,514 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { matches } from '../data/mock';
 import { useAppStore } from '../store';
+import { matches as matchesApi, publicMatches } from '../utils/api';
+import type { Match } from '../utils/api';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import LiveTvIcon from '@mui/icons-material/LiveTv';
 import SportsSoccerIcon from '@mui/icons-material/SportsSoccer';
-import SportsBasketballIcon from '@mui/icons-material/SportsBasketball';
-import SportsTennisIcon from '@mui/icons-material/SportsTennis';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import SearchIcon from '@mui/icons-material/Search';
 
-const filterTabs = [
-  { key: 'all', label: 'All' },
-  { key: 'football', label: 'Football', icon: <SportsSoccerIcon fontSize="small" /> },
-  { key: 'basketball', label: 'Basketball', icon: <SportsBasketballIcon fontSize="small" /> },
-  { key: 'tennis', label: 'Tennis', icon: <SportsTennisIcon fontSize="small" /> },
-];
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+interface OddsMap {
+  home: number;
+  draw: number;
+  away: number;
+}
 
-export default function LiveMatchesPage() {
+interface EnrichedMatch extends Match {
+  oddsMap?: OddsMap;
+}
+
+// ---------------------------------------------------------------------------
+// Live status set — mirrors reference page exactly
+// ---------------------------------------------------------------------------
+const LIVE_STATUSES = new Set([
+  'LIVE', 'live', 'IN_PLAY', 'in_play', 'inplay',
+  'FIRST_HALF', 'first_half', '1H', '1h',
+  'SECOND_HALF', 'second_half', '2H', '2h',
+  'HALFTIME', 'halftime', 'HALF_TIME', 'half_time', 'HT', 'ht',
+  'EXTRA_TIME', 'extra_time', 'ET', 'et',
+  'PENALTIES', 'penalties', 'PEN', 'pen', 'P',
+  'BREAK', 'break', 'INTERRUPTED', 'interrupted', 'SUSPENDED', 'suspended',
+]);
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function formatMinute(match: Match): string {
+  if (match.minutePlayed != null) return `${match.minutePlayed}'`;
+  return 'LIVE';
+}
+
+function groupByLeague(matches: EnrichedMatch[]): Map<string, EnrichedMatch[]> {
+  const map = new Map<string, EnrichedMatch[]>();
+  for (const m of matches) {
+    const key = m.league ?? 'Other';
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(m);
+  }
+  return map;
+}
+
+// ---------------------------------------------------------------------------
+// Odds extraction — same robust logic as reference page
+// ---------------------------------------------------------------------------
+function extractOddsMap(
+  oddsArray: unknown[],
+  homeTeam: string,
+  awayTeam: string,
+): OddsMap | undefined {
+  if (!Array.isArray(oddsArray) || oddsArray.length === 0) return undefined;
+
+  const entries = (oddsArray as Array<Record<string, unknown>>).filter((o) => {
+    const market = String(o.market ?? o.market_name ?? o.marketName ?? o.type ?? '')
+      .toLowerCase()
+      .replace(/[\s_-]/g, '');
+    return market === '1x2' || market === 'matchresult' || market === 'matchodds';
+  });
+
+  const pool = entries.length > 0 ? entries : (oddsArray as Array<Record<string, unknown>>);
+  const parseOdd = (o: Record<string, unknown>): number =>
+    parseFloat(String(o.odd ?? o.value ?? o.odds ?? o.price ?? o.decimal ?? '0'));
+
+  const norm = (s: string) => s.toLowerCase().trim();
+  const normHome = norm(homeTeam);
+  const normAway = norm(awayTeam);
+  const matchesTeam = (selection: string, teamNorm: string) => {
+    const sel = norm(selection);
+    return sel === teamNorm || sel.includes(teamNorm) || teamNorm.includes(sel);
+  };
+
+  let home = 0, draw = 0, away = 0;
+  for (const o of pool) {
+    const sel = norm(String(o.selection ?? o.outcome ?? o.name ?? o.label ?? ''));
+    const val = parseOdd(o);
+    if (val <= 0) continue;
+    if (sel === 'draw' || sel === 'x') { if (draw === 0) draw = val; }
+    else if (matchesTeam(sel, normHome)) { if (home === 0) home = val; }
+    else if (matchesTeam(sel, normAway)) { if (away === 0) away = val; }
+  }
+
+  if (home === 0 && draw === 0 && away === 0) {
+    const numericVals = pool.map(parseOdd).filter((v) => v > 1 && v < 50);
+    if (numericVals.length >= 3)
+      return { home: numericVals[0], draw: numericVals[1], away: numericVals[2] };
+    return undefined;
+  }
+  return { home, draw, away };
+}
+
+// ---------------------------------------------------------------------------
+// Skeleton loader
+// ---------------------------------------------------------------------------
+function MatchSkeleton() {
+  return (
+    <div className="animate-pulse p-3 border-b border-slate-100 dark:border-slate-800 last:border-b-0">
+      <div className="flex justify-between mb-3">
+        <div className="h-3 w-28 bg-slate-200 dark:bg-slate-700 rounded" />
+        <div className="h-3 w-10 bg-slate-200 dark:bg-slate-700 rounded" />
+      </div>
+      <div className="flex items-center justify-between mb-4">
+        <div className="h-4 w-24 bg-slate-200 dark:bg-slate-700 rounded" />
+        <div className="h-7 w-16 bg-slate-200 dark:bg-slate-700 rounded" />
+        <div className="h-4 w-24 bg-slate-200 dark:bg-slate-700 rounded" />
+      </div>
+      <div className="flex gap-2">
+        <div className="h-9 flex-1 bg-slate-200 dark:bg-slate-700 rounded-lg" />
+        <div className="h-9 flex-1 bg-slate-200 dark:bg-slate-700 rounded-lg" />
+        <div className="h-9 flex-1 bg-slate-200 dark:bg-slate-700 rounded-lg" />
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Single match card
+// ---------------------------------------------------------------------------
+function MatchCard({ match }: { match: EnrichedMatch }) {
   const navigate = useNavigate();
   const { betSlip, addToBetSlip, showToast } = useAppStore();
-  const [activeFilter, setActiveFilter] = useState('all');
-  const [liveMatches, setLiveMatches] = useState(matches.filter((m) => m.status === 'live'));
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setLiveMatches((prev) =>
-        prev.map((m) => ({
-          ...m,
-          minute: Math.min((m.minute || 0) + 1, 90),
-          homeScore: m.homeScore ?? 0,
-          awayScore: m.awayScore ?? 0,
-        }))
-      );
-    }, 60000);
-    return () => clearInterval(interval);
-  }, []);
+  const isSelected = (market: string, selection: string) =>
+    betSlip.some(
+      (s) => s.matchId === match.id && s.market === market && s.selection === selection,
+    );
 
-  const isSelected = (matchId: string, market: string, selection: string) =>
-    betSlip.some((s) => s.matchId === matchId && s.market === market && s.selection === selection);
-
-  const handleOddClick = (e: React.MouseEvent, matchId: string, matchName: string, market: string, selection: string, odd: number) => {
+  const handleOddClick = (
+    e: React.MouseEvent,
+    market: string,
+    selection: string,
+    odd: number,
+  ) => {
     e.stopPropagation();
-    addToBetSlip({ matchId, matchName, market, selection, odd });
+    addToBetSlip({
+      matchId: match.id,
+      matchName: `${match.homeTeam} vs ${match.awayTeam}`,
+      market,
+      selection,
+      odd,
+    });
     showToast('Added to bet slip', 'success');
   };
 
+  const odds = match.oddsMap;
+
+  return (
+    <div
+      onClick={() => navigate(`/match/${match.id}`)}
+      className="p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-100 dark:border-slate-800 last:border-b-0"
+    >
+      {/* League + minute row */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 min-w-0">
+          {match.leagueLogo ? (
+            <img
+              src={match.leagueLogo}
+              alt={match.league ?? ''}
+              className="w-4 h-4 object-contain shrink-0"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : (
+            <SportsSoccerIcon className="text-slate-400" sx={{ fontSize: 14 }} />
+          )}
+          <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
+            {match.league ?? 'Football'}
+          </span>
+        </div>
+        <span className="flex items-center gap-1 text-xs text-green-500 font-semibold shrink-0">
+          <FiberManualRecordIcon sx={{ fontSize: 8 }} className="animate-pulse" />
+          {formatMinute(match)}
+        </span>
+      </div>
+
+      {/* Teams + score */}
+      <div className="flex items-center justify-between mb-4 gap-2">
+        {/* Home */}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {match.homeLogo && (
+            <img
+              src={match.homeLogo}
+              alt={match.homeTeam}
+              className="w-6 h-6 object-contain shrink-0"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            />
+          )}
+          <span className="font-semibold text-slate-900 dark:text-slate-100 truncate text-sm">
+            {match.homeTeam}
+          </span>
+        </div>
+
+        {/* Score */}
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="font-heading text-2xl font-bold text-primary tabular-nums">
+            {match.scoreHome ?? 0}
+          </span>
+          <span className="font-heading text-xl font-bold text-slate-400 mx-0.5">-</span>
+          <span className="font-heading text-2xl font-bold text-primary tabular-nums">
+            {match.scoreAway ?? 0}
+          </span>
+        </div>
+
+        {/* Away */}
+        <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
+          <span className="font-semibold text-slate-900 dark:text-slate-100 truncate text-sm text-right">
+            {match.awayTeam}
+          </span>
+          {match.awayLogo && (
+            <img
+              src={match.awayLogo}
+              alt={match.awayTeam}
+              className="w-6 h-6 object-contain shrink-0"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Odds buttons */}
+      {odds ? (
+        <div className="grid grid-cols-3 gap-1.5" onClick={(e) => e.stopPropagation()}>
+          {(['1', 'X', '2'] as const).map((sel, i) => {
+            const odd = [odds.home, odds.draw, odds.away][i];
+            const selected = isSelected('1X2', sel);
+            return (
+              <button
+                key={sel}
+                onClick={(e) => handleOddClick(e, '1X2', sel, odd)}
+                className={`flex flex-col items-center py-1.5 px-2 rounded border text-xs font-semibold transition-colors
+                  ${selected
+                    ? 'bg-primary text-white border-primary'
+                    : 'bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:border-primary hover:text-primary'
+                  }`}
+              >
+                <span className="text-[10px] font-normal text-slate-500 dark:text-slate-400 mb-0.5">
+                  {sel === 'X' ? 'Draw' : sel === '1' ? '1 (Home)' : '2 (Away)'}
+                </span>
+                <span className="tabular-nums">{odd > 0 ? odd.toFixed(2) : '—'}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-10 rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center"
+            >
+              <span className="text-xs text-slate-400">—</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Page
+// ---------------------------------------------------------------------------
+export default function LiveMatchesPage() {
+  const [allMatches, setAllMatches]     = useState<EnrichedMatch[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState<string | null>(null);
+  const [refreshing, setRefreshing]     = useState(false);
+  const [lastUpdated, setLastUpdated]   = useState<Date | null>(null);
+  const [teamFilter, setTeamFilter]     = useState('');
+  const genRef = useRef(0);
+
+  // ── Fetch ─────────────────────────────────────────────────────────────────
+  const fetchLive = useCallback(async (silent = false) => {
+    const myGen = ++genRef.current;
+    const alive = () => myGen === genRef.current;
+
+    if (!silent) setLoading(true);
+    else setRefreshing(true);
+    setError(null);
+
+    try {
+      // Try authenticated endpoint first, fall back to public
+      let raw: Match[] = [];
+      try {
+        const res = await matchesApi.live();
+        raw = Array.isArray(res.data) ? res.data : [];
+      } catch {
+        const res = await publicMatches.live() as unknown as { data?: Match[] } | Match[];
+        raw = Array.isArray(res)
+          ? (res as Match[])
+          : Array.isArray((res as { data?: Match[] }).data)
+            ? (res as { data: Match[] }).data
+            : [];
+      }
+
+      if (!alive()) return;
+
+      // Fetch odds per match in parallel (best-effort)
+      const enriched: EnrichedMatch[] = await Promise.all(
+        raw.map(async (m) => {
+          try {
+            let oddsRaw: unknown[] = [];
+            try {
+              const oddsRes = await matchesApi.odds(m.id);
+              oddsRaw = Array.isArray(oddsRes.data) ? oddsRes.data : [];
+            } catch {
+              const oddsRes = await publicMatches.odds(m.id) as unknown as { data?: unknown[] } | unknown[];
+              oddsRaw = Array.isArray(oddsRes)
+                ? (oddsRes as unknown[])
+                : Array.isArray((oddsRes as { data?: unknown[] }).data)
+                  ? (oddsRes as { data: unknown[] }).data
+                  : [];
+            }
+            const oddsMap = extractOddsMap(oddsRaw, m.homeTeam ?? '', m.awayTeam ?? '');
+            return { ...m, oddsMap };
+          } catch {
+            return { ...m, oddsMap: undefined };
+          }
+        }),
+      );
+
+      // Deduplicate by id
+      const seen = new Set<string>();
+      const deduped = enriched.filter((m) => {
+        if (seen.has(m.id)) return false;
+        seen.add(m.id);
+        return true;
+      });
+
+      // Only keep genuinely live matches
+      const live = deduped.filter((m) => LIVE_STATUSES.has(m.status ?? ''));
+
+      if (alive()) {
+        setAllMatches(live);
+        setLastUpdated(new Date());
+      }
+    } catch (err: unknown) {
+      if (alive())
+        setError(err instanceof Error ? err.message : 'Failed to load live matches');
+    } finally {
+      if (alive()) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => { fetchLive(); }, [fetchLive]);
+
+  // Auto-refresh every 60 s (only when tab is visible)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') fetchLive(true);
+    }, 60_000);
+    return () => { genRef.current++; clearInterval(interval); };
+  }, [fetchLive]);
+
+  // ── Filter + group ────────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    if (!teamFilter.trim()) return allMatches;
+    const lower = teamFilter.toLowerCase();
+    return allMatches.filter(
+      (m) =>
+        (m.homeTeam ?? '').toLowerCase().includes(lower) ||
+        (m.awayTeam ?? '').toLowerCase().includes(lower),
+    );
+  }, [allMatches, teamFilter]);
+
+  const grouped   = useMemo(() => groupByLeague(filtered), [filtered]);
+  const leagueKeys = useMemo(() => [...grouped.keys()].sort(), [grouped]);
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-4xl mx-auto p-4">
-      <div className="flex items-center gap-3 mb-6">
+
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-4">
         <LiveTvIcon className="text-green-500" fontSize="large" />
         <h1 className="font-heading text-2xl font-bold">Live Now</h1>
-        <span className="badge-green">{liveMatches.length} events</span>
-      </div>
 
-      <div className="flex gap-2 mb-4 overflow-x-auto scrollbar-hide">
-        {filterTabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveFilter(tab.key)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-              activeFilter === tab.key
-                ? 'bg-primary text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="space-y-3">
-        {liveMatches.map((match) => (
-          <div
-            key={match.id}
-            onClick={() => navigate(`/match/${match.id}`)}
-            className="card p-4 cursor-pointer hover:shadow-md transition-shadow"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs text-slate-500 dark:text-slate-400">{match.leagueFlag} {match.league}</span>
-              <span className="flex items-center gap-1 text-xs text-green-500 font-semibold">
-                <FiberManualRecordIcon sx={{ fontSize: 8 }} className="animate-pulse-green" />
-                {match.minute}'
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between mb-3">
-              <span className="font-semibold text-slate-900 dark:text-slate-100">{match.homeTeam}</span>
-              <span className="font-heading text-2xl font-bold text-primary">
-                {match.homeScore} - {match.awayScore}
-              </span>
-              <span className="font-semibold text-slate-900 dark:text-slate-100">{match.awayTeam}</span>
-            </div>
-
-            <div className="flex gap-2 justify-center">
-              <button
-                onClick={(e) => handleOddClick(e, match.id, `${match.homeTeam} vs ${match.awayTeam}`, '1X2', '1', match.odds.home)}
-                className={`odd-btn ${isSelected(match.id, '1X2', '1') ? 'odd-btn-selected' : ''}`}
-              >
-                1 {match.odds.home.toFixed(2)}
-              </button>
-              <button
-                onClick={(e) => handleOddClick(e, match.id, `${match.homeTeam} vs ${match.awayTeam}`, '1X2', 'X', match.odds.draw)}
-                className={`odd-btn ${isSelected(match.id, '1X2', 'X') ? 'odd-btn-selected' : ''}`}
-              >
-                X {match.odds.draw.toFixed(2)}
-              </button>
-              <button
-                onClick={(e) => handleOddClick(e, match.id, `${match.homeTeam} vs ${match.awayTeam}`, '1X2', '2', match.odds.away)}
-                className={`odd-btn ${isSelected(match.id, '1X2', '2') ? 'odd-btn-selected' : ''}`}
-              >
-                2 {match.odds.away.toFixed(2)}
-              </button>
-            </div>
-          </div>
-        ))}
-
-        {liveMatches.length === 0 && (
-          <div className="text-center py-12 text-slate-400">
-            <LiveTvIcon fontSize="large" className="mx-auto mb-2" />
-            <p>No live matches right now</p>
-            <p className="text-sm mt-1">Check back soon!</p>
-          </div>
+        {!loading && (
+          <span className="badge-green">{filtered.length} events</span>
         )}
+
+        <div className="ml-auto flex items-center gap-3">
+          {lastUpdated && (
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 hidden sm:block">
+              Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+          <button
+            onClick={() => fetchLive(true)}
+            disabled={refreshing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+          >
+            <RefreshIcon fontSize="small" className={refreshing ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {/* Search */}
+      <div className="mb-4">
+        <div className="relative">
+          <SearchIcon
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            sx={{ fontSize: 18 }}
+          />
+          <input
+            type="text"
+            placeholder="Search team..."
+            value={teamFilter}
+            onChange={(e) => setTeamFilter(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+      </div>
+
+      {/* Loading skeletons */}
+      {loading && (
+        <div className="card overflow-hidden">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <MatchSkeleton key={i} />
+          ))}
+        </div>
+      )}
+
+      {/* Error state */}
+      {!loading && error && (
+        <div className="text-center py-16">
+          <LiveTvIcon
+            fontSize="large"
+            className="mx-auto mb-3 text-slate-300 dark:text-slate-600"
+          />
+          <p className="font-semibold text-slate-600 dark:text-slate-400 mb-1">
+            Failed to load live matches
+          </p>
+          <p className="text-sm text-slate-400 dark:text-slate-500 mb-4">{error}</p>
+          <button
+            onClick={() => fetchLive()}
+            className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && !error && filtered.length === 0 && (
+        <div className="text-center py-16 text-slate-400">
+          <LiveTvIcon fontSize="large" className="mx-auto mb-3" />
+          <p className="font-semibold">
+            {teamFilter
+              ? `No live matches for "${teamFilter}"`
+              : 'No live matches right now'}
+          </p>
+          <p className="text-sm mt-1">Check back soon — we refresh every minute.</p>
+        </div>
+      )}
+
+      {/* Matches grouped by league */}
+      {!loading && !error && leagueKeys.length > 0 && (
+        <div className="space-y-4">
+          {leagueKeys.map((league) => {
+            const lm = grouped.get(league)!;
+            return (
+              <div key={league} className="card overflow-hidden">
+                {/* League header */}
+                <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
+                  {lm[0]?.leagueLogo ? (
+                    <img
+                      src={lm[0].leagueLogo}
+                      alt={league}
+                      className="w-4 h-4 object-contain"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <SportsSoccerIcon className="text-slate-400" sx={{ fontSize: 14 }} />
+                  )}
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+                    {league}
+                  </span>
+                  <span className="flex items-center gap-1 text-xs text-green-500 font-semibold ml-1">
+                    <FiberManualRecordIcon sx={{ fontSize: 7 }} className="animate-pulse" />
+                    {lm.length} live
+                  </span>
+                  <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700 ml-2" />
+                </div>
+
+                {/* Match rows */}
+                {lm.map((match) => (
+                  <MatchCard key={match.id} match={match} />
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
     </div>
   );
 }
