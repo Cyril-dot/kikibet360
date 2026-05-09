@@ -14,8 +14,8 @@ export default function Layout() {
         <Header />
         <div className="flex max-w-[1440px] mx-auto w-full">
           <Sidebar />
-          {/* pb-20 clears the 64px BottomNav on mobile; lg:pb-4 restores normal padding on desktop */}
-          <main className="flex-1 min-w-0 min-h-[calc(100vh-4rem)] pb-20 lg:pb-4">
+          {/* pb-32 + mb-16 on mobile = padding inside + margin outside the main, well clear of 64px BottomNav */}
+          <main className="flex-1 min-w-0 min-h-[calc(100vh-4rem)] pb-32 mb-16 lg:pb-6 lg:mb-0">
             <Outlet />
           </main>
         </div>
