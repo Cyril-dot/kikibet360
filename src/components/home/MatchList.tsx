@@ -75,7 +75,7 @@ function finishedLabel(status?: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// League definitions
+// League definitions — Top 6
 // ---------------------------------------------------------------------------
 const TOP_6_LEAGUES = [
   { label: 'Premier League',   shortLabel: 'EPL'  },
@@ -88,6 +88,204 @@ const TOP_6_LEAGUES = [
 
 const TOP_6_LABELS = new Set<string>(TOP_6_LEAGUES.map((l) => l.label));
 
+// ---------------------------------------------------------------------------
+// Cup competitions — displayed as "Other Cups"
+// ---------------------------------------------------------------------------
+const CUPS_LABELS = new Set<string>([
+  // UEFA
+  'Europa League',
+  'UEFA Europa League',
+  'Conference League',
+  'UEFA Conference League',
+  'UEFA Super Cup',
+  // English
+  'FA Cup',
+  'Carabao Cup',
+  'EFL Cup',
+  'Community Shield',
+  'FA Trophy',
+  // Spanish
+  'Copa del Rey',
+  'Supercopa de España',
+  // German
+  'DFB Pokal',
+  'DFB-Pokal',
+  // Italian
+  'Coppa Italia',
+  'Supercoppa Italiana',
+  // French
+  'Coupe de France',
+  'Trophée des Champions',
+  // South American
+  'Copa Libertadores',
+  'CONMEBOL Libertadores',
+  'Copa Sudamericana',
+  'CONMEBOL Sudamericana',
+  'Recopa Sudamericana',
+  // African
+  'CAF Champions League',
+  'CAF Confederation Cup',
+  'CAF Super Cup',
+  'AFCON',
+  'Africa Cup of Nations',
+  'CHAN',
+  'WAFU Cup',
+  // Asian
+  'AFC Champions League',
+  'AFC Cup',
+  // North/Central American
+  'CONCACAF Champions League',
+  'CONCACAF League',
+  'Gold Cup',
+  // Scottish
+  'Scottish Cup',
+  'Scottish League Cup',
+  // Portuguese
+  'Taça de Portugal',
+  // Dutch
+  'KNVB Cup',
+  // Turkish
+  'Turkish Cup',
+  // Belgian
+  'Belgian Cup',
+  // Global
+  'FIFA Club World Cup',
+  'FIFA World Cup',
+  'UEFA Nations League',
+  'CONMEBOL–UEFA Cup of Champions',
+]);
+
+// ---------------------------------------------------------------------------
+// Other recognised leagues — displayed as "Other Leagues"
+// ---------------------------------------------------------------------------
+const OTHER_LEAGUE_LABELS = new Set<string>([
+  // Europe — second tier English
+  'Championship',
+  'EFL Championship',
+  'League One',
+  'League Two',
+  // Netherlands
+  'Eredivisie',
+  'Eerste Divisie',
+  // Portugal
+  'Primeira Liga',
+  'Liga Portugal',
+  'Liga NOS',
+  // Scotland
+  'Scottish Premiership',
+  'Scottish Premier League',
+  // Turkey
+  'Süper Lig',
+  'Super Lig',
+  'Turkish Super Lig',
+  // Belgium
+  'Belgian Pro League',
+  'First Division A',
+  'Jupiler Pro League',
+  // Greece
+  'Super League Greece',
+  'Greek Super League',
+  // Russia
+  'Russian Premier League',
+  'RPL',
+  // Ukraine
+  'Ukrainian Premier League',
+  'UPL',
+  // Denmark
+  'Danish Superliga',
+  'Superliga',
+  // Norway
+  'Eliteserien',
+  'Norwegian Eliteserien',
+  // Sweden
+  'Allsvenskan',
+  'Swedish Allsvenskan',
+  // Switzerland
+  'Swiss Super League',
+  'Super League Switzerland',
+  // Austria
+  'Austrian Bundesliga',
+  'Austrian Football Bundesliga',
+  // Czech Republic
+  'Czech First League',
+  'Czech Liga',
+  // Romania
+  'Romanian Liga 1',
+  'Liga 1 Romania',
+  // Poland
+  'Ekstraklasa',
+  'Polish Ekstraklasa',
+  // Hungary
+  'OTP Bank Liga',
+  'Hungarian Liga',
+  // Serbia
+  'Serbian SuperLiga',
+  // Croatia
+  'Croatian SuperSport HNL',
+  // Israel
+  'Israeli Premier League',
+  // Americas
+  'MLS',
+  'Major League Soccer',
+  'Liga MX',
+  'Mexican Liga MX',
+  'Argentine Liga Profesional',
+  'Primera División Argentina',
+  'Argentine Primera División',
+  'Brazilian Série A',
+  'Brasileirão',
+  'Série A Brazil',
+  'Brazilian Série B',
+  'Chilean Primera División',
+  'Colombian Primera A',
+  'Uruguayan Primera División',
+  'Ecuadorian Serie A',
+  'Peruvian Primera División',
+  // Middle East
+  'Saudi Pro League',
+  'Saudi Professional League',
+  'Saudi Arabia Pro League',
+  'UAE Pro League',
+  'Qatar Stars League',
+  // Asia
+  'J1 League',
+  'J-League',
+  'Japanese J1 League',
+  'K League 1',
+  'Korean K League 1',
+  'Chinese Super League',
+  'CSL',
+  'Indian Super League',
+  'ISL',
+  'A-League',
+  'Australian A-League',
+  // Africa
+  'Ghana Premier League',
+  'GPL',
+  'Nigeria Professional Football League',
+  'NPFL',
+  'Egyptian Premier League',
+  'CAF',
+  'South African PSL',
+  'Premier Soccer League',
+  'Kenyan Premier League',
+  'Botswana Premier League',
+  'Zambia Super League',
+  'Tanzanian Premier League',
+  'Ugandan Premier League',
+  'Rwandan Premier League',
+  'Ethiopian Premier League',
+  'Algerian Ligue Professionnelle 1',
+  'Moroccan Botola Pro',
+  'Tunisian Ligue Professionnelle 1',
+  'Senegalese Ligue 1',
+  'Ivorian Ligue 1',
+  'Cameroonian MTN Elite One',
+]);
+
+// ---------------------------------------------------------------------------
+// Top-6 team sets
+// ---------------------------------------------------------------------------
 const PREMIER_LEAGUE_TEAMS = new Set([
   'Arsenal', 'Aston Villa', 'Bournemouth', 'Brentford', 'Brighton',
   'Brighton & Hove Albion', 'Chelsea', 'Crystal Palace', 'Everton', 'Fulham',
@@ -141,15 +339,200 @@ const CHAMPIONS_LEAGUE_TEAMS = new Set([
   ...LIGUE_1_TEAMS,
 ]);
 
+// ---------------------------------------------------------------------------
+// Other league team sets (used for verification)
+// ---------------------------------------------------------------------------
+const EREDIVISIE_TEAMS = new Set([
+  'Ajax', 'PSV', 'PSV Eindhoven', 'Feyenoord', 'AZ', 'AZ Alkmaar',
+  'Utrecht', 'FC Utrecht', 'Twente', 'FC Twente', 'Heerenveen',
+  'SC Heerenveen', 'Sparta Rotterdam', 'NEC Nijmegen', 'RKC Waalwijk',
+  'Fortuna Sittard', 'Almere City', 'Go Ahead Eagles', 'Heracles',
+  'Willem II', 'NAC Breda', 'PEC Zwolle',
+]);
+
+const PRIMEIRA_LIGA_TEAMS = new Set([
+  'Benfica', 'Porto', 'FC Porto', 'Sporting CP', 'Sporting',
+  'Braga', 'SC Braga', 'Vitoria Guimaraes', 'Guimaraes',
+  'Rio Ave', 'Boavista', 'Famalicao', 'Moreirense', 'Arouca',
+  'Casa Pia', 'Chaves', 'Estrela Amadora', 'Farense', 'Gil Vicente',
+  'Vizela', 'AVS', 'Nacional',
+]);
+
+const CHAMPIONSHIP_TEAMS = new Set([
+  'Leeds United', 'Sheffield United', 'Burnley', 'Middlesbrough',
+  'Sunderland', 'West Bromwich Albion', 'WBA', 'Coventry City',
+  'Watford', 'Norwich City', 'Stoke City', 'Hull City',
+  'Millwall', 'Preston North End', 'Swansea City', 'Bristol City',
+  'Cardiff City', 'Luton Town', 'QPR', 'Queens Park Rangers',
+  'Plymouth Argyle', 'Oxford United', 'Derby County', 'Portsmouth',
+]);
+
+const SCOTTISH_PREM_TEAMS = new Set([
+  'Celtic', 'Rangers', 'Hearts', 'Hibernian', 'Aberdeen',
+  'Dundee United', 'Dundee', 'Kilmarnock', 'Motherwell', 'St Mirren',
+  'St Johnstone', 'Ross County', 'Livingston', 'Hamilton',
+]);
+
+const SUPER_LIG_TEAMS = new Set([
+  'Galatasaray', 'Fenerbahce', 'Besiktas', 'Trabzonspor',
+  'Basaksehir', 'Istanbul Basaksehir', 'Sivasspor', 'Konyaspor',
+  'Alanyaspor', 'Kasimpasa', 'Rizespor', 'Kayserispor',
+  'Antalyaspor', 'Gaziantep FK', 'Hatayspor', 'Samsunspor',
+  'Adana Demirspor', 'Ankaragücü',
+]);
+
+const BELGIAN_PRO_TEAMS = new Set([
+  'Club Brugge', 'Anderlecht', 'RSC Anderlecht', 'Gent', 'KAA Gent',
+  'Standard Liège', 'Standard', 'Antwerp', 'Royal Antwerp',
+  'Genk', 'Racing Genk', 'Union Saint-Gilloise', 'Cercle Brugge',
+  'Mechelen', 'KV Mechelen', 'Westerlo', 'Kortrijk', 'Sint-Truiden',
+  'Charleroi', 'Sporting Charleroi',
+]);
+
+const MLS_TEAMS = new Set([
+  'LA Galaxy', 'LAFC', 'Los Angeles FC', 'Inter Miami', 'Inter Miami CF',
+  'Seattle Sounders', 'Portland Timbers', 'Atlanta United',
+  'New York City FC', 'NYCFC', 'New York Red Bulls', 'Red Bulls',
+  'Toronto FC', 'CF Montréal', 'Columbus Crew', 'Chicago Fire',
+  'FC Dallas', 'Sporting Kansas City', 'Real Salt Lake',
+  'Colorado Rapids', 'San Jose Earthquakes', 'Minnesota United',
+  'Orlando City', 'DC United', 'Philadelphia Union',
+  'New England Revolution', 'Nashville SC', 'Charlotte FC',
+  'Austin FC', 'St. Louis City SC', 'St Louis City',
+]);
+
+const SAUDI_PRO_TEAMS = new Set([
+  'Al-Hilal', 'Al Hilal', 'Al-Nassr', 'Al Nassr', 'Al-Ittihad', 'Al Ittihad',
+  'Al-Ahli', 'Al Ahli', 'Al-Shabab', 'Al Shabab', 'Al-Qadsiah',
+  'Al-Fayha', 'Al-Fateh', 'Al-Khaleej', 'Al-Riyadh', 'Al-Ettifaq',
+  'Al-Okhdood', 'Al-Taawoun', 'Al-Wehda', 'Damac FC',
+]);
+
+const LIGA_MX_TEAMS = new Set([
+  'Club América', 'America', 'Chivas', 'Guadalajara', 'Cruz Azul',
+  'Tigres UANL', 'Tigres', 'Monterrey', 'CF Monterrey',
+  'Pumas UNAM', 'Pumas', 'León', 'Atlas', 'Toluca',
+  'Santos Laguna', 'Pachuca', 'Necaxa', 'Querétaro', 'Mazatlán',
+  'San Luis', 'Atlético San Luis', 'Juárez', 'FC Juárez',
+  'Tijuana', 'Club Tijuana', 'Puebla', 'Xolos',
+]);
+
+const BRASILEIRAO_TEAMS = new Set([
+  'Flamengo', 'CR Flamengo', 'Palmeiras', 'SE Palmeiras',
+  'Atletico Mineiro', 'Atlético-MG', 'Fluminense', 'Botafogo',
+  'Internacional', 'Grêmio', 'São Paulo', 'Santos',
+  'Vasco da Gama', 'Vasco', 'Corinthians', 'Cruzeiro',
+  'Bahia', 'Fortaleza', 'RB Bragantino', 'Athletico Paranaense',
+  'Athletico-PR', 'Cuiabá', 'Goiás', 'Coritiba', 'América-MG',
+]);
+
+const ARGENTINA_TEAMS = new Set([
+  'River Plate', 'Boca Juniors', 'Racing Club', 'Independiente',
+  'San Lorenzo', 'Estudiantes', 'Vélez Sársfield', 'Talleres',
+  'Atletico Tucumán', 'Newell\'s Old Boys', 'Rosario Central',
+  'Lanús', 'Defensa y Justicia', 'Huracán', 'Argentinos Juniors',
+  'Banfield', 'Godoy Cruz', 'Tigre', 'Platense', 'Instituto',
+]);
+
+const J1_LEAGUE_TEAMS = new Set([
+  'Vissel Kobe', 'Gamba Osaka', 'Cerezo Osaka', 'Kashima Antlers',
+  'Kashiwa Reysol', 'Urawa Red Diamonds', 'Urawa Reds',
+  'FC Tokyo', 'Yokohama F. Marinos', 'Yokohama Marinos',
+  'Nagoya Grampus', 'Sanfrecce Hiroshima', 'Sagan Tosu',
+  'Avispa Fukuoka', 'Shonan Bellmare', 'Albirex Niigata',
+  'Kyoto Sanga', 'Consadole Sapporo',
+]);
+
+const GHANA_PREMIER_TEAMS = new Set([
+  'Accra Hearts of Oak', 'Hearts of Oak', 'Asante Kotoko', 'Kotoko',
+  'Medeama SC', 'Medeama', 'Dreams FC', 'Bechem United',
+  'Aduana Stars', 'Aduana FC', 'Ashantigold SC', 'Ashantigold',
+  'King Faisal', 'Real Tamale United', 'RTU', 'Bibiani Gold Stars',
+  'Berekum Chelsea', 'Nations FC', 'Nsoatreman FC',
+  'Legon Cities', 'Karela United', 'FC Samartex', 'Samartex',
+  'Bofoakwa Tano', 'Heart of Lions',
+]);
+
+const EGYPT_PREMIER_TEAMS = new Set([
+  'Al Ahly', 'Zamalek', 'Pyramids FC', 'Pyramids',
+  'El Gouna FC', 'Misr Lel Maqasa', 'ENPPI', 'Smouha',
+  'Future FC', 'Al Masry', 'Ceramica Cleopatra', 'ZED FC',
+]);
+
+const NIGERIA_NPFL_TEAMS = new Set([
+  'Enyimba', 'Enyimba FC', 'Rivers United', 'Shooting Stars',
+  'Kano Pillars', 'Heartland FC', 'Sunshine Stars', 'Rangers International',
+  'Lobi Stars', 'Kwara United', 'Nasarawa United', 'Dakkada FC',
+  'Plateau United', 'Wikki Tourists',
+]);
+
+const K_LEAGUE_TEAMS = new Set([
+  'Jeonbuk Hyundai Motors', 'Jeonbuk', 'Ulsan Hyundai', 'Ulsan',
+  'FC Seoul', 'Suwon Samsung Bluewings', 'Suwon Bluewings',
+  'Pohang Steelers', 'Pohang', 'Incheon United',
+  'Seongnam FC', 'Jeju United', 'Daegu FC', 'Gangwon FC',
+  'Gimcheon Sangmu', 'Suwon FC',
+]);
+
+const CSL_TEAMS = new Set([
+  'Shanghai Port', 'Shanghai SIPG', 'Shandong Taishan', 'Shandong',
+  'Guangzhou FC', 'Guangzhou Evergrande', 'Beijing Guoan',
+  'Wuhan Three Towns', 'Zhejiang FC', 'Chengdu Rongcheng',
+  'Tianjin Jinmen Tiger', 'Cangzhou Mighty Lions',
+]);
+
 const LEAGUE_TEAM_MAP: Record<string, Set<string>> = {
-  'Premier League':   PREMIER_LEAGUE_TEAMS,
-  'La Liga':          LA_LIGA_TEAMS,
-  'Bundesliga':       BUNDESLIGA_TEAMS,
-  'Serie A':          SERIE_A_TEAMS,
-  'Ligue 1':          LIGUE_1_TEAMS,
-  'Champions League': CHAMPIONS_LEAGUE_TEAMS,
+  'Premier League':            PREMIER_LEAGUE_TEAMS,
+  'La Liga':                   LA_LIGA_TEAMS,
+  'Bundesliga':                BUNDESLIGA_TEAMS,
+  'Serie A':                   SERIE_A_TEAMS,
+  'Ligue 1':                   LIGUE_1_TEAMS,
+  'Champions League':          CHAMPIONS_LEAGUE_TEAMS,
+  // Other leagues
+  'Eredivisie':                EREDIVISIE_TEAMS,
+  'Eerste Divisie':            EREDIVISIE_TEAMS,
+  'Primeira Liga':             PRIMEIRA_LIGA_TEAMS,
+  'Liga Portugal':             PRIMEIRA_LIGA_TEAMS,
+  'Liga NOS':                  PRIMEIRA_LIGA_TEAMS,
+  'Championship':              CHAMPIONSHIP_TEAMS,
+  'EFL Championship':          CHAMPIONSHIP_TEAMS,
+  'Scottish Premiership':      SCOTTISH_PREM_TEAMS,
+  'Scottish Premier League':   SCOTTISH_PREM_TEAMS,
+  'Süper Lig':                 SUPER_LIG_TEAMS,
+  'Super Lig':                 SUPER_LIG_TEAMS,
+  'Turkish Super Lig':         SUPER_LIG_TEAMS,
+  'Belgian Pro League':        BELGIAN_PRO_TEAMS,
+  'Jupiler Pro League':        BELGIAN_PRO_TEAMS,
+  'First Division A':          BELGIAN_PRO_TEAMS,
+  'MLS':                       MLS_TEAMS,
+  'Major League Soccer':       MLS_TEAMS,
+  'Saudi Pro League':          SAUDI_PRO_TEAMS,
+  'Saudi Professional League': SAUDI_PRO_TEAMS,
+  'Liga MX':                   LIGA_MX_TEAMS,
+  'Mexican Liga MX':           LIGA_MX_TEAMS,
+  'Brazilian Série A':         BRASILEIRAO_TEAMS,
+  'Brasileirão':               BRASILEIRAO_TEAMS,
+  'Série A Brazil':            BRASILEIRAO_TEAMS,
+  'Argentine Liga Profesional':       ARGENTINA_TEAMS,
+  'Primera División Argentina':       ARGENTINA_TEAMS,
+  'Argentine Primera División':       ARGENTINA_TEAMS,
+  'J1 League':                 J1_LEAGUE_TEAMS,
+  'J-League':                  J1_LEAGUE_TEAMS,
+  'Japanese J1 League':        J1_LEAGUE_TEAMS,
+  'K League 1':                K_LEAGUE_TEAMS,
+  'Korean K League 1':         K_LEAGUE_TEAMS,
+  'Chinese Super League':      CSL_TEAMS,
+  'CSL':                       CSL_TEAMS,
+  'Ghana Premier League':      GHANA_PREMIER_TEAMS,
+  'GPL':                       GHANA_PREMIER_TEAMS,
+  'Egyptian Premier League':   EGYPT_PREMIER_TEAMS,
+  'Nigeria Professional Football League': NIGERIA_NPFL_TEAMS,
+  'NPFL':                      NIGERIA_NPFL_TEAMS,
 };
 
+// ---------------------------------------------------------------------------
+// Classification helpers
+// ---------------------------------------------------------------------------
 function hasVerifiedTeam(m: EnrichedMatch, leagueLabel: string): boolean {
   const teamSet = LEAGUE_TEAM_MAP[leagueLabel];
   if (!teamSet) return true;
@@ -171,15 +554,37 @@ function isTop6Match(m: EnrichedMatch): boolean {
 
 function getDisplayLeagueName(m: EnrichedMatch): string {
   const league = m.league ?? 'Other';
-  if (!TOP_6_LABELS.has(league)) return league;
-  if (league === 'Champions League') return league;
-  if (hasVerifiedTeam(m, league)) return league;
-  return 'Other Leagues';
+
+  // Top-6 check
+  if (TOP_6_LABELS.has(league)) {
+    if (league === 'Champions League') return league;
+    if (hasVerifiedTeam(m, league)) return league;
+    // Team not verified for this top-6 league — fall through to others
+  }
+
+  // Cup competitions
+  if (CUPS_LABELS.has(league)) return league;
+
+  // Other recognised leagues
+  if (OTHER_LEAGUE_LABELS.has(league)) return league;
+
+  // Anything else
+  return 'Other';
 }
 
 function leagueSortKey(leagueName: string): string {
-  const idx = TOP_6_LEAGUES.findIndex((l) => l.label === leagueName);
-  return idx === -1 ? `z_${leagueName.toLowerCase()}` : `${String(idx).padStart(2, '0')}_${leagueName}`;
+  // Top-6 first
+  const top6Idx = TOP_6_LEAGUES.findIndex((l) => l.label === leagueName);
+  if (top6Idx !== -1) return `00_${String(top6Idx).padStart(2, '0')}_${leagueName}`;
+
+  // Cups next
+  if (CUPS_LABELS.has(leagueName)) return `01_${leagueName.toLowerCase()}`;
+
+  // Other recognised leagues
+  if (OTHER_LEAGUE_LABELS.has(leagueName)) return `02_${leagueName.toLowerCase()}`;
+
+  // Catch-all
+  return `99_${leagueName.toLowerCase()}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -455,9 +860,7 @@ function extractOddsMap(oddsArray: unknown[], homeTeam: string, awayTeam: string
 }
 
 // ---------------------------------------------------------------------------
-// FIX #5: Unwrap /with-all-odds response — now includes catch-all for any
-// array key not in the known categories list, so live data is never silently
-// dropped if the backend uses a different key name.
+// Unwrap /with-all-odds response
 // ---------------------------------------------------------------------------
 function unwrapResponse(raw: unknown): Array<{ match: Match; odds: unknown[] }> {
   if (!raw) return [];
@@ -466,7 +869,6 @@ function unwrapResponse(raw: unknown): Array<{ match: Match; odds: unknown[] }> 
   const data = obj.data as Record<string, unknown>;
   const allItems: Array<{ match: Match; odds: unknown[] }> = [];
 
-  // Known category keys — process these first
   const categories = ['future', 'live', 'results', 'today', 'upcoming'] as const;
   const consumed = new Set<string>();
 
@@ -488,14 +890,10 @@ function unwrapResponse(raw: unknown): Array<{ match: Match; odds: unknown[] }> 
     }
   }
 
-  // FIX #5: Catch-all — pick up any array under an unexpected key name.
-  // This prevents live matches from being silently dropped when the backend
-  // returns them under a key not in the known categories list above.
   for (const [key, val] of Object.entries(data)) {
     if (consumed.has(key) || !Array.isArray(val)) continue;
     for (const item of val as unknown[]) {
       const i = item as Record<string, unknown>;
-      // Some shapes inline the match directly; others nest it under "match"
       const match = (i.match ?? i) as Match;
       if (!match || !match.id) continue;
       const oddsArray: unknown[] = Array.isArray(i.match_result)
@@ -539,13 +937,17 @@ export default function MatchList() {
   const [activeLeague, setActiveLeague] = useState<string | null>(null);
   const [showFinished, setShowFinished] = useState(true);
   const genRef = useRef(0);
+  const initialLoadDone = useRef(false);
 
   useEffect(() => {
     const myGen = ++genRef.current;
     const alive = () => myGen === genRef.current;
 
-    async function load() {
-      setLoading(true);
+    async function load(isBackground = false) {
+      // Only show skeletons on the very first load
+      if (!isBackground && !initialLoadDone.current) {
+        setLoading(true);
+      }
       setError(null);
       try {
         const response = await publicMatches.withAllOdds();
@@ -564,26 +966,31 @@ export default function MatchList() {
           seen.add(m.id);
           return true;
         });
-        if (alive()) setAllMatches(deduped);
+        if (alive()) {
+          setAllMatches(deduped);
+          initialLoadDone.current = true;
+        }
       } catch (err) {
-        if (alive()) setError((err as Error).message ?? 'Failed to load matches');
+        // On background refresh, swallow the error silently so the
+        // existing data stays visible and the user isn't disturbed
+        if (alive() && !isBackground) {
+          setError((err as Error).message ?? 'Failed to load matches');
+        }
       } finally {
         if (alive()) setLoading(false);
       }
     }
 
-    load();
+    // First load — show skeletons
+    load(false);
 
-    // Poll every 30s when the tab is visible
+    // Subsequent refreshes — fully silent
     const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') load();
+      if (document.visibilityState === 'visible') load(true);
     }, 30_000);
 
-    // FIX #6: Force an immediate reload when the user returns to the tab.
-    // Without this, if the tab was hidden for >30s the data stays stale
-    // until the next interval fires — which could be another 30s away.
     const onVisible = () => {
-      if (document.visibilityState === 'visible') load();
+      if (document.visibilityState === 'visible') load(true);
     };
     document.addEventListener('visibilitychange', onVisible);
 
@@ -658,7 +1065,10 @@ export default function MatchList() {
   }
 
   function renderLeagueCard(league: string, lm: EnrichedMatch[], isUpcoming: boolean, isFinishedSection = false) {
-    const showLogo = TOP_6_LABELS.has(league) && league !== 'Other Leagues';
+    const isTop6 = TOP_6_LABELS.has(league);
+    const isCup  = CUPS_LABELS.has(league);
+    const showLogo = (isTop6 || isCup) && league !== 'Other' && league !== 'Other Leagues' && league !== 'Other Cups';
+
     return (
       <div key={league} className="card mb-2 overflow-hidden">
         <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
@@ -688,8 +1098,10 @@ export default function MatchList() {
   ) {
     if (matches.length === 0) return null;
 
-    const top6 = matches.filter(isTop6Match);
-    const others = matches.filter((m) => !isTop6Match(m));
+    // Split into top-6, cups, other leagues, and unknown
+    const top6    = matches.filter(isTop6Match);
+    const cups    = matches.filter((m) => !isTop6Match(m) && CUPS_LABELS.has(m.league ?? ''));
+    const others  = matches.filter((m) => !isTop6Match(m) && !CUPS_LABELS.has(m.league ?? ''));
 
     return (
       <section className="mb-6">
@@ -717,22 +1129,45 @@ export default function MatchList() {
 
         {isFinishedSection && !showFinished ? null : (
           <>
+            {/* Top-6 leagues */}
             {[...groupByLeague(top6).entries()].map(([league, lm]) =>
               renderLeagueCard(league, lm, isUpcoming, isFinishedSection)
             )}
 
-            {top6.length > 0 && others.length > 0 && (
-              <div className="flex items-center gap-2 my-3">
-                <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                  Other Leagues
-                </span>
-                <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
-              </div>
+            {/* Divider → Other Cups */}
+            {cups.length > 0 && (
+              <>
+                {top6.length > 0 && (
+                  <div className="flex items-center gap-2 my-3">
+                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                      Other Cups
+                    </span>
+                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+                  </div>
+                )}
+                {[...groupByLeague(cups).entries()].map(([league, lm]) =>
+                  renderLeagueCard(league, lm, isUpcoming, isFinishedSection)
+                )}
+              </>
             )}
 
-            {[...groupByLeague(others).entries()].map(([league, lm]) =>
-              renderLeagueCard(league, lm, isUpcoming, isFinishedSection)
+            {/* Divider → Other Leagues */}
+            {others.length > 0 && (
+              <>
+                {(top6.length > 0 || cups.length > 0) && (
+                  <div className="flex items-center gap-2 my-3">
+                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                      Other Leagues
+                    </span>
+                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+                  </div>
+                )}
+                {[...groupByLeague(others).entries()].map(([league, lm]) =>
+                  renderLeagueCard(league, lm, isUpcoming, isFinishedSection)
+                )}
+              </>
             )}
           </>
         )}

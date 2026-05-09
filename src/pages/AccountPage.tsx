@@ -27,7 +27,6 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import QrCodeIcon from '@mui/icons-material/QrCode';
-import PsychologyIcon from '@mui/icons-material/Psychology';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import ChatIcon from '@mui/icons-material/Chat';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -119,20 +118,18 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 // ---------------------------------------------------------------------------
 // Admin Upgrade Modal
 //
-// Behaviour:
-//   • Slides in LEFT → RIGHT using an inline @keyframes (no global CSS needed)
-//   • Panel is a full-height side drawer anchored to the left edge
-//   • flex flex-col layout: header (shrink-0) + scrollable body (flex-1 min-h-0
-//     overflow-y-auto) + footer (shrink-0) — footer never gets pushed off screen
-//   • On mobile: full-width. On sm+: capped at max-w-sm (384 px)
+// Mobile fix: uses 100dvh (dynamic viewport height) so the browser chrome
+// (address bar, home indicator) never clips the footer/payment button.
+// Falls back to 100vh for browsers that don't support dvh.
+// The panel is a flex column: header (shrink-0) + scrollable body (flex-1
+// overflow-y-auto) + footer (shrink-0) — footer is ALWAYS on screen.
 // ---------------------------------------------------------------------------
 const PERKS = [
-  { icon: <BarChartIcon sx={{ fontSize: 16 }} />,    label: 'Analytics Dashboard',   desc: 'Real-time revenue & user stats'       },
-  { icon: <PsychologyIcon sx={{ fontSize: 16 }} />,  label: 'AI Predictions Engine', desc: 'Generate & publish match insights'    },
-  { icon: <QrCodeIcon sx={{ fontSize: 16 }} />,      label: 'Booking Code Access',   desc: 'Create & manage booking codes'        },
-  { icon: <GroupAddIcon sx={{ fontSize: 16 }} />,    label: 'Affiliate Tools',       desc: 'Referral links & commission tracking' },
-  { icon: <PaymentsIcon sx={{ fontSize: 16 }} />,    label: 'Withdrawal Management', desc: 'Approve & reject user withdrawals'    },
-  { icon: <ChatIcon sx={{ fontSize: 16 }} />,        label: 'Upgrade Chat Support',  desc: 'Direct chat with super admins'        },
+  { icon: <BarChartIcon sx={{ fontSize: 16 }} />,   label: 'Analytics Dashboard',   desc: 'Real-time revenue & user stats'       },
+  { icon: <QrCodeIcon sx={{ fontSize: 16 }} />,     label: 'Booking Code Access',   desc: 'Create & manage booking codes'        },
+  { icon: <GroupAddIcon sx={{ fontSize: 16 }} />,   label: 'Affiliate Tools',       desc: 'Referral links & commission tracking' },
+  { icon: <PaymentsIcon sx={{ fontSize: 16 }} />,   label: 'Withdrawal Management', desc: 'Approve & reject user withdrawals'    },
+  { icon: <ChatIcon sx={{ fontSize: 16 }} />,       label: 'Upgrade Chat Support',  desc: 'Direct chat with super admins'        },
 ];
 
 function AdminUpgradeModal({ onClose }: { onClose: () => void }) {
@@ -159,38 +156,41 @@ function AdminUpgradeModal({ onClose }: { onClose: () => void }) {
     }
   };
 
+  // Dynamic viewport height: covers the real visible area on mobile browsers
+  // where 100vh overshoots due to the address bar / home indicator.
+  const dvhStyle: React.CSSProperties = {
+    height: '100dvh',
+  };
+
   return (
-    /*
-      BACKDROP
-      - fixed inset-0 covers the whole screen
-      - flex + justify-start pins the panel to the LEFT edge (not bottom/center)
-      - click on the dark area (e.currentTarget) → close
-    */
     <div
       className="fixed inset-0 z-50 flex items-stretch justify-start"
       style={{ backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
+      <style>{`
+        @keyframes adminPanelSlideIn {
+          from { transform: translateX(-100%); }
+          to   { transform: translateX(0); }
+        }
+        /* Ensure the panel never overflows on any mobile browser */
+        .admin-upgrade-panel {
+          height: 100vh;
+          height: 100dvh;
+        }
+      `}</style>
+
       {/*
         PANEL
-        Inline keyframe so zero global CSS is required.
-        Key layout rules:
-          flex flex-col          → stack header / body / footer vertically
-          h-full                 → fills full viewport height
-          overflow-hidden        → clip children (the inner scroll handles its own overflow)
-          w-full max-w-sm        → full-width on mobile, 384 px cap on sm+
+        - w-full on mobile, capped at max-w-sm (384px) on larger screens
+        - admin-upgrade-panel uses 100dvh with 100vh fallback (see style tag above)
+        - flex flex-col: header shrink-0 | body flex-1 overflow-y-auto | footer shrink-0
+        - overflow-hidden clips children; inner scroll area handles its own overflow
       */}
       <div
-        className="relative flex flex-col w-full max-w-sm h-full bg-white dark:bg-slate-900 shadow-2xl overflow-hidden"
+        className="admin-upgrade-panel relative flex flex-col w-full max-w-sm bg-white dark:bg-slate-900 shadow-2xl overflow-hidden"
         style={{ animation: 'adminPanelSlideIn 0.30s cubic-bezier(0.22, 1, 0.36, 1) both' }}
       >
-        <style>{`
-          @keyframes adminPanelSlideIn {
-            from { transform: translateX(-100%); }
-            to   { transform: translateX(0); }
-          }
-        `}</style>
-
         {/* Gradient accent bar */}
         <div className="h-1 w-full bg-gradient-to-r from-primary via-primary/70 to-emerald-400 shrink-0" />
 
@@ -212,7 +212,7 @@ function AdminUpgradeModal({ onClose }: { onClose: () => void }) {
         ) : step === 'overview' ? (
           /* ── OVERVIEW STEP ── */
           <>
-            {/* HEADER — shrink-0, never scrolls */}
+            {/* HEADER — never scrolls */}
             <div className="flex items-start justify-between px-5 pt-5 pb-3 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center shrink-0">
@@ -233,9 +233,10 @@ function AdminUpgradeModal({ onClose }: { onClose: () => void }) {
 
             {/*
               SCROLLABLE BODY
-              flex-1       → takes all remaining height between header and footer
-              min-h-0      → critical: allows flex child to shrink below its content size
-              overflow-y-auto → only this area scrolls; header and footer stay fixed
+              flex-1 + min-h-0 is the critical combo:
+                flex-1  → takes all space between header and footer
+                min-h-0 → allows shrinking below natural content height (flex default is min-h auto)
+              overflow-y-auto → only this div scrolls
             */}
             <div className="flex-1 min-h-0 overflow-y-auto px-5 py-2">
               {/* Hero banner */}
@@ -254,7 +255,7 @@ function AdminUpgradeModal({ onClose }: { onClose: () => void }) {
 
               {/* Perks list */}
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">Everything included</p>
-              <div className="space-y-2 pb-2">
+              <div className="space-y-2 pb-4">
                 {PERKS.map((perk) => (
                   <div key={perk.label} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
                     <div className="w-8 h-8 rounded-lg bg-primary/10 dark:bg-primary/20 flex items-center justify-center shrink-0 text-primary">{perk.icon}</div>
@@ -268,8 +269,14 @@ function AdminUpgradeModal({ onClose }: { onClose: () => void }) {
               </div>
             </div>
 
-            {/* FOOTER — shrink-0, always visible at bottom, never scrolls away */}
-            <div className="shrink-0 px-5 pt-3 pb-8 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+            {/*
+              FOOTER — shrink-0 keeps it pinned to the bottom.
+              pb-safe uses env(safe-area-inset-bottom) via Tailwind's safe area
+              utilities to clear the iPhone home indicator.
+            */}
+            <div className="shrink-0 px-5 pt-3 pb-6 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900"
+              style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
+            >
               <p className="text-[11px] text-slate-400 text-center mb-3 leading-relaxed">
                 A one-time upgrade fee applies. Payment processed securely via Paystack.
               </p>
@@ -322,7 +329,12 @@ function AdminUpgradeModal({ onClose }: { onClose: () => void }) {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  {['Full admin dashboard access', 'Manage all platform features', 'Affiliate commission earnings', 'Priority support via upgrade chat'].map(item => (
+                  {[
+                    'Full admin dashboard access',
+                    'Manage all platform features',
+                    'Affiliate commission earnings',
+                    'Priority support via upgrade chat',
+                  ].map(item => (
                     <div key={item} className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                       <CheckCircleIcon className="text-primary shrink-0" sx={{ fontSize: 14 }} />
                       <span className="text-xs">{item}</span>
@@ -340,8 +352,11 @@ function AdminUpgradeModal({ onClose }: { onClose: () => void }) {
               </div>
             </div>
 
-            {/* FOOTER */}
-            <div className="shrink-0 px-5 pt-3 pb-8 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+            {/* FOOTER — payment button always visible */}
+            <div
+              className="shrink-0 px-5 pt-3 pb-6 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900"
+              style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
+            >
               <button
                 onClick={handleUpgrade}
                 disabled={loading}
