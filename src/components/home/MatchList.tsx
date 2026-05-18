@@ -1153,13 +1153,8 @@ function SpecialGamesSection() {
 
     async function load() {
       try {
-     const raw = await fetch(
-  'https://poikiloblastic-leeanne-gazeless.ngrok-free.app/api/public/admin-matches',
-  {
-    headers: {
-      'ngrok-skip-browser-warning': 'true'
-    }
-  }
+const raw = await fetch(
+  'https://poikiloblastic-leeanne-gazeless.ngrok-free.app/api/public/admin-matches?ngrok-skip-browser-warning=true',
 ).then((r) => r.json());
 if (!alive()) return;
 

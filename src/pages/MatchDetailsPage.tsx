@@ -414,12 +414,7 @@ const ADMIN_ODDS_BASE = 'https://poikiloblastic-leeanne-gazeless.ngrok-free.dev'
 async function fetchAdminOddsRaw(id: string): Promise<unknown[]> {
   try {
     const raw = await fetch(
-      `${ADMIN_ODDS_BASE}/api/public/admin-matches/${id}/odds`,
-      {
-        headers: {
-          'ngrok-skip-browser-warning': 'true'
-        }
-      }
+      `${ADMIN_ODDS_BASE}/api/public/admin-matches/${id}/odds?ngrok-skip-browser-warning=true`
     ).then((r) => r.json());
     // Unwrap { success, data: [...] }
     if (raw && typeof raw === 'object' && Array.isArray((raw as Record<string, unknown>).data)) {

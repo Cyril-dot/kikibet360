@@ -4,7 +4,6 @@
 // =============================================================================
 
 const BASE_URL = "https://poikiloblastic-leeanne-gazeless.ngrok-free.dev";
-
 // ---------------------------------------------------------------------------
 // Types & Schemas
 // ---------------------------------------------------------------------------
@@ -655,12 +654,12 @@ async function request<T>(
     ...extraHeaders,
   };
 
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers,
-    credentials: "include",
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  const res = await fetch(`${BASE_URL}${path}${path.includes('?') ? '&' : '?'}ngrok-skip-browser-warning=true`, {
+  method,
+  headers,
+  credentials: "include",
+  body: body !== undefined ? JSON.stringify(body) : undefined,
+});
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ message: res.statusText }));
