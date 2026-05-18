@@ -1,9 +1,10 @@
 // =============================================================================
-// api.ts — Auto-generated API client from OpenAPI spec
-// Base URL: http://localhost:8080
+// api.ts — futball api
+// Base URL: https://futballbackend.onrender.com
 // =============================================================================
 
-const BASE_URL = "https://luminous-warmth-production.up.railway.app";
+const BASE_URL = "http://localhost:8080";
+
 // ---------------------------------------------------------------------------
 // Types & Schemas
 // ---------------------------------------------------------------------------
@@ -39,8 +40,41 @@ export type MatchSource =
   | "API_FOOTBALL"
   | "VIRTUAL"
   | "ADMIN_CREATED"
-  | "LIVESCORE";
+  | "LIVESCORE"
+  | "ESPN";
+export type SportEnum =
+  | "FOOTBALL"
+  | "BASKETBALL"
+  | "BASEBALL"
+  | "AMERICAN_FOOTBALL"
+  | "MMA"
+  | "TENNIS";
 export type BinanceDepositStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export type FootballLeague =
+  | "PREMIER_LEAGUE" | "LA_LIGA" | "BUNDESLIGA" | "SERIE_A" | "LIGUE_1"
+  | "CHAMPIONS_LEAGUE_GROUP" | "CHAMPIONSHIP" | "EREDIVISIE" | "PRIMEIRA_LIGA"
+  | "SCOTTISH_PREM" | "BELGIAN_PRO" | "TURKISH_SUPER" | "RUSSIAN_PREMIER"
+  | "GREEK_SUPER" | "UKRAINIAN_PREMIER" | "AUSTRIAN_BUNDESLIGA" | "SWISS_SUPER"
+  | "DANISH_SUPER" | "NORWEGIAN_ELITE" | "SWEDISH_ALLSVENSKAN" | "CZECH_FIRST"
+  | "POLISH_EKSTRA" | "ROMANIAN_LIGA1" | "CROATIAN_HNL" | "SERBIAN_SUPER"
+  | "ISRAELI_PREMIER" | "HUNGARIAN_LIGA" | "SLOVAK_SUPER" | "SLOVENIAN_PRVA"
+  | "BELARUSIAN_PREMIER" | "KAZAKH_PREMIER" | "FINNISH_VEIKKAUS"
+  | "SOUTH_AFRICAN_PREMIER" | "MOROCCAN_BOTOLA" | "EGYPTIAN_PREMIER"
+  | "NIGERIAN_PREMIER" | "GHANAIAN_PREMIER" | "SAUDI_PRO" | "UAE_PRO"
+  | "INDIAN_SUPER" | "J1_LEAGUE" | "K_LEAGUE_1" | "CHINESE_SUPER"
+  | "THAI_LEAGUE_1" | "MALAYSIAN_SUPER" | "INDONESIAN_LIGA1" | "IRANIAN_PGPL"
+  | "A_LEAGUE" | "MLS" | "LIGA_MX" | "BRAZILIAN_SERIE_A" | "ARGENTINE_PRIMERA"
+  | "COLOMBIAN_PRIMERA" | "CHILEAN_PRIMERA" | "PERUVIAN_LIGA1"
+  | "ECUADORIAN_SERIE_A" | "URUGUAYAN_PRIMERA" | "VENEZUELAN_PRIMERA"
+  | "BOLIVIAN_DFP" | "PARAGUAYAN_DP";
+
+export type FootballCup =
+  | "FA_CUP" | "EFL_CUP" | "COPA_DEL_REY" | "DFB_POKAL" | "COPPA_ITALIA"
+  | "COUPE_DE_FRANCE" | "CHAMPIONS_LEAGUE" | "EUROPA_LEAGUE"
+  | "CONFERENCE_LEAGUE" | "NATIONS_LEAGUE" | "EUROS" | "COPA_LIBERTADORES"
+  | "COPA_AMERICA" | "CONCACAF_CHAMPIONS" | "AFC_CHAMPIONS" | "CAF_CHAMPIONS"
+  | "AFCON" | "WORLD_CUP" | "WOMENS_WORLD_CUP" | "CLUB_WORLD_CUP";
 
 export interface GrantedAuthority {
   authority: string;
@@ -90,6 +124,61 @@ export interface UserDto {
   themePreference?: string;
 }
 
+export interface UserSummaryDto {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  country?: string;
+  role: string;
+  emailVerified?: boolean;
+  createdAt?: string;
+}
+
+export interface WalletSummaryDto {
+  walletId: string;
+  balance: number;
+  currency?: string;
+  totalTransactions?: number;
+  totalDeposited?: number;
+  totalWithdrawn?: number;
+}
+
+export interface UserDetailDto {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  country?: string;
+  role: string;
+  emailVerified?: boolean;
+  createdAt?: string;
+  wallet?: WalletSummaryDto;
+}
+
+export interface ReferralSummaryDto {
+  linkId?: string;
+  code?: string;
+  commissionPercent?: number;
+  totalReferrals?: number;
+  totalEarnings?: number;
+}
+
+export interface AdminDetailDto {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  country?: string;
+  emailVerified?: boolean;
+  createdAt?: string;
+  wallet?: WalletSummaryDto;
+  referral?: ReferralSummaryDto;
+}
+
 export interface AuthResponse {
   accessToken: string;
   tokenType: string;
@@ -100,6 +189,20 @@ export interface AuthResponse {
 export interface Transaction {
   id: string;
   walletId: string;
+  kind: TransactionKind;
+  amount: number;
+  balanceAfter: number;
+  providerRef?: string;
+  status?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface TransactionDto {
+  id: string;
+  walletId: string;
+  userId: string;
+  userEmail?: string;
   kind: TransactionKind;
   amount: number;
   balanceAfter: number;
@@ -211,6 +314,7 @@ export interface Match {
   externalId?: string;
   minutePlayed?: number;
   sport?: string;
+  sportEnum?: SportEnum;
   league?: string;
   homeTeam: string;
   awayTeam: string;
@@ -344,6 +448,17 @@ export interface ReferredUserDTO {
   lifetimeCommission?: number;
 }
 
+export interface RevenueOverviewDto {
+  totalDepositsAllTime: number;
+  totalDepositsThisMonth: number;
+  totalDepositsToday: number;
+  totalWithdrawalsAllTime: number;
+  totalWithdrawalsThisMonth: number;
+  totalDepositCount: number;
+  totalWithdrawalCount: number;
+  currency?: string;
+}
+
 // ── Binance / Crypto deposit ──────────────────────────────────────────────────
 
 export interface BinanceDeposit {
@@ -428,6 +543,7 @@ export interface PlaceBetRequest {
 
 export interface SelectionDto {
   matchId: string;
+  fixtureId?: string;
   market: string;
   selection: string;
   submittedOdds: number;
@@ -712,15 +828,11 @@ export const deposits = {
 
   // ── Binance / Crypto deposits ─────────────────────────────────────────────
 
-  /** POST /api/wallet/binance-deposits
-   *  Submit a crypto payment proof for admin review.
-   */
+  /** POST /api/wallet/binance-deposits */
   binanceSubmit: (body: BinanceDepositSubmitRequest) =>
     http.post<ApiResponse<BinanceDeposit>>("/api/wallet/binance-deposits", body),
 
-  /** GET /api/wallet/binance-deposits
-   *  List the current user's own Binance deposit history.
-   */
+  /** GET /api/wallet/binance-deposits */
   getBinanceDeposits: (page = 0, size = 20) =>
     http.get<ApiResponse<PageResponse<BinanceDeposit>>>(
       `/api/wallet/binance-deposits${qs({ page, size })}`
@@ -728,31 +840,23 @@ export const deposits = {
 
   // ── Super-admin Binance deposit management ────────────────────────────────
 
-  /** GET /api/admin/binance-deposits
-   *  All deposits — newest first (super-admin only).
-   */
+  /** GET /api/admin/binance-deposits */
   adminGetAllBinanceDeposits: (page = 0, size = 20) =>
     http.get<ApiResponse<PageResponse<BinanceDeposit>>>(
       `/api/admin/binance-deposits${qs({ page, size })}`
     ),
 
-  /** GET /api/admin/binance-deposits/pending
-   *  Pending queue — oldest first (super-admin only).
-   */
+  /** GET /api/admin/binance-deposits/pending */
   adminGetPendingBinanceDeposits: (page = 0, size = 20) =>
     http.get<ApiResponse<PageResponse<BinanceDeposit>>>(
       `/api/admin/binance-deposits/pending${qs({ page, size })}`
     ),
 
-  /** GET /api/admin/binance-deposits/:id
-   *  Single deposit detail (super-admin only).
-   */
+  /** GET /api/admin/binance-deposits/:id */
   adminGetBinanceDeposit: (id: string) =>
     http.get<ApiResponse<BinanceDeposit>>(`/api/admin/binance-deposits/${id}`),
 
-  /** POST /api/admin/binance-deposits/:id/approve
-   *  Approve and credit the user's wallet (super-admin only).
-   */
+  /** POST /api/admin/binance-deposits/:id/approve */
   adminApproveBinanceDeposit: (
     id: string,
     body: { creditedGhsAmount: number; adminNote?: string }
@@ -762,9 +866,7 @@ export const deposits = {
       body
     ),
 
-  /** POST /api/admin/binance-deposits/:id/reject
-   *  Reject a deposit (super-admin only).
-   */
+  /** POST /api/admin/binance-deposits/:id/reject */
   adminRejectBinanceDeposit: (id: string, body: { adminNote: string }) =>
     http.post<ApiResponse<BinanceDeposit>>(
       `/api/admin/binance-deposits/${id}/reject`,
@@ -837,23 +939,43 @@ export const games = {
 };
 
 // =============================================================================
-// BOOKING CODES
+// BOOKING CODES (user-facing)
 // =============================================================================
 
 export const booking = {
   /** POST /api/booking/redeem */
   redeem: (body: RedeemRequest) =>
     http.post<ApiResponse<RedeemResponse>>("/api/booking/redeem", body),
+};
 
+// =============================================================================
+// ADMIN — BOOKING CODES
+// =============================================================================
+
+export const adminBooking = {
   /** GET /api/admin/booking-codes */
   list: (page = 0, size = 20) =>
     http.get<ApiResponse<PageResponse<BookingCode>>>(
       `/api/admin/booking-codes${qs({ page, size })}`
     ),
 
-  /** POST /api/admin/booking-codes */
-  create: (body: CreateBookingRequest) =>
+  /** POST /api/admin/booking-codes — Standard code */
+  createBookingCode: (body: CreateBookingRequest) =>
     http.post<ApiResponse<BookingCode>>("/api/admin/booking-codes", body),
+
+  /** POST /api/admin/booking-codes — Admin-only matches */
+  createAdminOnlyBookingCode: (body: CreateBookingRequest) =>
+    http.post<ApiResponse<BookingCode>>("/api/admin/booking-codes", {
+      ...body,
+      bookingType: "ADMIN_ONLY",
+    }),
+
+  /** POST /api/admin/booking-codes — Mixed */
+  createMixedBookingCode: (body: CreateBookingRequest) =>
+    http.post<ApiResponse<BookingCode>>("/api/admin/booking-codes", {
+      ...body,
+      bookingType: "MIXED",
+    }),
 
   /** GET /api/admin/booking-codes/:id */
   detail: (id: string) =>
@@ -861,239 +983,845 @@ export const booking = {
 };
 
 // =============================================================================
-// PUBLIC MATCHES
+// GEO
 // =============================================================================
 
-export const publicMatches = {
-  /** GET /api/public/matches */
+export const geo = {
+  /** GET /api/geo/currency */
+  getCurrency: () =>
+    http.get<Record<string, string>>("/api/geo/currency"),
+};
+
+// =============================================================================
+// PUBLIC — FOOTBALL MATCHES
+// =============================================================================
+
+export const publicFootball = {
+  /** GET /api/public/football/matches */
   getAll: () =>
-    http.get<ApiResponse<Record<string, unknown>>>("/api/public/matches"),
+    http.get<ApiResponse<Record<string, unknown>>>("/api/public/football/matches"),
 
-  /** GET /api/public/matches/upcoming */
+  /** GET /api/public/football/matches/upcoming */
   upcoming: () =>
-    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/matches/upcoming"),
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/matches/upcoming"),
 
-  /** GET /api/public/matches/today */
+  /** GET /api/public/football/matches/today */
   today: () =>
-    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/matches/today"),
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/matches/today"),
 
-  /** GET /api/public/matches/live */
+  /** GET /api/public/football/matches/live */
   live: () =>
-    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/matches/live"),
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/matches/live"),
 
-  /** GET /api/public/matches/future */
+  /** GET /api/public/football/matches/future */
   future: () =>
-    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/matches/future"),
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/matches/future"),
 
-  /** GET /api/public/matches/results */
+  /** GET /api/public/football/matches/results */
   results: (limit = 20) =>
-    http.get<ApiResponse<Match[]>>(`/api/public/matches/results${qs({ limit })}`),
+    http.get<ApiResponse<Match[]>>(`/api/public/football/matches/results${qs({ limit })}`),
 
-  /** GET /api/public/matches/featured */
+  /** GET /api/public/football/matches/featured */
   featured: () =>
-    http.get<ApiResponse<Match[]>>("/api/public/matches/featured"),
+    http.get<ApiResponse<Match[]>>("/api/public/football/matches/featured"),
 
-  /** GET /api/public/matches/with-odds */
+  /** GET /api/public/football/matches/with-odds */
   withOdds: () =>
-    http.get<ApiResponse<Record<string, unknown>>>("/api/public/matches/with-odds"),
+    http.get<ApiResponse<Record<string, unknown>>>("/api/public/football/matches/with-odds"),
 
-  /** GET /api/public/matches/with-all-odds */
+  /** GET /api/public/football/matches/with-all-odds */
   withAllOdds: () =>
-    http.get<ApiResponse<Record<string, unknown>>>("/api/public/matches/with-all-odds"),
+    http.get<ApiResponse<Record<string, unknown>>>("/api/public/football/matches/with-all-odds"),
 
-  /** GET /api/public/matches/top6/upcoming */
+  /** GET /api/public/football/matches/top6/upcoming */
   top6Upcoming: () =>
-    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/matches/top6/upcoming"),
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/matches/top6/upcoming"),
 
-  /** GET /api/public/matches/top6/today */
+  /** GET /api/public/football/matches/top6/today */
   top6Today: () =>
-    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/matches/top6/today"),
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/matches/top6/today"),
 
-  /** GET /api/public/matches/top6/live */
+  /** GET /api/public/football/matches/top6/live */
   top6Live: () =>
-    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/matches/top6/live"),
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/matches/top6/live"),
 
-  /** GET /api/public/matches/cups/upcoming */
+  /** GET /api/public/football/matches/cups/upcoming */
   cupsUpcoming: () =>
-    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/matches/cups/upcoming"),
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/matches/cups/upcoming"),
 
-  /** GET /api/public/matches/cups/today */
+  /** GET /api/public/football/matches/cups/today */
   cupsToday: () =>
-    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/matches/cups/today"),
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/matches/cups/today"),
 
-  /** GET /api/public/matches/cups/live */
+  /** GET /api/public/football/matches/cups/live */
   cupsLive: () =>
-    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/matches/cups/live"),
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/matches/cups/live"),
 
-  /** GET /api/public/matches/all-cups/upcoming */
+  /** GET /api/public/football/matches/all-cups/upcoming */
   allCupsUpcoming: () =>
-    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/matches/all-cups/upcoming"),
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/matches/all-cups/upcoming"),
 
-  /** GET /api/public/matches/all-cups/today */
+  /** GET /api/public/football/matches/all-cups/today */
   allCupsToday: () =>
-    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/matches/all-cups/today"),
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/matches/all-cups/today"),
 
-  /** GET /api/public/matches/all-cups/live */
+  /** GET /api/public/football/matches/all-cups/live */
   allCupsLive: () =>
-    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/matches/all-cups/live"),
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/matches/all-cups/live"),
 
-  /** GET /api/public/matches/:id */
+  /** GET /api/public/football/matches/:id */
   getById: (id: string) =>
-    http.get<ApiResponse<Match>>(`/api/public/matches/${id}`),
+    http.get<ApiResponse<Match>>(`/api/public/football/matches/${id}`),
 
-  /** GET /api/public/matches/:id/stats */
+  /** GET /api/public/football/matches/:id/stats */
   stats: (id: string) =>
-    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/matches/${id}/stats`),
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/football/matches/${id}/stats`),
 
-  /** GET /api/public/matches/:id/prediction */
+  /** GET /api/public/football/matches/:id/prediction */
   prediction: (id: string) =>
-    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/matches/${id}/prediction`),
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/football/matches/${id}/prediction`),
 
-  /** GET /api/public/matches/:id/odds */
+  /** GET /api/public/football/matches/:id/odds */
   odds: (id: string) =>
-    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/matches/${id}/odds`),
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/matches/${id}/odds`),
 
-  /** GET /api/public/matches/:id/odds/all */
+  /** GET /api/public/football/matches/:id/odds/raw */
+  oddsRaw: (id: string) =>
+    http.get<ApiResponse<Odds[]>>(`/api/public/football/matches/${id}/odds/raw`),
+
+  /** GET /api/public/football/matches/:id/odds/all */
   oddsAll: (id: string) =>
-    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/matches/${id}/odds/all`),
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/football/matches/${id}/odds/all`),
 
-  /** GET /api/public/matches/:id/odds/handicap */
+  /** GET /api/public/football/matches/:id/odds/handicap */
   oddsHandicap: (id: string) =>
-    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/matches/${id}/odds/handicap`),
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/matches/${id}/odds/handicap`),
 
-  /** GET /api/public/matches/:id/odds/half-time */
+  /** GET /api/public/football/matches/:id/odds/half-time */
   oddsHalfTime: (id: string) =>
-    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/matches/${id}/odds/half-time`),
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/matches/${id}/odds/half-time`),
 
-  /** GET /api/public/matches/:id/odds/correct-score */
+  /** GET /api/public/football/matches/:id/odds/correct-score */
   oddsCorrectScore: (id: string) =>
-    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/matches/${id}/odds/correct-score`),
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/matches/${id}/odds/correct-score`),
 
-  /** GET /api/public/matches/:id/lineups */
+  /** GET /api/public/football/matches/:id/odds/goalscorer */
+  oddsGoalscorer: (id: string) =>
+    http.get<ApiResponse<Record<string, Record<string, unknown>[]>>>(`/api/public/football/matches/${id}/odds/goalscorer`),
+
+  /** GET /api/public/football/matches/:id/odds/espn */
+  oddsEspn: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/football/matches/${id}/odds/espn`),
+
+  /** GET /api/public/football/matches/:id/odds/cache-status */
+  oddsCacheStatus: (id: string) =>
+    http.get<ApiResponse<Record<string, boolean>>>(`/api/public/football/matches/${id}/odds/cache-status`),
+
+  /** GET /api/public/football/matches/:id/lineups */
   lineups: (id: string) =>
-    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/matches/${id}/lineups`),
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/football/matches/${id}/lineups`),
 
-  /** GET /api/public/matches/:id/h2h */
+  /** GET /api/public/football/matches/:id/h2h */
   h2h: (id: string) =>
-    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/matches/${id}/h2h`),
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/football/matches/${id}/h2h`),
 
-  /** GET /api/public/matches/:id/events */
+  /** GET /api/public/football/matches/:id/events */
   events: (id: string) =>
-    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/matches/${id}/events`),
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/football/matches/${id}/events`),
 
-  /** GET /api/public/matches/:id/detail */
+  /** GET /api/public/football/matches/:id/detail */
   detail: (id: string) =>
-    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/matches/${id}/detail`),
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/football/matches/${id}/detail`),
+
+  /** GET /api/public/football/matches/:id/form */
+  form: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/matches/${id}/form`),
+
+  /** GET /api/public/football/matches/:id/news */
+  news: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/matches/${id}/news`),
+
+  /** GET /api/public/football/matches/:id/videos */
+  videos: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/matches/${id}/videos`),
+
+  /** GET /api/public/football/matches/:id/venue */
+  venue: (id: string) =>
+    http.get<ApiResponse<string>>(`/api/public/football/matches/${id}/venue`),
 };
 
 // =============================================================================
-// PUBLIC — LEAGUES
+// PUBLIC — FOOTBALL LEAGUES
 // =============================================================================
 
-export const publicLeagues = {
-  /** GET /api/public/leagues/:league/upcoming */
-  upcoming: (league: string) =>
-    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/leagues/${league}/upcoming`),
+export const publicFootballLeagues = {
+  /** GET /api/public/football/leagues/:league/upcoming */
+  upcoming: (league: FootballLeague) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/leagues/${league}/upcoming`),
 
-  /** GET /api/public/leagues/:league/today */
-  today: (league: string) =>
-    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/leagues/${league}/today`),
+  /** GET /api/public/football/leagues/:league/today */
+  today: (league: FootballLeague) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/leagues/${league}/today`),
 
-  /** GET /api/public/leagues/:league/live */
-  live: (league: string) =>
-    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/leagues/${league}/live`),
+  /** GET /api/public/football/leagues/:league/live */
+  live: (league: FootballLeague) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/leagues/${league}/live`),
 
-  /** GET /api/public/leagues/top6/:league/upcoming */
-  top6Upcoming: (league: string) =>
-    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/leagues/top6/${league}/upcoming`),
+  /** GET /api/public/football/leagues/top6/:league/upcoming */
+  top6Upcoming: (league: FootballLeague) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/leagues/top6/${league}/upcoming`),
 
-  /** GET /api/public/leagues/top6/:league/today */
-  top6Today: (league: string) =>
-    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/leagues/top6/${league}/today`),
+  /** GET /api/public/football/leagues/top6/:league/today */
+  top6Today: (league: FootballLeague) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/leagues/top6/${league}/today`),
 
-  /** GET /api/public/leagues/top6/:league/live */
-  top6Live: (league: string) =>
-    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/leagues/top6/${league}/live`),
+  /** GET /api/public/football/leagues/top6/:league/live */
+  top6Live: (league: FootballLeague) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/leagues/top6/${league}/live`),
+
+  /** GET /api/public/football/leagues/top6/:league/results/finished */
+  top6Finished: (league: FootballLeague) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/leagues/top6/${league}/results/finished`),
+
+  /** GET /api/public/football/leagues/top6/:league/teams */
+  top6Teams: (league: FootballLeague) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/football/leagues/top6/${league}/teams`),
+
+  /** GET /api/public/football/leagues/top6/:league/teams/:teamId/schedule */
+  top6TeamSchedule: (league: FootballLeague, teamId: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/football/leagues/top6/${league}/teams/${teamId}/schedule`),
+
+  /** GET /api/public/football/leagues/top6/:league/fixtures/date/:date */
+  top6FixturesByDate: (league: FootballLeague, date: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/leagues/top6/${league}/fixtures/date/${date}`),
 };
 
 // =============================================================================
-// PUBLIC — CUPS
+// PUBLIC — FOOTBALL CUPS
 // =============================================================================
 
-export const publicCups = {
-  /** GET /api/public/cups/:cup/upcoming */
-  upcoming: (cup: string) =>
-    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/cups/${cup}/upcoming`),
+export const publicFootballCups = {
+  /** GET /api/public/football/cups/:cup/upcoming */
+  upcoming: (cup: FootballCup) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/cups/${cup}/upcoming`),
 
-  /** GET /api/public/cups/:cup/today */
-  today: (cup: string) =>
-    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/cups/${cup}/today`),
+  /** GET /api/public/football/cups/:cup/today */
+  today: (cup: FootballCup) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/cups/${cup}/today`),
 
-  /** GET /api/public/cups/:cup/live */
-  live: (cup: string) =>
-    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/cups/${cup}/live`),
+  /** GET /api/public/football/cups/:cup/live */
+  live: (cup: FootballCup) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/cups/${cup}/live`),
+
+  /** GET /api/public/football/cups/:cup/results/finished */
+  finished: (cup: FootballCup) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/cups/${cup}/results/finished`),
+
+  /** GET /api/public/football/cups/:cup/matches/:eventId/detail */
+  matchDetail: (cup: FootballCup, eventId: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/football/cups/${cup}/matches/${eventId}/detail`),
+
+  /** GET /api/public/football/cups/fixtures/date/:date */
+  fixturesByDate: (date: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/cups/fixtures/date/${date}`),
 };
 
 // =============================================================================
-// PUBLIC — TEAMS
+// PUBLIC — FOOTBALL TEAMS
 // =============================================================================
 
-export const publicTeams = {
-  /** GET /api/public/teams/:team/upcoming */
+export const publicFootballTeams = {
+  /** GET /api/public/football/teams/:team/upcoming */
   upcoming: (team: string) =>
-    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/teams/${team}/upcoming`),
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/teams/${team}/upcoming`),
 
-  /** GET /api/public/teams/:team/results */
+  /** GET /api/public/football/teams/:team/results */
   results: (team: string) =>
-    http.get<ApiResponse<Match[]>>(`/api/public/teams/${team}/results`),
+    http.get<ApiResponse<Match[]>>(`/api/public/football/teams/${team}/results`),
 
-  /** GET /api/public/teams/:team/live */
+  /** GET /api/public/football/teams/:team/live */
   live: (team: string) =>
-    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/teams/${team}/live`),
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/teams/${team}/live`),
 };
 
 // =============================================================================
-// PUBLIC — STANDINGS
+// PUBLIC — FOOTBALL STANDINGS
 // =============================================================================
 
-export const publicStandings = {
-  /** GET /api/public/standings/:competitionId */
+export const publicFootballStandings = {
+  /** GET /api/public/football/standings/:competitionId */
   byCompetition: (competitionId: number) =>
-    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/standings/${competitionId}`),
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/football/standings/${competitionId}`),
 
-  /** GET /api/public/standings/top6 */
+  /** GET /api/public/football/standings/top6 */
   top6: () =>
-    http.get<ApiResponse<Record<string, Record<string, unknown>>>>("/api/public/standings/top6"),
+    http.get<ApiResponse<Record<string, Record<string, unknown>>>>("/api/public/football/standings/top6"),
 
-  /** GET /api/public/standings/leagues/:league */
-  byLeague: (league: string) =>
-    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/standings/leagues/${league}`),
+  /** GET /api/public/football/standings/leagues/:league */
+  byLeague: (league: FootballLeague) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/football/standings/leagues/${league}`),
 
-  /** GET /api/public/standings/leagues/top6/:league */
-  top6ByLeague: (league: string) =>
-    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/standings/leagues/top6/${league}`),
+  /** GET /api/public/football/standings/leagues/top6/:league */
+  top6ByLeague: (league: FootballLeague) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/football/standings/leagues/top6/${league}`),
 
-  /** GET /api/public/standings/cups/:cup */
-  byCup: (cup: string) =>
-    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/standings/cups/${cup}`),
+  /** GET /api/public/football/standings/cups/:cup */
+  byCup: (cup: FootballCup) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/football/standings/cups/${cup}`),
 };
 
 // =============================================================================
-// PUBLIC — SCORERS
+// PUBLIC — FOOTBALL SCORERS
 // =============================================================================
 
-export const publicScorers = {
-  /** GET /api/public/scorers/:competitionId */
+export const publicFootballScorers = {
+  /** GET /api/public/football/scorers/:competitionId */
   byCompetition: (competitionId: number) =>
-    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/scorers/${competitionId}`),
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/football/scorers/${competitionId}`),
 
-  /** GET /api/public/scorers/leagues/:league */
-  byLeague: (league: string) =>
-    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/scorers/leagues/${league}`),
+  /** GET /api/public/football/scorers/leagues/:league */
+  byLeague: (league: FootballLeague) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/football/scorers/leagues/${league}`),
 
-  /** GET /api/public/scorers/leagues/top6/:league */
-  top6ByLeague: (league: string) =>
-    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/scorers/leagues/top6/${league}`),
+  /** GET /api/public/football/scorers/leagues/top6/:league */
+  top6ByLeague: (league: FootballLeague) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/football/scorers/leagues/top6/${league}`),
+};
+
+// =============================================================================
+// PUBLIC — FOOTBALL LIVESCORE
+// =============================================================================
+
+export const publicFootballLivescore = {
+  /** GET /api/public/football/livescore/live */
+  live: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/livescore/live"),
+
+  /** GET /api/public/football/livescore/today */
+  today: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/livescore/today"),
+
+  /** GET /api/public/football/livescore/fixtures */
+  fixtures: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/livescore/fixtures"),
+
+  /** GET /api/public/football/livescore/top6/live */
+  top6Live: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/livescore/top6/live"),
+
+  /** GET /api/public/football/livescore/top6/fixtures */
+  top6Fixtures: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/livescore/top6/fixtures"),
+
+  /** GET /api/public/football/livescore/top6/all-fixtures */
+  top6AllFixtures: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/livescore/top6/all-fixtures"),
+
+  /** GET /api/public/football/livescore/leagues/top6/:league/live */
+  top6LeagueLive: (league: FootballLeague) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/livescore/leagues/top6/${league}/live`),
+
+  /** GET /api/public/football/livescore/leagues/top6/:league/fixtures */
+  top6LeagueFixtures: (league: FootballLeague) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/livescore/leagues/top6/${league}/fixtures`),
+
+  /** GET /api/public/football/livescore/cups/live */
+  cupsLive: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/livescore/cups/live"),
+
+  /** GET /api/public/football/livescore/cups/fixtures */
+  cupsFixtures: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/livescore/cups/fixtures"),
+
+  /** GET /api/public/football/livescore/cups/:cup/live */
+  cupLive: (cup: FootballCup) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/livescore/cups/${cup}/live`),
+
+  /** GET /api/public/football/livescore/cups/:cup/fixtures */
+  cupFixtures: (cup: FootballCup) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/football/livescore/cups/${cup}/fixtures`),
+
+  /** GET /api/public/football/livescore/all-leagues/today */
+  allLeaguesToday: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/livescore/all-leagues/today"),
+
+  /** GET /api/public/football/livescore/all-cups/today */
+  allCupsToday: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/football/livescore/all-cups/today"),
+};
+
+// =============================================================================
+// PUBLIC — BASKETBALL / NBA MATCHES
+// =============================================================================
+
+export const publicBasketball = {
+  /** GET /api/public/basketball/matches  (also /api/public/nba/matches) */
+  getAll: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/public/basketball/matches"),
+
+  /** GET /api/public/basketball/matches/upcoming */
+  upcoming: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/basketball/matches/upcoming"),
+
+  /** GET /api/public/basketball/matches/today */
+  today: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/basketball/matches/today"),
+
+  /** GET /api/public/basketball/matches/live */
+  live: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/basketball/matches/live"),
+
+  /** GET /api/public/basketball/matches/future */
+  future: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/basketball/matches/future"),
+
+  /** GET /api/public/basketball/matches/results */
+  results: (limit = 20) =>
+    http.get<ApiResponse<Match[]>>(`/api/public/basketball/matches/results${qs({ limit })}`),
+
+  /** GET /api/public/basketball/matches/with-odds */
+  withOdds: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/public/basketball/matches/with-odds"),
+
+  /** GET /api/public/basketball/matches/with-all-odds */
+  withAllOdds: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/public/basketball/matches/with-all-odds"),
+
+  /** GET /api/public/basketball/matches/:id */
+  getById: (id: string) =>
+    http.get<ApiResponse<Match>>(`/api/public/basketball/matches/${id}`),
+
+  /** GET /api/public/basketball/matches/:id/odds */
+  odds: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/basketball/matches/${id}/odds`),
+
+  /** GET /api/public/basketball/matches/:id/odds/all */
+  oddsAll: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/basketball/matches/${id}/odds/all`),
+
+  /** GET /api/public/basketball/matches/:id/odds/moneyline */
+  oddsMoneyline: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/basketball/matches/${id}/odds/moneyline`),
+
+  /** GET /api/public/basketball/matches/:id/odds/spread */
+  oddsSpread: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/basketball/matches/${id}/odds/spread`),
+
+  /** GET /api/public/basketball/matches/:id/odds/total */
+  oddsTotal: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/basketball/matches/${id}/odds/total`),
+
+  /** GET /api/public/basketball/matches/:id/odds/quarters */
+  oddsQuarters: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/basketball/matches/${id}/odds/quarters`),
+
+  /** GET /api/public/basketball/matches/:id/odds/margin */
+  oddsMargin: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/basketball/matches/${id}/odds/margin`),
+
+  /** GET /api/public/basketball/matches/:id/stats */
+  stats: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/basketball/matches/${id}/stats`),
+
+  /** GET /api/public/basketball/matches/:id/lineups */
+  lineups: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/basketball/matches/${id}/lineups`),
+
+  /** GET /api/public/basketball/matches/:id/h2h */
+  h2h: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/basketball/matches/${id}/h2h`),
+
+  /** GET /api/public/basketball/matches/:id/events */
+  events: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/basketball/matches/${id}/events`),
+
+  /** GET /api/public/basketball/matches/:id/detail */
+  detail: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/basketball/matches/${id}/detail`),
+
+  /** GET /api/public/basketball/standings */
+  standings: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/public/basketball/standings"),
+
+  /** GET /api/public/basketball/teams */
+  teams: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/public/basketball/teams"),
+
+  /** GET /api/public/basketball/teams/:team/upcoming */
+  teamUpcoming: (team: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/basketball/teams/${team}/upcoming`),
+
+  /** GET /api/public/basketball/teams/:team/results */
+  teamResults: (team: string) =>
+    http.get<ApiResponse<Match[]>>(`/api/public/basketball/teams/${team}/results`),
+
+  /** GET /api/public/basketball/teams/:team/live */
+  teamLive: (team: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/basketball/teams/${team}/live`),
+
+  /** GET /api/public/basketball/teams/:teamId/schedule */
+  teamSchedule: (teamId: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/basketball/teams/${teamId}/schedule`),
+
+  /** GET /api/public/basketball/teams/:teamId/roster */
+  teamRoster: (teamId: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/basketball/teams/${teamId}/roster`),
+
+  /** GET /api/public/basketball/teams/:teamId/info */
+  teamInfo: (teamId: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/basketball/teams/${teamId}/info`),
+
+  /** GET /api/public/basketball/espn/upcoming */
+  espnUpcoming: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/basketball/espn/upcoming"),
+
+  /** GET /api/public/basketball/espn/today */
+  espnToday: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/basketball/espn/today"),
+
+  /** GET /api/public/basketball/espn/live */
+  espnLive: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/basketball/espn/live"),
+
+  /** GET /api/public/basketball/espn/game/:espnGameId */
+  espnGameDetail: (espnGameId: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/basketball/espn/game/${espnGameId}`),
+};
+
+// =============================================================================
+// PUBLIC — NFL / AMERICAN FOOTBALL MATCHES
+// =============================================================================
+
+export const publicNfl = {
+  /** GET /api/public/nfl/matches */
+  getAll: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/public/nfl/matches"),
+
+  /** GET /api/public/nfl/matches/upcoming */
+  upcoming: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/nfl/matches/upcoming"),
+
+  /** GET /api/public/nfl/matches/today */
+  today: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/nfl/matches/today"),
+
+  /** GET /api/public/nfl/matches/live */
+  live: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/nfl/matches/live"),
+
+  /** GET /api/public/nfl/matches/results */
+  results: () =>
+    http.get<ApiResponse<Match[]>>("/api/public/nfl/matches/results"),
+
+  /** GET /api/public/nfl/matches/with-odds */
+  withOdds: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/public/nfl/matches/with-odds"),
+
+  /** GET /api/public/nfl/matches/:id */
+  getById: (id: string) =>
+    http.get<ApiResponse<Match>>(`/api/public/nfl/matches/${id}`),
+
+  /** GET /api/public/nfl/matches/:id/odds */
+  odds: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/nfl/matches/${id}/odds`),
+
+  /** GET /api/public/nfl/matches/:id/odds/all */
+  oddsAll: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/nfl/matches/${id}/odds/all`),
+
+  /** GET /api/public/nfl/matches/:id/score */
+  score: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/nfl/matches/${id}/score`),
+
+  /** GET /api/public/nfl/matches/:id/detail */
+  detail: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/nfl/matches/${id}/detail`),
+
+  /** GET /api/public/nfl/standings */
+  standings: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/public/nfl/standings"),
+
+  /** GET /api/public/nfl/espn/week */
+  espnCurrentWeek: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/nfl/espn/week"),
+
+  /** GET /api/public/nfl/espn/week/:week */
+  espnByWeek: (week: number, seasonType = 2) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/nfl/espn/week/${week}${qs({ seasonType })}`),
+
+  /** GET /api/public/nfl/espn/upcoming */
+  espnUpcoming: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/nfl/espn/upcoming"),
+
+  /** GET /api/public/nfl/espn/live */
+  espnLive: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/nfl/espn/live"),
+
+  /** GET /api/public/nfl/espn/finished */
+  espnFinished: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/nfl/espn/finished"),
+
+  /** GET /api/public/nfl/espn/date/:date */
+  espnByDate: (date: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/nfl/espn/date/${date}`),
+};
+
+// =============================================================================
+// PUBLIC — BASEBALL MATCHES
+// =============================================================================
+
+export const publicBaseball = {
+  /** GET /api/public/baseball/matches */
+  getAll: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/public/baseball/matches"),
+
+  /** GET /api/public/baseball/matches/upcoming */
+  upcoming: () =>
+    http.get<ApiResponse<Match[]>>("/api/public/baseball/matches/upcoming"),
+
+  /** GET /api/public/baseball/matches/today */
+  today: () =>
+    http.get<ApiResponse<Match[]>>("/api/public/baseball/matches/today"),
+
+  /** GET /api/public/baseball/matches/live */
+  live: () =>
+    http.get<ApiResponse<Match[]>>("/api/public/baseball/matches/live"),
+
+  /** GET /api/public/baseball/matches/results */
+  results: (limit = 20) =>
+    http.get<ApiResponse<Match[]>>(`/api/public/baseball/matches/results${qs({ limit })}`),
+
+  /** GET /api/public/baseball/matches/:id */
+  getById: (id: string) =>
+    http.get<ApiResponse<Match>>(`/api/public/baseball/matches/${id}`),
+
+  /** GET /api/public/baseball/matches/:id/odds */
+  odds: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/baseball/matches/${id}/odds`),
+
+  /** GET /api/public/baseball/matches/:id/odds/persisted */
+  oddsDb: (id: string) =>
+    http.get<ApiResponse<Odds[]>>(`/api/public/baseball/matches/${id}/odds/persisted`),
+
+  /** GET /api/public/baseball/matches/:id/score */
+  score: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/baseball/matches/${id}/score`),
+
+  /** GET /api/public/baseball/matches/:id/detail */
+  detail: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/baseball/matches/${id}/detail`),
+
+  /** GET /api/public/baseball/standings */
+  standings: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/public/baseball/standings"),
+
+  /** GET /api/public/baseball/teams/:team/upcoming */
+  teamUpcoming: (team: string) =>
+    http.get<ApiResponse<Match[]>>(`/api/public/baseball/teams/${team}/upcoming`),
+
+  /** GET /api/public/baseball/teams/:team/results */
+  teamResults: (team: string) =>
+    http.get<ApiResponse<Match[]>>(`/api/public/baseball/teams/${team}/results`),
+
+  /** GET /api/public/baseball/teams/:team/live */
+  teamLive: (team: string) =>
+    http.get<ApiResponse<Match[]>>(`/api/public/baseball/teams/${team}/live`),
+
+  /** GET /api/public/baseball/espn/upcoming */
+  espnUpcoming: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/baseball/espn/upcoming"),
+
+  /** GET /api/public/baseball/espn/today */
+  espnToday: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/baseball/espn/today"),
+
+  /** GET /api/public/baseball/espn/live */
+  espnLive: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/baseball/espn/live"),
+
+  /** GET /api/public/baseball/espn/game/:espnGameId */
+  espnGameDetail: (espnGameId: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/baseball/espn/game/${espnGameId}`),
+};
+
+// =============================================================================
+// PUBLIC — MMA MATCHES
+// =============================================================================
+
+export const publicMma = {
+  /** GET /api/public/mma/matches */
+  getAll: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/public/mma/matches"),
+
+  /** GET /api/public/mma/matches/upcoming */
+  upcoming: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/mma/matches/upcoming"),
+
+  /** GET /api/public/mma/matches/live */
+  live: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/mma/matches/live"),
+
+  /** GET /api/public/mma/matches/results */
+  results: (limit = 20) =>
+    http.get<ApiResponse<Match[]>>(`/api/public/mma/matches/results${qs({ limit })}`),
+
+  /** GET /api/public/mma/matches/featured */
+  featured: () =>
+    http.get<ApiResponse<Match[]>>("/api/public/mma/matches/featured"),
+
+  /** GET /api/public/mma/matches/:id */
+  getById: (id: string) =>
+    http.get<ApiResponse<Match>>(`/api/public/mma/matches/${id}`),
+
+  /** GET /api/public/mma/matches/:id/odds */
+  odds: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/mma/matches/${id}/odds`),
+
+  /** GET /api/public/mma/matches/:id/odds/all */
+  oddsAll: (id: string) =>
+    http.get<ApiResponse<Odds[]>>(`/api/public/mma/matches/${id}/odds/all`),
+
+  /** GET /api/public/mma/matches/:id/score */
+  score: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/mma/matches/${id}/score`),
+
+  /** GET /api/public/mma/matches/:id/detail */
+  detail: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/mma/matches/${id}/detail`),
+
+  /** GET /api/public/mma/matches/:id/events */
+  events: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/mma/matches/${id}/events`),
+
+  /** GET /api/public/mma/matches/:id/full */
+  fullDetail: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/mma/matches/${id}/full`),
+
+  /** GET /api/public/mma/matches/:id/fight-card */
+  fightCard: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/mma/matches/${id}/fight-card`),
+
+  /** GET /api/public/mma/matches/with-odds */
+  withOdds: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/public/mma/matches/with-odds"),
+
+  /** GET /api/public/mma/fighters/:athleteId */
+  fighter: (athleteId: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/mma/fighters/${athleteId}`),
+
+  /** GET /api/public/mma/espn/events */
+  espnEvents: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/mma/espn/events"),
+
+  /** GET /api/public/mma/espn/events/upcoming */
+  espnUpcoming: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/mma/espn/events/upcoming"),
+
+  /** GET /api/public/mma/espn/events/live */
+  espnLive: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/mma/espn/events/live"),
+
+  /** GET /api/public/mma/espn/events/finished */
+  espnFinished: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/mma/espn/events/finished"),
+};
+
+// =============================================================================
+// PUBLIC — TENNIS MATCHES
+// =============================================================================
+
+export const publicTennis = {
+  /** GET /api/public/tennis/matches */
+  getAll: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/public/tennis/matches"),
+
+  /** GET /api/public/tennis/matches/upcoming */
+  upcoming: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/tennis/matches/upcoming"),
+
+  /** GET /api/public/tennis/matches/live */
+  live: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/tennis/matches/live"),
+
+  /** GET /api/public/tennis/matches/results */
+  results: (limit = 20) =>
+    http.get<ApiResponse<Match[]>>(`/api/public/tennis/matches/results${qs({ limit })}`),
+
+  /** GET /api/public/tennis/matches/featured */
+  featured: () =>
+    http.get<ApiResponse<Match[]>>("/api/public/tennis/matches/featured"),
+
+  /** GET /api/public/tennis/matches/with-odds */
+  withOdds: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/public/tennis/matches/with-odds"),
+
+  /** GET /api/public/tennis/matches/:id */
+  getById: (id: string) =>
+    http.get<ApiResponse<Match>>(`/api/public/tennis/matches/${id}`),
+
+  /** GET /api/public/tennis/matches/:id/odds */
+  odds: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/tennis/matches/${id}/odds`),
+
+  /** GET /api/public/tennis/matches/:id/score */
+  score: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/tennis/matches/${id}/score`),
+
+  /** GET /api/public/tennis/matches/:id/events */
+  events: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/tennis/matches/${id}/events`),
+
+  /** GET /api/public/tennis/matches/:id/detail */
+  detail: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/public/tennis/matches/${id}/detail`),
+
+  /** GET /api/public/tennis/atp/matches */
+  atpMatches: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/tennis/atp/matches"),
+
+  /** GET /api/public/tennis/atp/live */
+  atpLive: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/tennis/atp/live"),
+
+  /** GET /api/public/tennis/atp/upcoming */
+  atpUpcoming: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/tennis/atp/upcoming"),
+
+  /** GET /api/public/tennis/atp/tournaments */
+  atpTournaments: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/tennis/atp/tournaments"),
+
+  /** GET /api/public/tennis/atp/rankings */
+  atpRankings: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/public/tennis/atp/rankings"),
+
+  /** GET /api/public/tennis/wta/matches */
+  wtaMatches: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/tennis/wta/matches"),
+
+  /** GET /api/public/tennis/wta/live */
+  wtaLive: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/tennis/wta/live"),
+
+  /** GET /api/public/tennis/wta/upcoming */
+  wtaUpcoming: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/tennis/wta/upcoming"),
+
+  /** GET /api/public/tennis/wta/tournaments */
+  wtaTournaments: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/public/tennis/wta/tournaments"),
+
+  /** GET /api/public/tennis/wta/rankings */
+  wtaRankings: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/public/tennis/wta/rankings"),
+
+  /** GET /api/public/tennis/tours/:tour/upcoming */
+  tourUpcoming: (tour: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/tennis/tours/${tour}/upcoming`),
+
+  /** GET /api/public/tennis/tours/:tour/live */
+  tourLive: (tour: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/public/tennis/tours/${tour}/live`),
 };
 
 // =============================================================================
@@ -1149,7 +1877,7 @@ export const publicPredictions = {
 };
 
 // =============================================================================
-// AUTHENTICATED MATCHES (non-public)
+// AUTHENTICATED — FOOTBALL MATCHES
 // =============================================================================
 
 export const matches = {
@@ -1263,7 +1991,7 @@ export const matches = {
 };
 
 // =============================================================================
-// LIVESCORE
+// AUTHENTICATED — LIVESCORE
 // =============================================================================
 
 export const livescore = {
@@ -1317,7 +2045,7 @@ export const livescore = {
 };
 
 // =============================================================================
-// STANDINGS (authenticated)
+// AUTHENTICATED — STANDINGS
 // =============================================================================
 
 export const standings = {
@@ -1343,7 +2071,7 @@ export const standings = {
 };
 
 // =============================================================================
-// SCORERS (authenticated)
+// AUTHENTICATED — SCORERS
 // =============================================================================
 
 export const scorers = {
@@ -1361,7 +2089,7 @@ export const scorers = {
 };
 
 // =============================================================================
-// TEAMS (authenticated)
+// AUTHENTICATED — TEAMS (football)
 // =============================================================================
 
 export const teams = {
@@ -1391,7 +2119,7 @@ export const teams = {
 };
 
 // =============================================================================
-// LEAGUES (authenticated)
+// AUTHENTICATED — LEAGUES (football)
 // =============================================================================
 
 export const leagues = {
@@ -1421,7 +2149,7 @@ export const leagues = {
 };
 
 // =============================================================================
-// CUPS (authenticated)
+// AUTHENTICATED — CUPS (football)
 // =============================================================================
 
 export const cups = {
@@ -1436,6 +2164,480 @@ export const cups = {
   /** GET /api/cups/:cup/live */
   live: (cup: string) =>
     http.get<ApiResponse<Record<string, unknown>[]>>(`/api/cups/${cup}/live`),
+};
+
+// =============================================================================
+// AUTHENTICATED — NBA / BASKETBALL (auth)
+// =============================================================================
+
+export const nba = {
+  /** GET /api/nba/matches/upcoming  (also /api/basketball/matches/upcoming) */
+  upcoming: () =>
+    http.get<ApiResponse<Match[]>>("/api/nba/matches/upcoming"),
+
+  /** GET /api/nba/matches/today */
+  today: () =>
+    http.get<ApiResponse<Match[]>>("/api/nba/matches/today"),
+
+  /** GET /api/nba/matches/live */
+  live: () =>
+    http.get<ApiResponse<Match[]>>("/api/nba/matches/live"),
+
+  /** GET /api/nba/matches/future */
+  future: () =>
+    http.get<ApiResponse<Match[]>>("/api/nba/matches/future"),
+
+  /** GET /api/nba/matches/results */
+  results: (limit = 20) =>
+    http.get<ApiResponse<Match[]>>(`/api/nba/matches/results${qs({ limit })}`),
+
+  /** GET /api/nba/matches/:id */
+  getById: (id: string) =>
+    http.get<ApiResponse<Match>>(`/api/nba/matches/${id}`),
+
+  /** GET /api/nba/matches/:id/odds */
+  odds: (id: string) =>
+    http.get<ApiResponse<Odds[]>>(`/api/nba/matches/${id}/odds`),
+
+  /** GET /api/nba/matches/:id/odds/all */
+  oddsAll: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/nba/matches/${id}/odds/all`),
+
+  /** GET /api/nba/matches/:id/odds/moneyline */
+  oddsMoneyline: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/nba/matches/${id}/odds/moneyline`),
+
+  /** GET /api/nba/matches/:id/odds/spread */
+  oddsSpread: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/nba/matches/${id}/odds/spread`),
+
+  /** GET /api/nba/matches/:id/odds/total */
+  oddsTotal: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/nba/matches/${id}/odds/total`),
+
+  /** GET /api/nba/matches/:id/odds/quarters */
+  oddsQuarters: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/nba/matches/${id}/odds/quarters`),
+
+  /** GET /api/nba/matches/:id/odds/margin */
+  oddsMargin: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/nba/matches/${id}/odds/margin`),
+
+  /** GET /api/nba/matches/:id/score */
+  score: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/nba/matches/${id}/score`),
+
+  /** GET /api/nba/matches/:id/stats */
+  stats: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/nba/matches/${id}/stats`),
+
+  /** GET /api/nba/matches/:id/lineups */
+  lineups: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/nba/matches/${id}/lineups`),
+
+  /** GET /api/nba/matches/:id/h2h */
+  h2h: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/nba/matches/${id}/h2h`),
+
+  /** GET /api/nba/matches/:id/events */
+  events: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/nba/matches/${id}/events`),
+
+  /** GET /api/nba/matches/:id/detail */
+  detail: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/nba/matches/${id}/detail`),
+
+  /** GET /api/nba/matches/:id/detail/full */
+  detailFull: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/nba/matches/${id}/detail/full`),
+
+  /** GET /api/nba/standings */
+  standings: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/nba/standings"),
+
+  /** GET /api/nba/teams */
+  teams: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/nba/teams"),
+
+  /** GET /api/nba/teams/:team/upcoming */
+  teamUpcoming: (team: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/nba/teams/${team}/upcoming`),
+
+  /** GET /api/nba/teams/:team/results */
+  teamResults: (team: string) =>
+    http.get<ApiResponse<Match[]>>(`/api/nba/teams/${team}/results`),
+
+  /** GET /api/nba/teams/:team/live */
+  teamLive: (team: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/nba/teams/${team}/live`),
+
+  /** GET /api/nba/teams/:teamId/schedule */
+  teamSchedule: (teamId: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/nba/teams/${teamId}/schedule`),
+
+  /** GET /api/nba/teams/:teamId/roster */
+  teamRoster: (teamId: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/nba/teams/${teamId}/roster`),
+
+  /** GET /api/nba/teams/:teamId/info */
+  teamInfo: (teamId: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/nba/teams/${teamId}/info`),
+
+  /** GET /api/nba/espn/upcoming */
+  espnUpcoming: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/nba/espn/upcoming"),
+
+  /** GET /api/nba/espn/today */
+  espnToday: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/nba/espn/today"),
+
+  /** GET /api/nba/espn/live */
+  espnLive: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/nba/espn/live"),
+
+  /** GET /api/nba/espn/game/:espnGameId */
+  espnGameDetail: (espnGameId: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/nba/espn/game/${espnGameId}`),
+};
+
+// =============================================================================
+// AUTHENTICATED — NFL (auth)
+// =============================================================================
+
+export const nfl = {
+  /** GET /api/nfl/matches/upcoming */
+  upcoming: () =>
+    http.get<ApiResponse<Match[]>>("/api/nfl/matches/upcoming"),
+
+  /** GET /api/nfl/matches/today */
+  today: () =>
+    http.get<ApiResponse<Match[]>>("/api/nfl/matches/today"),
+
+  /** GET /api/nfl/matches/live */
+  live: () =>
+    http.get<ApiResponse<Match[]>>("/api/nfl/matches/live"),
+
+  /** GET /api/nfl/matches/results */
+  results: () =>
+    http.get<ApiResponse<Match[]>>("/api/nfl/matches/results"),
+
+  /** GET /api/nfl/matches/:id */
+  getById: (id: string) =>
+    http.get<ApiResponse<Match>>(`/api/nfl/matches/${id}`),
+
+  /** GET /api/nfl/matches/:id/odds */
+  odds: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/nfl/matches/${id}/odds`),
+
+  /** GET /api/nfl/matches/:id/odds/db */
+  oddsDb: (id: string) =>
+    http.get<ApiResponse<Odds[]>>(`/api/nfl/matches/${id}/odds/db`),
+
+  /** GET /api/nfl/matches/:id/odds/all */
+  oddsAll: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/nfl/matches/${id}/odds/all`),
+
+  /** GET /api/nfl/matches/:id/score */
+  score: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/nfl/matches/${id}/score`),
+
+  /** GET /api/nfl/matches/:id/detail */
+  detail: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/nfl/matches/${id}/detail`),
+
+  /** GET /api/nfl/matches/espn/:espnGameId/full */
+  espnFullGame: (espnGameId: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/nfl/matches/espn/${espnGameId}/full`),
+
+  /** GET /api/nfl/standings */
+  standings: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/nfl/standings"),
+
+  /** GET /api/nfl/teams */
+  teams: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/nfl/teams"),
+
+  /** GET /api/nfl/teams/:teamId */
+  teamInfo: (teamId: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/nfl/teams/${teamId}`),
+
+  /** GET /api/nfl/teams/:teamId/schedule */
+  teamSchedule: (teamId: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/nfl/teams/${teamId}/schedule`),
+
+  /** GET /api/nfl/teams/:teamId/roster */
+  teamRoster: (teamId: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/nfl/teams/${teamId}/roster`),
+
+  /** GET /api/nfl/espn/week */
+  espnCurrentWeek: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/nfl/espn/week"),
+
+  /** GET /api/nfl/espn/week/:week */
+  espnByWeek: (week: number, seasonType = 2) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/nfl/espn/week/${week}${qs({ seasonType })}`),
+
+  /** GET /api/nfl/espn/upcoming */
+  espnUpcoming: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/nfl/espn/upcoming"),
+
+  /** GET /api/nfl/espn/live */
+  espnLive: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/nfl/espn/live"),
+
+  /** GET /api/nfl/espn/finished */
+  espnFinished: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/nfl/espn/finished"),
+
+  /** GET /api/nfl/espn/date/:date */
+  espnByDate: (date: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/nfl/espn/date/${date}`),
+};
+
+// =============================================================================
+// AUTHENTICATED — BASEBALL (auth)
+// =============================================================================
+
+export const baseball = {
+  /** GET /api/baseball/matches/upcoming */
+  upcoming: () =>
+    http.get<ApiResponse<Match[]>>("/api/baseball/matches/upcoming"),
+
+  /** GET /api/baseball/matches/today */
+  today: () =>
+    http.get<ApiResponse<Match[]>>("/api/baseball/matches/today"),
+
+  /** GET /api/baseball/matches/live */
+  live: () =>
+    http.get<ApiResponse<Match[]>>("/api/baseball/matches/live"),
+
+  /** GET /api/baseball/matches/results */
+  results: (limit = 20) =>
+    http.get<ApiResponse<Match[]>>(`/api/baseball/matches/results${qs({ limit })}`),
+
+  /** GET /api/baseball/matches/:id */
+  getById: (id: string) =>
+    http.get<ApiResponse<Match>>(`/api/baseball/matches/${id}`),
+
+  /** GET /api/baseball/matches/:id/odds */
+  odds: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/baseball/matches/${id}/odds`),
+
+  /** GET /api/baseball/matches/:id/odds/persisted */
+  oddsDb: (id: string) =>
+    http.get<ApiResponse<Odds[]>>(`/api/baseball/matches/${id}/odds/persisted`),
+
+  /** GET /api/baseball/matches/:id/score */
+  score: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/baseball/matches/${id}/score`),
+
+  /** GET /api/baseball/matches/:id/detail */
+  detail: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/baseball/matches/${id}/detail`),
+
+  /** GET /api/baseball/standings */
+  standings: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/baseball/standings"),
+
+  /** GET /api/baseball/teams/:team/upcoming */
+  teamUpcoming: (team: string) =>
+    http.get<ApiResponse<Match[]>>(`/api/baseball/teams/${team}/upcoming`),
+
+  /** GET /api/baseball/teams/:team/results */
+  teamResults: (team: string) =>
+    http.get<ApiResponse<Match[]>>(`/api/baseball/teams/${team}/results`),
+
+  /** GET /api/baseball/teams/:team/live */
+  teamLive: (team: string) =>
+    http.get<ApiResponse<Match[]>>(`/api/baseball/teams/${team}/live`),
+
+  /** GET /api/baseball/espn/upcoming */
+  espnUpcoming: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/baseball/espn/upcoming"),
+
+  /** GET /api/baseball/espn/today */
+  espnToday: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/baseball/espn/today"),
+
+  /** GET /api/baseball/espn/live */
+  espnLive: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/baseball/espn/live"),
+
+  /** GET /api/baseball/espn/game/:espnGameId */
+  espnGameDetail: (espnGameId: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/baseball/espn/game/${espnGameId}`),
+};
+
+// =============================================================================
+// AUTHENTICATED — MMA (auth)
+// =============================================================================
+
+export const mma = {
+  /** GET /api/mma/matches/upcoming */
+  upcoming: () =>
+    http.get<ApiResponse<Match[]>>("/api/mma/matches/upcoming"),
+
+  /** GET /api/mma/matches/live */
+  live: () =>
+    http.get<ApiResponse<Match[]>>("/api/mma/matches/live"),
+
+  /** GET /api/mma/matches/results */
+  results: (limit = 20) =>
+    http.get<ApiResponse<Match[]>>(`/api/mma/matches/results${qs({ limit })}`),
+
+  /** GET /api/mma/matches/featured */
+  featured: () =>
+    http.get<ApiResponse<Match[]>>("/api/mma/matches/featured"),
+
+  /** GET /api/mma/matches/:id */
+  getById: (id: string) =>
+    http.get<ApiResponse<Match>>(`/api/mma/matches/${id}`),
+
+  /** GET /api/mma/matches/:id/odds */
+  odds: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/mma/matches/${id}/odds`),
+
+  /** GET /api/mma/matches/:id/odds/all */
+  oddsAll: (id: string) =>
+    http.get<ApiResponse<Odds[]>>(`/api/mma/matches/${id}/odds/all`),
+
+  /** GET /api/mma/matches/:id/score */
+  score: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/mma/matches/${id}/score`),
+
+  /** GET /api/mma/matches/:id/detail */
+  detail: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/mma/matches/${id}/detail`),
+
+  /** GET /api/mma/matches/:id/events */
+  events: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/mma/matches/${id}/events`),
+
+  /** GET /api/mma/matches/:id/full */
+  fullDetail: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/mma/matches/${id}/full`),
+
+  /** GET /api/mma/matches/:id/fight-card */
+  fightCard: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/mma/matches/${id}/fight-card`),
+
+  /** GET /api/mma/fighters/:athleteId */
+  fighter: (athleteId: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/mma/fighters/${athleteId}`),
+
+  /** GET /api/mma/espn/events */
+  espnEvents: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/mma/espn/events"),
+
+  /** GET /api/mma/espn/events/upcoming */
+  espnUpcoming: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/mma/espn/events/upcoming"),
+
+  /** GET /api/mma/espn/events/live */
+  espnLive: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/mma/espn/events/live"),
+
+  /** GET /api/mma/espn/events/finished */
+  espnFinished: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/mma/espn/events/finished"),
+};
+
+// =============================================================================
+// AUTHENTICATED — TENNIS (auth)
+// =============================================================================
+
+export const tennis = {
+  /** GET /api/tennis/matches/upcoming */
+  upcoming: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/tennis/matches/upcoming"),
+
+  /** GET /api/tennis/matches/live */
+  live: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/tennis/matches/live"),
+
+  /** GET /api/tennis/matches/results */
+  results: (limit = 20) =>
+    http.get<ApiResponse<Match[]>>(`/api/tennis/matches/results${qs({ limit })}`),
+
+  /** GET /api/tennis/matches/featured */
+  featured: () =>
+    http.get<ApiResponse<Match[]>>("/api/tennis/matches/featured"),
+
+  /** GET /api/tennis/matches/:id */
+  getById: (id: string) =>
+    http.get<ApiResponse<Match>>(`/api/tennis/matches/${id}`),
+
+  /** GET /api/tennis/matches/:id/odds */
+  odds: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/tennis/matches/${id}/odds`),
+
+  /** GET /api/tennis/matches/:id/odds/db */
+  oddsDb: (id: string) =>
+    http.get<ApiResponse<Odds[]>>(`/api/tennis/matches/${id}/odds/db`),
+
+  /** GET /api/tennis/matches/:id/score */
+  score: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/tennis/matches/${id}/score`),
+
+  /** GET /api/tennis/matches/:id/events */
+  events: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/tennis/matches/${id}/events`),
+
+  /** GET /api/tennis/matches/:id/detail */
+  detail: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/tennis/matches/${id}/detail`),
+
+  /** GET /api/tennis/matches/:id/full-detail */
+  fullDetail: (id: string) =>
+    http.get<ApiResponse<Record<string, unknown>>>(`/api/tennis/matches/${id}/full-detail`),
+
+  /** GET /api/tennis/atp/matches */
+  atpMatches: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/tennis/atp/matches"),
+
+  /** GET /api/tennis/atp/live */
+  atpLive: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/tennis/atp/live"),
+
+  /** GET /api/tennis/atp/upcoming */
+  atpUpcoming: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/tennis/atp/upcoming"),
+
+  /** GET /api/tennis/atp/tournaments */
+  atpTournaments: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/tennis/atp/tournaments"),
+
+  /** GET /api/tennis/atp/rankings */
+  atpRankings: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/tennis/atp/rankings"),
+
+  /** GET /api/tennis/wta/matches */
+  wtaMatches: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/tennis/wta/matches"),
+
+  /** GET /api/tennis/wta/live */
+  wtaLive: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/tennis/wta/live"),
+
+  /** GET /api/tennis/wta/upcoming */
+  wtaUpcoming: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/tennis/wta/upcoming"),
+
+  /** GET /api/tennis/wta/tournaments */
+  wtaTournaments: () =>
+    http.get<ApiResponse<Record<string, unknown>[]>>("/api/tennis/wta/tournaments"),
+
+  /** GET /api/tennis/wta/rankings */
+  wtaRankings: () =>
+    http.get<ApiResponse<Record<string, unknown>>>("/api/tennis/wta/rankings"),
+
+  /** GET /api/tennis/tours/:tour/upcoming */
+  tourUpcoming: (tour: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/tennis/tours/${tour}/upcoming`),
+
+  /** GET /api/tennis/tours/:tour/live */
+  tourLive: (tour: string) =>
+    http.get<ApiResponse<Record<string, unknown>[]>>(`/api/tennis/tours/${tour}/live`),
 };
 
 // =============================================================================
@@ -1701,6 +2903,12 @@ export const superAdminAffiliateWithdrawals = {
   getPending: () =>
     http.get<ApiResponse<AffiliateWithdrawalRequest[]>>("/api/super-admin/affiliate-withdrawals/pending"),
 
+  /** GET /api/super-admin/affiliate-withdrawals (paginated with optional status filter) */
+  list: (page = 0, size = 20, status?: AffiliateWithdrawalStatus) =>
+    http.get<ApiResponse<PageResponse<AffiliateWithdrawalRequest>>>(
+      `/api/super-admin/affiliate-withdrawals${qs({ page, size, status })}`
+    ),
+
   /** POST /api/super-admin/affiliate-withdrawals/:id/process */
   process: (id: string) =>
     http.post<ApiResponse<AffiliateWithdrawalRequest>>(`/api/super-admin/affiliate-withdrawals/${id}/process`),
@@ -1711,7 +2919,7 @@ export const superAdminAffiliateWithdrawals = {
 };
 
 // =============================================================================
-// SUPER ADMIN — ADMINS, METRICS, PREDICTIONS, AUDIT
+// SUPER ADMIN — ADMINS, USERS, METRICS, TRANSACTIONS, AUDIT
 // =============================================================================
 
 export const superAdmin = {
@@ -1723,9 +2931,41 @@ export const superAdmin = {
   createAdmin: (body: Record<string, string>) =>
     http.post<ApiResponse<User>>("/api/super-admin/admins", body),
 
+  /** GET /api/super-admin/admins/:adminId */
+  getAdminDetail: (adminId: string) =>
+    http.get<ApiResponse<AdminDetailDto>>(`/api/super-admin/admins/${adminId}`),
+
+  /** GET /api/super-admin/users */
+  listUsers: (page = 0, size = 20, search?: string, role?: UserRole) =>
+    http.get<ApiResponse<PageResponse<UserSummaryDto>>>(
+      `/api/super-admin/users${qs({ page, size, search, role })}`
+    ),
+
+  /** GET /api/super-admin/users/:userId */
+  getUserDetail: (userId: string) =>
+    http.get<ApiResponse<UserDetailDto>>(`/api/super-admin/users/${userId}`),
+
   /** GET /api/super-admin/metrics */
   metrics: () =>
     http.get<ApiResponse<Record<string, unknown>>>("/api/super-admin/metrics"),
+
+  /** GET /api/super-admin/metrics/deposits */
+  depositMetrics: () =>
+    http.get<ApiResponse<RevenueOverviewDto>>("/api/super-admin/metrics/deposits"),
+
+  /** GET /api/super-admin/transactions */
+  listTransactions: (
+    page = 0,
+    size = 50,
+    kind?: TransactionKind,
+    status?: string,
+    walletId?: string,
+    from?: string,
+    to?: string
+  ) =>
+    http.get<ApiResponse<PageResponse<TransactionDto>>>(
+      `/api/super-admin/transactions${qs({ page, size, kind, status, walletId, from, to })}`
+    ),
 
   /** GET /api/super-admin/audit-log */
   auditLog: (page = 0, size = 50) =>
@@ -1754,15 +2994,25 @@ const api = {
   bets,
   games,
   booking,
-  publicMatches,
-  publicLeagues,
-  publicCups,
-  publicTeams,
-  publicStandings,
-  publicScorers,
+  adminBooking,
+  geo,
+  // Public sports
+  publicFootball,
+  publicFootballLeagues,
+  publicFootballCups,
+  publicFootballTeams,
+  publicFootballStandings,
+  publicFootballScorers,
+  publicFootballLivescore,
+  publicBasketball,
+  publicNfl,
+  publicBaseball,
+  publicMma,
+  publicTennis,
   publicAdminMatches,
   publicConfig,
   publicPredictions,
+  // Authenticated sports
   matches,
   livescore,
   standings,
@@ -1770,6 +3020,12 @@ const api = {
   teams,
   leagues,
   cups,
+  nba,
+  nfl,
+  baseball,
+  mma,
+  tennis,
+  // Admin
   affiliate,
   adminMatches,
   adminPredictions,

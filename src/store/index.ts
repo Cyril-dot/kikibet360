@@ -2,6 +2,11 @@ import { create } from 'zustand';
 import type { User, BetSlipSelection, Bet, Transaction } from '../types';
 import { mockBets, mockTransactions } from '../data/mock';
 
+// Define the new theme types
+type Theme =
+  | 'super-bet-primary' // Default Super Bet theme (light violet)
+  | 'super-bet-dark';    // Super Bet dark theme
+
 interface AppState {
   user: User | null;
   betSlip: BetSlipSelection[];
@@ -9,7 +14,7 @@ interface AppState {
   mainWalletBalance: number;
   affiliateWalletBalance: number;
   transactions: Transaction[];
-  theme: 'light' | 'dark';
+  theme: Theme; // Use the new Theme type
   isAdminModalOpen: boolean;
   toast: { message: string; type: 'success' | 'error' | 'info' } | null;
 
@@ -19,7 +24,7 @@ interface AppState {
   removeFromBetSlip: (matchId: string, market: string, selection: string) => void;
   clearBetSlip: () => void;
   placeBet: (stake: number) => void;
-  toggleTheme: () => void;
+  toggleTheme: () => void; // Now only cycles between primary and dark
   setAdminModalOpen: (open: boolean) => void;
   showToast: (message: string, type: 'success' | 'error' | 'info') => void;
   clearToast: () => void;
@@ -28,6 +33,12 @@ interface AppState {
   withdrawAffiliate: (amount: number) => void;
 }
 
+// Define allowed themes and determine the initial theme
+const allowedThemes: Theme[] = ['super-bet-primary', 'super-bet-dark'];
+const savedTheme = localStorage.getItem('theme') as Theme;
+const initialTheme: Theme = allowedThemes.includes(savedTheme) ? savedTheme : 'super-bet-primary';
+
+
 export const useAppStore = create<AppState>((set, get) => ({
   user: null,
   betSlip: [],
@@ -35,7 +46,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   mainWalletBalance: 1250.00,
   affiliateWalletBalance: 820.00,
   transactions: mockTransactions,
-  theme: 'light',
+  theme: initialTheme, // Initialize with saved theme (or default)
   isAdminModalOpen: false,
   toast: null,
 
@@ -48,9 +59,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       (s) => s.matchId === selection.matchId && s.market === selection.market && s.selection === selection.selection
     );
     if (exists) {
+      // If it exists, remove it (toggle off)
       set({ betSlip: betSlip.filter((s) => !(s.matchId === selection.matchId && s.market === selection.market && s.selection === selection.selection)) });
     } else {
+      // If it doesn't exist, and it's a different market for the same match, replace that market's selection
       const filtered = betSlip.filter((s) => !(s.matchId === selection.matchId && s.market === selection.market));
+      // Add the new selection
       set({ betSlip: [...filtered, selection] });
     }
   },
@@ -63,41 +77,69 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   placeBet: (stake) => {
     const { betSlip, mainWalletBalance, bets } = get();
-    if (betSlip.length === 0 || stake <= 0 || stake > mainWalletBalance) return;
+    if (betSlip.length === 0 || stake <= 0 || stake > mainWalletBalance) {
+        get().showToast('Invalid bet amount or empty bet slip.', 'error');
+        return;
+    }
     const totalOdds = betSlip.reduce((acc, s) => acc * s.odd, 1);
     const newBet: Bet = {
       id: `b${Date.now()}`,
       selections: [...betSlip],
       stake,
+      // Recalculate odds and potential return carefully
       totalOdds: Math.round(totalOdds * 100) / 100,
       potentialReturn: Math.round(stake * totalOdds * 100) / 100,
       status: 'pending',
       placedAt: new Date().toISOString(),
     };
-    set({
-      bets: [newBet, ...bets],
+    set((state) => ({
+      bets: [newBet, ...state.bets],
       betSlip: [],
       mainWalletBalance: Math.round((mainWalletBalance - stake) * 100) / 100,
       transactions: [
         { id: `t${Date.now()}`, type: 'bet_loss', amount: stake, description: 'Bet Placed', date: new Date().toISOString().split('T')[0], status: 'completed' },
-        ...get().transactions,
+        ...state.transactions,
       ],
-    });
+    }));
     get().showToast('Bet placed successfully!', 'success');
   },
 
-  toggleTheme: () => set((s) => ({ theme: s.theme === 'light' ? 'dark' : 'light' })),
+  toggleTheme: () =>
+    set((state) => {
+      let nextTheme: Theme;
+      // *** REMOVED super-bet-violet theme ***
+      // Only cycle between primary and dark themes
+      const themeOrder: Theme[] = [
+        'super-bet-primary', // Default light violet
+        'super-bet-dark',    // Dark mode
+      ];
+
+      const currentIndex = themeOrder.indexOf(state.theme);
+      // Calculate the next index, wrapping around using the modulo operator
+      const nextIndex = (currentIndex + 1) % themeOrder.length;
+      nextTheme = themeOrder[nextIndex];
+
+      // Keep the DOM attribute and localStorage in sync
+      document.documentElement.setAttribute('data-theme', nextTheme);
+      localStorage.setItem('theme', nextTheme);
+      return { theme: nextTheme };
+    }),
 
   setAdminModalOpen: (open) => set({ isAdminModalOpen: open }),
 
   showToast: (message, type) => {
     set({ toast: { message, type } });
+    // Automatically clear toast after a duration
     setTimeout(() => set({ toast: null }), 3000);
   },
 
   clearToast: () => set({ toast: null }),
 
   deposit: (amount) => {
+    if (amount <= 0) {
+      get().showToast('Deposit amount must be positive.', 'error');
+      return;
+    };
     set((s) => ({
       mainWalletBalance: Math.round((s.mainWalletBalance + amount) * 100) / 100,
       transactions: [
@@ -105,11 +147,19 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...s.transactions,
       ],
     }));
+    get().showToast('Deposit successful!', 'success');
   },
 
   withdraw: (amount) => {
     const { mainWalletBalance } = get();
-    if (amount > mainWalletBalance) return;
+    if (amount <= 0) {
+        get().showToast('Withdrawal amount must be positive.', 'error');
+        return;
+    }
+    if (amount > mainWalletBalance) {
+        get().showToast('Insufficient balance for withdrawal.', 'error');
+        return;
+    }
     set((s) => ({
       mainWalletBalance: Math.round((s.mainWalletBalance - amount) * 100) / 100,
       transactions: [
@@ -117,11 +167,19 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...s.transactions,
       ],
     }));
+    get().showToast('Withdrawal successful!', 'success');
   },
 
   withdrawAffiliate: (amount) => {
     const { affiliateWalletBalance } = get();
-    if (amount > affiliateWalletBalance) return;
+     if (amount <= 0) {
+        get().showToast('Affiliate withdrawal amount must be positive.', 'error');
+        return;
+    }
+    if (amount > affiliateWalletBalance) {
+        get().showToast('Insufficient affiliate balance for withdrawal.', 'error');
+        return;
+    }
     set((s) => ({
       affiliateWalletBalance: Math.round((s.affiliateWalletBalance - amount) * 100) / 100,
       transactions: [
@@ -129,5 +187,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...s.transactions,
       ],
     }));
+    get().showToast('Affiliate withdrawal successful!', 'success');
   },
 }));

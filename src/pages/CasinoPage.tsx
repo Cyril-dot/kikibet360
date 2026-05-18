@@ -1,7 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 
-// ── Google Material Icons (via @mui/icons-material) ──────────────────────────
 import CasinoIcon from '@mui/icons-material/Casino';
 import CloseIcon from '@mui/icons-material/Close';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
@@ -15,296 +13,357 @@ import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import FilterListIcon from '@mui/icons-material/FilterList';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Ghana-only currency config
+// ---------------------------------------------------------------------------
+export interface CurrencyConfig {
+  code: string;
+  symbol: string;
+  countryCode: string;
+  locale: string;
+  minBets: {
+    default: number;
+    aviator: number;
+    'sporty-jet': number;
+    mines: number;
+    'virtual-football': number;
+  };
+}
+
+export const GHANA_CURRENCY: CurrencyConfig = {
+  code: 'GHS',
+  symbol: 'GH₵',
+  countryCode: 'GH',
+  locale: 'en-GH',
+  minBets: {
+    default: 5,
+    aviator: 5,
+    'sporty-jet': 5,
+    mines: 10,
+    'virtual-football': 10,
+  },
+};
+
+export function formatAmount(amount: number, cfg: CurrencyConfig): string {
+  return `${cfg.symbol}${amount.toLocaleString(cfg.locale)}`;
+}
+
+// ---------------------------------------------------------------------------
+// useCurrency — always Ghana, no geo call needed
+// ---------------------------------------------------------------------------
+export function useCurrency() {
+  return { currency: GHANA_CURRENCY, loading: false, error: false };
+}
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 interface CasinoGame {
   slug: string;
   name: string;
   provider: string;
   family: string;
   maxPayout: string;
-  minBet: string;
   desc: string;
   longDesc: string;
   accentColor: string;
-  bgColor: string;
   hot: boolean;
-  pslTag: string;
+  gplTag: string;
   Icon: React.ElementType;
-  ArtComponent: React.FC;
+  GameIllustration: React.FC;
 }
 
-// ── Custom SVG Art Components ──────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Custom SVG Illustrations — one per game
+// ---------------------------------------------------------------------------
 
-const AviatorArt: React.FC = () => (
-  <svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+/** AVIATOR — plane climbing through clouds with a rising multiplier arc */
+const AviatorIllustration: React.FC = () => (
+  <svg viewBox="0 0 640 200" xmlns="http://www.w3.org/2000/svg" style={{ width: '100%', height: '100%' }}>
+    {/* Sky gradient */}
     <defs>
-      <linearGradient id="aviatorSky" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#0f0c29" />
-        <stop offset="50%" stopColor="#302b63" />
-        <stop offset="100%" stopColor="#24243e" />
+      <linearGradient id="avSky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#0a0a2e" />
+        <stop offset="100%" stopColor="#1a1050" />
       </linearGradient>
-      <linearGradient id="planeGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <linearGradient id="avTrail" x1="0" y1="0" x2="1" y2="0">
         <stop offset="0%" stopColor="#ff6b35" stopOpacity="0" />
-        <stop offset="100%" stopColor="#ff6b35" stopOpacity="0.8" />
+        <stop offset="100%" stopColor="#ff6b35" stopOpacity="0.9" />
       </linearGradient>
-      <filter id="glow">
-        <feGaussianBlur stdDeviation="3" result="coloredBlur" />
-        <feMerge><feMergeNode in="coloredBlur" /><feMergeNode in="SourceGraphic" /></feMerge>
-      </filter>
-      <filter id="softGlow">
-        <feGaussianBlur stdDeviation="6" result="coloredBlur" />
-        <feMerge><feMergeNode in="coloredBlur" /><feMergeNode in="SourceGraphic" /></feMerge>
-      </filter>
     </defs>
+    <rect width="640" height="200" fill="url(#avSky)" />
 
-    <rect width="320" height="180" fill="url(#aviatorSky)" />
-
-    {[[30,20],[80,15],[150,25],[200,10],[260,30],[290,18],[45,55],[130,45],[240,50],[310,40],[15,80],[95,75],[175,65],[280,70]].map(([cx,cy], i) => (
-      <circle key={i} cx={cx} cy={cy} r={i % 2 === 0 ? 1.5 : 1} fill="white" opacity={0.7} />
+    {/* Stars */}
+    {[[30,20],[80,10],[150,35],[200,8],[280,25],[350,12],[420,30],[500,18],[580,8],[610,38]].map(([x,y],i) => (
+      <circle key={i} cx={x} cy={y} r="1.5" fill="#fff" opacity={0.5 + (i % 3) * 0.2} />
     ))}
 
-    <path d="M 20 150 Q 80 140 120 110 Q 160 80 180 60 Q 200 40 215 25" stroke="#ff4d4d" strokeWidth="2.5" fill="none" strokeLinecap="round" filter="url(#glow)" />
-    <circle cx="215" cy="25" r="6" fill="#ff4d4d" filter="url(#softGlow)" opacity="0.9" />
-    <rect x="220" y="15" width="58" height="20" rx="10" fill="#ff4d4d" opacity="0.9" />
-    <text x="249" y="28" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold" fontFamily="monospace">1000x</text>
+    {/* Multiplier arc path */}
+    <path d="M 30 180 Q 200 170 400 90 Q 500 55 560 30" fill="none" stroke="#ff6b35" strokeWidth="3" strokeDasharray="6 3" opacity="0.7" />
 
-    <g transform="translate(170, 68) rotate(-25)" filter="url(#glow)">
-      <ellipse cx="0" cy="0" rx="22" ry="7" fill="#e8e8e8" />
-      <path d="M 18 0 L 28 0 L 22 4 Z" fill="#cccccc" />
-      <path d="M -18 -3 L -24 -16 L -14 -3 Z" fill="#cccccc" />
-      <path d="M -18 3 L -24 12 L -14 3 Z" fill="#cccccc" />
-      <path d="M -5 -5 L 8 -5 L 5 -18 L -8 -14 Z" fill="#d4d4d4" />
-      <path d="M -5 5 L 8 5 L 5 18 L -8 14 Z" fill="#d4d4d4" />
-      <ellipse cx="-20" cy="0" rx="5" ry="3" fill="#ff6b35" opacity="0.9" />
-      <ellipse cx="-26" cy="0" rx="8" ry="4" fill="#ff4d00" opacity="0.5" />
+    {/* Plane (at tip of arc) */}
+    <g transform="translate(535, 42) rotate(-32)">
+      {/* Fuselage */}
+      <ellipse cx="0" cy="0" rx="28" ry="7" fill="#fff" />
+      {/* Nose */}
+      <polygon points="28,-4 42,0 28,4" fill="#e0e0e0" />
+      {/* Wing */}
+      <polygon points="-5,-7 10,-7 8,12 -10,12" fill="#cccccc" />
+      {/* Tail */}
+      <polygon points="-22,-7 -14,-7 -18,-18 -26,-12" fill="#aaaaaa" />
+      {/* Engine glow */}
+      <ellipse cx="-30" cy="0" rx="5" ry="3" fill="#ff6b35" opacity="0.9" />
     </g>
 
-    <path d="M 145 88 Q 130 90 100 88 Q 80 87 60 89" stroke="url(#planeGlow)" strokeWidth="8" fill="none" strokeLinecap="round" opacity="0.6" />
-    <path d="M 145 88 Q 130 91 105 90 Q 85 89 65 91" stroke="#ff9966" strokeWidth="3" fill="none" strokeLinecap="round" opacity="0.4" />
+    {/* Trail flame */}
+    <ellipse cx="488" cy="58" rx="28" ry="5" fill="url(#avTrail)" transform="rotate(-32,488,58)" opacity="0.8" />
 
-    {[60,90,120,150].map((y, i) => (
-      <line key={i} x1="20" y1={y} x2="300" y2={y} stroke="white" strokeWidth="0.3" opacity="0.1" />
-    ))}
-    {[60,120,180,240,300].map((x, i) => (
-      <line key={i} x1={x} y1="30" x2={x} y2="160" stroke="white" strokeWidth="0.3" opacity="0.1" />
+    {/* Multiplier labels along arc */}
+    {[{x:80,y:168,t:'1x'},{x:210,y:138,t:'5x'},{x:340,y:95,t:'25x'},{x:450,y:62,t:'100x'}].map(({x,y,t}) => (
+      <text key={t} x={x} y={y} fill="#ff6b35" fontSize="13" fontWeight="700" fontFamily="sans-serif" textAnchor="middle">{t}</text>
     ))}
 
-    <rect x="0" y="155" width="320" height="25" fill="black" opacity="0.4" />
-    <text x="160" y="171" textAnchor="middle" fill="#ff6b35" fontSize="11" fontWeight="bold" fontFamily="monospace" letterSpacing="3">AVIATOR</text>
+    {/* "CASH OUT" pulse zone */}
+    <rect x="480" y="14" width="80" height="22" rx="11" fill="#ff6b35" opacity="0.15" />
+    <text x="520" y="30" fill="#ff6b35" fontSize="11" fontWeight="700" fontFamily="sans-serif" textAnchor="middle">CASH OUT!</text>
+
+    {/* Ground line */}
+    <line x1="0" y1="192" x2="640" y2="192" stroke="#ff6b35" strokeWidth="1" opacity="0.3" />
+    <text x="20" y="197" fill="#ff6b35" fontSize="10" fontFamily="sans-serif" opacity="0.7">0x</text>
   </svg>
 );
 
-const SportyJetArt: React.FC = () => (
-  <svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+/** SPORTY JET — rocket blasting through space past planets */
+const SportyJetIllustration: React.FC = () => (
+  <svg viewBox="0 0 640 200" xmlns="http://www.w3.org/2000/svg" style={{ width: '100%', height: '100%' }}>
     <defs>
-      <linearGradient id="spaceGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-        <stop offset="0%" stopColor="#0a0010" />
-        <stop offset="50%" stopColor="#1a0533" />
-        <stop offset="100%" stopColor="#0d1b4b" />
+      <linearGradient id="spSpace" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="#04000f" />
+        <stop offset="100%" stopColor="#130030" />
       </linearGradient>
-      <radialGradient id="engineBlast" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stopColor="#ffffff" />
-        <stop offset="30%" stopColor="#00d4ff" />
-        <stop offset="70%" stopColor="#7b2ff7" stopOpacity="0.8" />
-        <stop offset="100%" stopColor="#7b2ff7" stopOpacity="0" />
-      </radialGradient>
-      <filter id="rocketGlow">
-        <feGaussianBlur stdDeviation="4" result="coloredBlur" />
-        <feMerge><feMergeNode in="coloredBlur" /><feMergeNode in="SourceGraphic" /></feMerge>
-      </filter>
-      <linearGradient id="streakGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stopColor="#7b2ff7" stopOpacity="0" />
-        <stop offset="100%" stopColor="#00d4ff" stopOpacity="0.7" />
+      <linearGradient id="spFlame" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#7b2ff7" />
+        <stop offset="100%" stopColor="#e040fb" stopOpacity="0" />
+      </linearGradient>
+      <linearGradient id="spRocketBody" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stopColor="#9c27b0" />
+        <stop offset="100%" stopColor="#ce93d8" />
       </linearGradient>
     </defs>
+    <rect width="640" height="200" fill="url(#spSpace)" />
 
-    <rect width="320" height="180" fill="url(#spaceGrad)" />
-
-    {[[20,15],[70,8],[140,20],[210,5],[275,25],[300,12],[50,45],[120,38],[230,42],[285,55],[10,70],[100,65],[190,60],[270,68],[35,95],[160,90],[300,85]].map(([cx,cy], i) => (
-      <circle key={i} cx={cx} cy={cy} r={i % 3 === 0 ? 2 : 1} fill="white" opacity={0.4 + (i%5)*0.1} />
+    {/* Stars */}
+    {[[15,15],[60,40],[120,8],[200,50],[260,20],[320,45],[390,10],[450,35],[510,5],[590,25],[630,50],[70,80],[180,90],[300,70],[480,85]].map(([x,y],i) => (
+      <circle key={i} cx={x} cy={y} r={i % 4 === 0 ? 2 : 1} fill="#fff" opacity={0.3 + (i % 5) * 0.14} />
     ))}
 
-    <circle cx="260" cy="40" r="30" fill="#1e0047" opacity="0.8" />
-    <circle cx="260" cy="40" r="30" fill="none" stroke="#7b2ff7" strokeWidth="1" opacity="0.4" />
-    <ellipse cx="260" cy="40" rx="42" ry="10" fill="none" stroke="#7b2ff7" strokeWidth="1.5" opacity="0.5" />
+    {/* Distant planet 1 */}
+    <circle cx="100" cy="70" r="25" fill="#1a0040" stroke="#7b2ff7" strokeWidth="1.5" opacity="0.7" />
+    <ellipse cx="100" cy="70" rx="38" ry="8" fill="none" stroke="#9c27b0" strokeWidth="1" opacity="0.5" />
 
-    {([[0,80,100,80],[0,95,80,95],[0,110,120,110],[10,70,90,70]] as number[][]).map(([x1,y1,x2,y2], i) => (
-      <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="url(#streakGrad)" strokeWidth={i===2?2:1} opacity="0.5" />
+    {/* Distant planet 2 */}
+    <circle cx="550" cy="50" r="18" fill="#001a10" stroke="#00e676" strokeWidth="1" opacity="0.6" />
+
+    {/* Multiplier trail streak */}
+    {[0,1,2,3,4].map(i => (
+      <line key={i} x1={500 - i*80} y1={110 + i*12} x2={540 - i*80} y2={95 + i*12}
+        stroke="#7b2ff7" strokeWidth={3 - i * 0.4} opacity={0.8 - i * 0.15} />
     ))}
 
-    <g transform="translate(170, 88) rotate(-30)" filter="url(#rocketGlow)">
-      <rect x="-8" y="-25" width="16" height="40" rx="8" fill="#e0e0ff" />
-      <path d="M -8 -25 Q 0 -42 8 -25 Z" fill="#c0c0e0" />
-      <path d="M -8 12 L -18 22 L -8 20 Z" fill="#9999cc" />
-      <path d="M 8 12 L 18 22 L 8 20 Z" fill="#9999cc" />
-      <circle cx="0" cy="-10" r="5" fill="#00d4ff" opacity="0.8" />
-      <circle cx="0" cy="-10" r="3" fill="white" opacity="0.9" />
-      <rect x="-5" y="14" width="10" height="6" rx="2" fill="#888" />
+    {/* Rocket body */}
+    <g transform="translate(520,95) rotate(-38)">
+      {/* Body */}
+      <rect x="-8" y="-32" width="16" height="52" rx="8" fill="url(#spRocketBody)" />
+      {/* Nose cone */}
+      <polygon points="-8,-32 0,-52 8,-32" fill="#f3e5f5" />
+      {/* Window */}
+      <circle cx="0" cy="-12" r="6" fill="#7b2ff7" />
+      <circle cx="0" cy="-12" r="3" fill="#e1bee7" opacity="0.9" />
+      {/* Fins */}
+      <polygon points="-8,16 -20,32 -8,28" fill="#9c27b0" />
+      <polygon points="8,16 20,32 8,28" fill="#9c27b0" />
+      {/* Flame */}
+      <ellipse cx="0" cy="28" rx="6" ry="18" fill="url(#spFlame)" opacity="0.9" />
+      <ellipse cx="0" cy="34" rx="3" ry="10" fill="#fff" opacity="0.6" />
     </g>
 
-    <ellipse cx="148" cy="108" rx="18" ry="10" fill="url(#engineBlast)" opacity="0.9" transform="rotate(-30, 148, 108)" />
-    <ellipse cx="138" cy="115" rx="28" ry="12" fill="url(#engineBlast)" opacity="0.5" transform="rotate(-30, 138, 115)" />
+    {/* Multiplier labels */}
+    {[{x:60,y:145,t:'1x'},{x:160,y:130,t:'10x'},{x:300,y:108,t:'100x'},{x:420,y:92,t:'500x'}].map(({x,y,t}) => (
+      <text key={t} x={x} y={y} fill="#ce93d8" fontSize="12" fontWeight="700" fontFamily="sans-serif" textAnchor="middle">{t}</text>
+    ))}
 
-    <rect x="195" y="48" width="55" height="20" rx="10" fill="#7b2ff7" opacity="0.95" />
-    <text x="222" y="61" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold" fontFamily="monospace">750x</text>
-
-    <rect x="0" y="155" width="320" height="25" fill="black" opacity="0.4" />
-    <text x="160" y="171" textAnchor="middle" fill="#00d4ff" fontSize="11" fontWeight="bold" fontFamily="monospace" letterSpacing="2">SPORTY JET</text>
+    {/* "750x MAX" badge */}
+    <rect x="560" y="8" width="68" height="22" rx="11" fill="#7b2ff7" opacity="0.25" />
+    <text x="594" y="24" fill="#e040fb" fontSize="11" fontWeight="700" fontFamily="sans-serif" textAnchor="middle">750x MAX</text>
   </svg>
 );
 
-const MinesArt: React.FC = () => (
-  <svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-    <defs>
-      <linearGradient id="minesBg" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#0d1f0d" />
-        <stop offset="50%" stopColor="#0a1a0a" />
-        <stop offset="100%" stopColor="#071507" />
-      </linearGradient>
-      <radialGradient id="gemGlow" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stopColor="#00ff88" />
-        <stop offset="100%" stopColor="#00aa44" stopOpacity="0" />
-      </radialGradient>
-      <filter id="gemLight">
-        <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-        <feMerge><feMergeNode in="coloredBlur" /><feMergeNode in="SourceGraphic" /></feMerge>
-      </filter>
-      <filter id="bombGlow">
-        <feGaussianBlur stdDeviation="3" result="coloredBlur" />
-        <feMerge><feMergeNode in="coloredBlur" /><feMergeNode in="SourceGraphic" /></feMerge>
-      </filter>
-    </defs>
+/** MINES — 5×5 gem grid with some revealed and one exploding bomb */
+const MinesIllustration: React.FC = () => {
+  const cols = 7;
+  const rows = 4;
+  const cellW = 640 / cols;
+  const cellH = 200 / rows;
+  const pad = 6;
 
-    <rect width="320" height="180" fill="url(#minesBg)" />
+  // Which cells are gems (true), bombs (false), or hidden (null)
+  const states: (boolean | null)[][] = [
+    [true,  null, null, true,  null, null, true ],
+    [null,  true, null, null,  false,null, null ],
+    [true,  null, true, null,  null, null, true ],
+    [null,  null, null, true,  null, true, null ],
+  ];
 
-    {(() => {
-      const cells: React.ReactNode[] = [];
-      const revealed = [
-        {col:0,row:0,type:'gem'},{col:1,row:0,type:'gem'},{col:2,row:0,type:'safe'},{col:3,row:0,type:'gem'},{col:4,row:0,type:'safe'},
-        {col:0,row:1,type:'gem'},{col:1,row:1,type:'bomb'},{col:2,row:1,type:'gem'},{col:3,row:1,type:'safe'},{col:4,row:1,type:'gem'},
-        {col:0,row:2,type:'safe'},{col:1,row:2,type:'gem'},{col:2,row:2,type:'gem'},{col:3,row:2,type:'bomb'},{col:4,row:2,type:'safe'},
-        {col:0,row:3,type:'hidden'},{col:1,row:3,type:'hidden'},{col:2,row:3,type:'hidden'},{col:3,row:3,type:'hidden'},{col:4,row:3,type:'hidden'},
-      ];
-      const startX = 22, startY = 22, cellSize = 52, gap = 4;
+  return (
+    <svg viewBox="0 0 640 200" xmlns="http://www.w3.org/2000/svg" style={{ width: '100%', height: '100%' }}>
+      <defs>
+        <linearGradient id="mBg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#041a0a" />
+          <stop offset="100%" stopColor="#071f0d" />
+        </linearGradient>
+        <linearGradient id="mGem" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#00ff88" />
+          <stop offset="100%" stopColor="#00bcd4" />
+        </linearGradient>
+        <linearGradient id="mBomb" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#ff4444" />
+          <stop offset="100%" stopColor="#ff9800" />
+        </linearGradient>
+      </defs>
+      <rect width="640" height="200" fill="url(#mBg)" />
 
-      revealed.forEach(({ col, row, type }) => {
-        const x = startX + col * (cellSize + gap);
-        const y = startY + row * (cellSize + gap);
-        const cx = x + cellSize / 2;
-        const cy = y + cellSize / 2;
+      {states.map((row, ri) =>
+        row.map((state, ci) => {
+          const x = ci * cellW + pad;
+          const y = ri * cellH + pad;
+          const w = cellW - pad * 2;
+          const h = cellH - pad * 2;
+          const cx = x + w / 2;
+          const cy = y + h / 2;
 
-        if (type === 'hidden') {
-          cells.push(<rect key={`${col}-${row}`} x={x} y={y} width={cellSize} height={cellSize} rx="6" fill="#1a2e1a" stroke="#2d4a2d" strokeWidth="1" />);
-        } else if (type === 'gem') {
-          cells.push(
-            <g key={`${col}-${row}`} filter="url(#gemLight)">
-              <rect x={x} y={y} width={cellSize} height={cellSize} rx="6" fill="#0d2b18" stroke="#00cc66" strokeWidth="1.5" />
-              <circle cx={cx} cy={cy} r="14" fill="url(#gemGlow)" opacity="0.3" />
-              <polygon points={`${cx},${cy-14} ${cx+12},${cy-2} ${cx+8},${cy+12} ${cx-8},${cy+12} ${cx-12},${cy-2}`} fill="#00ff88" opacity="0.9" />
-              <polygon points={`${cx},${cy-14} ${cx+12},${cy-2} ${cx},${cy} ${cx-12},${cy-2}`} fill="white" opacity="0.3" />
-            </g>
-          );
-        } else if (type === 'bomb') {
-          cells.push(
-            <g key={`${col}-${row}`} filter="url(#bombGlow)">
-              <rect x={x} y={y} width={cellSize} height={cellSize} rx="6" fill="#2b0a0a" stroke="#ff3333" strokeWidth="1.5" />
-              <circle cx={cx} cy={cy} r="13" fill="#cc0000" />
-              <circle cx={cx} cy={cy} r="13" fill="none" stroke="#ff6666" strokeWidth="1" opacity="0.5" />
+          if (state === null) {
+            // Hidden cell
+            return (
+              <rect key={`${ri}-${ci}`} x={x} y={y} width={w} height={h} rx="8"
+                fill="#0d2e14" stroke="#1a4a22" strokeWidth="1" />
+            );
+          }
+          if (state === true) {
+            // Gem
+            return (
+              <g key={`${ri}-${ci}`}>
+                <rect x={x} y={y} width={w} height={h} rx="8"
+                  fill="#071f0d" stroke="#00ff8866" strokeWidth="1.5" />
+                {/* Diamond gem shape */}
+                <polygon
+                  points={`${cx},${cy-14} ${cx+12},${cy} ${cx},${cy+14} ${cx-12},${cy}`}
+                  fill="url(#mGem)" opacity="0.95"
+                />
+                <polygon
+                  points={`${cx},${cy-14} ${cx+12},${cy} ${cx},${cy-2}`}
+                  fill="#fff" opacity="0.3"
+                />
+                {/* Sparkle */}
+                <circle cx={cx+10} cy={cy-12} r="2" fill="#fff" opacity="0.8" />
+              </g>
+            );
+          }
+          // Bomb — exploding
+          return (
+            <g key={`${ri}-${ci}`}>
+              <rect x={x} y={y} width={w} height={h} rx="8" fill="#2a0000" stroke="#ff444466" strokeWidth="1.5" />
+              {/* Explosion rays */}
               {[0,45,90,135,180,225,270,315].map((angle, i) => {
-                const rad = angle * Math.PI / 180;
-                return <line key={i} x1={cx + Math.cos(rad)*8} y1={cy + Math.sin(rad)*8} x2={cx + Math.cos(rad)*16} y2={cy + Math.sin(rad)*16} stroke="#ff4444" strokeWidth="2" strokeLinecap="round" />;
+                const rad = (angle * Math.PI) / 180;
+                const x1 = cx + Math.cos(rad) * 10;
+                const y1 = cy + Math.sin(rad) * 10;
+                const x2 = cx + Math.cos(rad) * 20;
+                const y2 = cy + Math.sin(rad) * 20;
+                return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#ff9800" strokeWidth="2" opacity="0.8" />;
               })}
-              <circle cx={cx - 4} cy={cy - 4} r="3" fill="white" opacity="0.4" />
+              <circle cx={cx} cy={cy} r="10" fill="url(#mBomb)" />
+              <circle cx={cx-3} cy={cy-3} r="3" fill="#fff" opacity="0.4" />
             </g>
           );
-        } else {
-          cells.push(<rect key={`${col}-${row}`} x={x} y={y} width={cellSize} height={cellSize} rx="6" fill="#122012" stroke="#1e3a1e" strokeWidth="1" />);
-        }
-      });
-      return cells;
-    })()}
+        })
+      )}
 
-    <rect x="228" y="10" width="78" height="24" rx="12" fill="#00cc66" opacity="0.95" />
-    <text x="267" y="26" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold" fontFamily="monospace">1000x MAX</text>
+      {/* Multiplier overlay */}
+      <rect x="240" y="80" width="160" height="40" rx="8" fill="#000" opacity="0.6" />
+      <text x="320" y="105" fill="#00ff88" fontSize="18" fontWeight="700" fontFamily="sans-serif" textAnchor="middle">3.45x</text>
+    </svg>
+  );
+};
 
-    <rect x="0" y="155" width="320" height="25" fill="black" opacity="0.4" />
-    <text x="160" y="171" textAnchor="middle" fill="#00ff88" fontSize="11" fontWeight="bold" fontFamily="monospace" letterSpacing="4">MINES</text>
-  </svg>
-);
-
-const VirtualFootballArt: React.FC = () => (
-  <svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+/** VIRTUAL FOOTBALL — top-down football pitch with ball trajectory */
+const VirtualFootballIllustration: React.FC = () => (
+  <svg viewBox="0 0 640 200" xmlns="http://www.w3.org/2000/svg" style={{ width: '100%', height: '100%' }}>
     <defs>
-      <linearGradient id="pitchGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stopColor="#1a4a1a" />
-        <stop offset="50%" stopColor="#1f5c1f" />
-        <stop offset="100%" stopColor="#1a4a1a" />
+      <linearGradient id="vfPitch" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#1a4a0a" />
+        <stop offset="100%" stopColor="#0d3005" />
       </linearGradient>
-      <filter id="ballGlow">
-        <feGaussianBlur stdDeviation="3" result="coloredBlur" />
-        <feMerge><feMergeNode in="coloredBlur" /><feMergeNode in="SourceGraphic" /></feMerge>
-      </filter>
     </defs>
+    <rect width="640" height="200" fill="url(#vfPitch)" />
 
-    <rect width="320" height="180" fill="url(#pitchGrad)" />
-    {[0,64,128,192,256].map((x, i) => (
-      <rect key={i} x={x} y="0" width="32" height="180" fill="white" opacity="0.03" />
+    {/* Pitch stripes */}
+    {[0,1,2,3,4,5].map(i => (
+      <rect key={i} x={i * 107} y="0" width="53" height="200" fill="#1d5510" opacity="0.4" />
     ))}
 
-    <rect x="12" y="12" width="296" height="156" rx="2" fill="none" stroke="white" strokeWidth="2" opacity="0.7" />
-    <line x1="160" y1="12" x2="160" y2="168" stroke="white" strokeWidth="1.5" opacity="0.7" />
-    <circle cx="160" cy="90" r="32" fill="none" stroke="white" strokeWidth="1.5" opacity="0.7" />
-    <circle cx="160" cy="90" r="3" fill="white" opacity="0.7" />
+    {/* Pitch boundary */}
+    <rect x="20" y="15" width="600" height="170" rx="4" fill="none" stroke="#fff" strokeWidth="2" opacity="0.5" />
 
-    <rect x="12" y="52" width="54" height="76" fill="none" stroke="white" strokeWidth="1.5" opacity="0.7" />
-    <rect x="12" y="68" width="24" height="44" fill="none" stroke="white" strokeWidth="1.5" opacity="0.7" />
-    <circle cx="50" cy="90" r="2.5" fill="white" opacity="0.7" />
-    <path d="M 66 70 Q 82 90 66 110" fill="none" stroke="white" strokeWidth="1.5" opacity="0.7" />
+    {/* Centre circle */}
+    <circle cx="320" cy="100" r="35" fill="none" stroke="#fff" strokeWidth="1.5" opacity="0.5" />
+    <circle cx="320" cy="100" r="3" fill="#fff" opacity="0.6" />
+    {/* Centre line */}
+    <line x1="320" y1="15" x2="320" y2="185" stroke="#fff" strokeWidth="1.5" opacity="0.4" />
 
-    <rect x="254" y="52" width="54" height="76" fill="none" stroke="white" strokeWidth="1.5" opacity="0.7" />
-    <rect x="284" y="68" width="24" height="44" fill="none" stroke="white" strokeWidth="1.5" opacity="0.7" />
-    <circle cx="270" cy="90" r="2.5" fill="white" opacity="0.7" />
-    <path d="M 254 70 Q 238 90 254 110" fill="none" stroke="white" strokeWidth="1.5" opacity="0.7" />
+    {/* Left penalty box */}
+    <rect x="20" y="60" width="80" height="80" fill="none" stroke="#fff" strokeWidth="1.2" opacity="0.4" />
+    <rect x="20" y="80" width="40" height="40" fill="none" stroke="#fff" strokeWidth="1" opacity="0.35" />
+    {/* Left goal */}
+    <rect x="12" y="85" width="10" height="30" fill="none" stroke="#fff" strokeWidth="2" opacity="0.7" />
 
-    <rect x="0" y="70" width="12" height="40" fill="none" stroke="white" strokeWidth="2" opacity="0.9" />
-    <rect x="308" y="70" width="12" height="40" fill="none" stroke="white" strokeWidth="2" opacity="0.9" />
+    {/* Right penalty box */}
+    <rect x="540" y="60" width="80" height="80" fill="none" stroke="#fff" strokeWidth="1.2" opacity="0.4" />
+    <rect x="580" y="80" width="40" height="40" fill="none" stroke="#fff" strokeWidth="1" opacity="0.35" />
+    {/* Right goal */}
+    <rect x="618" y="85" width="10" height="30" fill="none" stroke="#fff" strokeWidth="2" opacity="0.7" />
 
-    <path d="M 12 24 Q 24 24 24 12" fill="none" stroke="white" strokeWidth="1.5" opacity="0.5" />
-    <path d="M 296 24 Q 296 12 308 12" fill="none" stroke="white" strokeWidth="1.5" opacity="0.5" />
-    <path d="M 12 156 Q 24 156 24 168" fill="none" stroke="white" strokeWidth="1.5" opacity="0.5" />
-    <path d="M 296 156 Q 296 168 308 168" fill="none" stroke="white" strokeWidth="1.5" opacity="0.5" />
-
-    <g filter="url(#ballGlow)">
-      <circle cx="160" cy="90" r="14" fill="white" />
-      <polygon points="160,78 167,83 164,91 156,91 153,83" fill="#1a1a1a" opacity="0.85" />
-      <polygon points="160,78 167,83 175,80 174,72 165,70" fill="#1a1a1a" opacity="0.6" />
-      <polygon points="153,83 156,91 149,96 142,91 143,83" fill="#1a1a1a" opacity="0.6" />
-      <polygon points="164,91 156,91 154,100 160,104 167,100" fill="#1a1a1a" opacity="0.6" />
-      <ellipse cx="155" cy="82" rx="5" ry="3" fill="white" opacity="0.5" transform="rotate(-20,155,82)" />
-    </g>
-
-    {[[90,60],[80,90],[90,120],[120,75],[120,105],[140,90]].map(([px,py],i) => (
-      <g key={`a${i}`}>
-        <circle cx={px} cy={py} r="7" fill="#00cc44" stroke="white" strokeWidth="1.5" opacity="0.9" />
-        <text x={px} y={py+1} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="7" fontWeight="bold">{i+1}</text>
-      </g>
-    ))}
-    {[[230,60],[240,90],[230,120],[200,75],[200,105],[180,90]].map(([px,py],i) => (
-      <g key={`b${i}`}>
-        <circle cx={px} cy={py} r="7" fill="#cc2200" stroke="white" strokeWidth="1.5" opacity="0.9" />
-        <text x={px} y={py+1} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="7" fontWeight="bold">{i+1}</text>
+    {/* Players (triangles = shirt shapes) */}
+    {[
+      // Team A (yellow - Ghana kit)
+      {x:120,y:90,c:'#FFD700'},{x:180,y:60,c:'#FFD700'},{x:180,y:140,c:'#FFD700'},
+      {x:240,y:100,c:'#FFD700'},{x:290,y:75,c:'#FFD700'},
+      // Team B (red)
+      {x:380,y:100,c:'#e53935'},{x:430,y:70,c:'#e53935'},{x:430,y:130,c:'#e53935'},
+      {x:490,y:95,c:'#e53935'},{x:540,y:110,c:'#e53935'},
+    ].map(({x,y,c},i) => (
+      <g key={i} transform={`translate(${x},${y})`}>
+        <circle r="9" fill={c} opacity="0.9" />
+        <circle r="4" fill={c === '#FFD700' ? '#333' : '#fff'} opacity="0.6" />
       </g>
     ))}
 
-    <rect x="120" y="6" width="80" height="22" rx="11" fill="black" opacity="0.65" />
-    <text x="160" y="21" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold" fontFamily="monospace">2 – 1</text>
+    {/* Ball trajectory arc */}
+    <path d="M 290 75 Q 350 30 460 70" fill="none" stroke="#fff" strokeWidth="2" strokeDasharray="5 3" opacity="0.8" />
+    {/* Ball */}
+    <circle cx="460" cy="70" r="8" fill="#fff" />
+    <circle cx="460" cy="70" r="8" fill="none" stroke="#333" strokeWidth="1" />
+    {/* Ball pentagon pattern */}
+    <polygon points="460,63 464,66 463,71 457,71 456,66" fill="#333" opacity="0.7" />
 
-    <rect x="0" y="155" width="320" height="25" fill="black" opacity="0.4" />
-    <text x="160" y="171" textAnchor="middle" fill="#44ff88" fontSize="11" fontWeight="bold" fontFamily="monospace" letterSpacing="2">VIRTUAL FOOTBALL</text>
+    {/* Score banner */}
+    <rect x="240" y="155" width="160" height="28" rx="6" fill="#000" opacity="0.65" />
+    <text x="320" y="173" fill="#FFD700" fontSize="14" fontWeight="700" fontFamily="sans-serif" textAnchor="middle">Hearts FC  2 – 1  Kotoko</text>
   </svg>
 );
 
-// ── Game catalogue ─────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Game catalogue — Ghana / GPL focused
+// ---------------------------------------------------------------------------
 const casinoGames: CasinoGame[] = [
   {
     slug: 'aviator',
@@ -312,15 +371,14 @@ const casinoGames: CasinoGame[] = [
     provider: 'Spribe',
     family: 'crash',
     maxPayout: '1000x',
-    minBet: 'GH₵5',
     desc: 'Cash out before the multiplier crashes. Hold your nerve for massive rewards.',
-    longDesc: 'Aviator is the world\'s most iconic crash game. Watch the multiplier climb — from 1x to 1000x. The longer you wait, the more you win. But if you don\'t cash out in time, you lose it all. Pure adrenaline, every round.',
+    longDesc:
+      "Aviator is the world's most iconic crash game. Watch the multiplier climb — from 1x to 1000x. The longer you wait, the more you win. But if you don't cash out in time, you lose it all. Pure adrenaline, every round. Minimum bet is GH₵5.",
     accentColor: '#ff6b35',
-    bgColor: '#1a0808',
     hot: true,
-    pslTag: 'PSL Season 10',
+    gplTag: 'GPL 2024/25',
     Icon: FlightTakeoffIcon,
-    ArtComponent: AviatorArt,
+    GameIllustration: AviatorIllustration,
   },
   {
     slug: 'sporty-jet',
@@ -328,15 +386,14 @@ const casinoGames: CasinoGame[] = [
     provider: 'In-House',
     family: 'crash',
     maxPayout: '750x',
-    minBet: 'GH₵5',
     desc: 'A high-speed space crash game with multipliers launching beyond the stratosphere.',
-    longDesc: 'Sporty Jet takes crash games to the cosmos. Ride the rocket as it blasts through space — time your cashout perfectly and walk away with up to 750x your stake. Lightning-fast rounds mean no downtime, only action.',
+    longDesc:
+      'Sporty Jet takes crash games to the cosmos. Ride the rocket as it blasts through space — time your cashout perfectly and walk away with up to 750x your stake. Lightning-fast rounds mean no downtime, only action. Minimum bet is GH₵5.',
     accentColor: '#7b2ff7',
-    bgColor: '#0d0020',
     hot: true,
-    pslTag: 'PSL Season 10',
+    gplTag: 'GPL 2024/25',
     Icon: RocketLaunchIcon,
-    ArtComponent: SportyJetArt,
+    GameIllustration: SportyJetIllustration,
   },
   {
     slug: 'mines',
@@ -344,15 +401,14 @@ const casinoGames: CasinoGame[] = [
     provider: 'In-House',
     family: 'skill',
     maxPayout: '1000x',
-    minBet: 'GH₵10',
     desc: 'Reveal gems across the grid. One wrong move and the bomb ends it all.',
-    longDesc: 'Mines is the ultimate game of nerves. A 5×5 grid hides gems and bombs — reveal gems to grow your multiplier, but detonate a mine and you lose your stake. You control the risk: choose how many mines are on the board before each round.',
+    longDesc:
+      'Mines is the ultimate game of nerves. A 5×5 grid hides gems and bombs — reveal gems to grow your multiplier, but detonate a mine and you lose your stake. You control the risk: choose how many mines are on the board before each round. Minimum bet is GH₵10.',
     accentColor: '#00ff88',
-    bgColor: '#041a0a',
     hot: false,
-    pslTag: 'PSL Season 10',
+    gplTag: 'GPL 2024/25',
     Icon: DiamondIcon,
-    ArtComponent: MinesArt,
+    GameIllustration: MinesIllustration,
   },
   {
     slug: 'virtual-football',
@@ -360,15 +416,14 @@ const casinoGames: CasinoGame[] = [
     provider: 'In-House',
     family: 'virtual',
     maxPayout: '200x',
-    minBet: 'GH₵10',
-    desc: 'Bet on realistic virtual PSL-style football matches running 24/7.',
-    longDesc: 'Virtual Football brings the excitement of PSL-style football to your fingertips — 24 hours a day, 7 days a week. Predict match outcomes, scorelines, and top scorers in AI-powered matches with real football physics and realistic team stats.',
+    desc: 'Bet on realistic virtual GPL-style football matches running 24/7.',
+    longDesc:
+      'Virtual Football brings the excitement of GPL-style football to your fingertips — 24 hours a day, 7 days a week. Predict match outcomes, scorelines, and top scorers in AI-powered matches featuring teams like Hearts of Oak and Kotoko, with real football physics and realistic team stats. Minimum bet is GH₵10.',
     accentColor: '#44dd88',
-    bgColor: '#041204',
     hot: false,
-    pslTag: 'PSL Season 10',
+    gplTag: 'GPL 2024/25',
     Icon: SportsSoccerIcon,
-    ArtComponent: VirtualFootballArt,
+    GameIllustration: VirtualFootballIllustration,
   },
 ];
 
@@ -379,269 +434,469 @@ const categories = [
   { key: 'virtual', label: 'Virtual' },
 ];
 
-// ── Main Component ─────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
 export default function CasinoPage() {
-  const navigate = useNavigate();
+  const { currency } = useCurrency();
+
   const [activeCategory, setActiveCategory] = useState('all');
-  const [preview, setPreview] = useState<CasinoGame | null>(null);
-  const [notified, setNotified] = useState<Set<string>>(new Set());
+  const [preview, setPreview]               = useState<CasinoGame | null>(null);
+  const [notified, setNotified]             = useState<Set<string>>(new Set());
 
   const filtered =
     activeCategory === 'all'
       ? casinoGames
       : casinoGames.filter((g) => g.family === activeCategory);
 
-  const handleNotify = (slug: string) => {
+  function getMinBet(slug: string): string {
+    const key    = slug as keyof CurrencyConfig['minBets'];
+    const amount = currency.minBets[key] ?? currency.minBets.default;
+    return formatAmount(amount, currency);
+  }
+
+  const handleNotify = (slug: string) =>
     setNotified(prev => new Set([...prev, slug]));
-  };
 
   return (
-    <div className="max-w-6xl mx-auto p-4 pb-10">
+    <div className="min-h-screen pb-10" style={{ backgroundColor: 'var(--card-alt)' }}>
+      <div className="max-w-6xl mx-auto p-4">
 
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-lg">
-            <CasinoIcon className="text-white" fontSize="medium" />
-          </div>
-          <div>
-            <h1 className="font-heading text-2xl font-bold leading-tight">Casino</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">4 upcoming PSL games</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/40 px-3 py-1.5 rounded-full">
-          <EmojiEventsIcon className="text-yellow-500" sx={{ fontSize: 16 }} />
-          <span className="text-xs font-bold text-yellow-600 dark:text-yellow-400">PSL Season 10</span>
-        </div>
-      </div>
-
-      {/* ── PSL upcoming banner ── */}
-      <div className="relative mb-6 rounded-2xl overflow-hidden bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-slate-700/50 p-5">
-        <div className="absolute inset-0 opacity-10"
-          style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.03) 10px, rgba(255,255,255,0.03) 20px)' }} />
-        <div className="relative flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center flex-shrink-0 shadow-xl">
-            <EmojiEventsIcon className="text-white" fontSize="medium" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-bold text-yellow-400 uppercase tracking-wider">Upcoming</span>
-              <div className="w-1 h-1 rounded-full bg-slate-500" />
-              <span className="text-xs text-slate-400">Pakistan Super League</span>
+        {/* ── Page header ───────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
+              style={{ background: 'linear-gradient(135deg, #eab308, #f97316)' }}
+            >
+              <CasinoIcon style={{ color: '#fff' }} fontSize="medium" />
             </div>
-            <h2 className="text-white font-bold text-base leading-snug">
-              PSL Season 10 Casino Games are almost here 🎰
-            </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              All 4 games coming soon. Notify yourself to be first in line.
-            </p>
+            <div>
+              <h1 className="text-2xl font-bold leading-tight" style={{ color: 'var(--text-main)' }}>
+                Casino
+              </h1>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                4 upcoming GPL games
+              </p>
+            </div>
           </div>
-          <div className="flex-shrink-0 hidden sm:flex items-center gap-1 bg-yellow-500/10 border border-yellow-500/30 px-3 py-1.5 rounded-full">
-            <AccessTimeIcon sx={{ fontSize: 14 }} className="text-yellow-400" />
-            <span className="text-xs font-bold text-yellow-400">Coming Soon</span>
+
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {/* Ghana currency badge */}
+            <div
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+              style={{
+                backgroundColor: 'color-mix(in srgb, #10b981 12%, var(--card-alt))',
+                border: '1px solid color-mix(in srgb, #10b981 30%, var(--border-light))',
+              }}
+            >
+              {/* Ghana flag colours dot */}
+              <span style={{ fontSize: 14 }}>🇬🇭</span>
+              <span className="text-xs font-bold" style={{ color: '#10b981' }}>GHS</span>
+            </div>
+            {/* GPL badge */}
+            <div
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+              style={{
+                backgroundColor: 'color-mix(in srgb, #eab308 12%, var(--card-alt))',
+                border: '1px solid color-mix(in srgb, #eab308 30%, var(--border-light))',
+              }}
+            >
+              <EmojiEventsIcon sx={{ fontSize: 16, color: '#eab308' }} />
+              <span className="text-xs font-bold" style={{ color: '#eab308' }}>GPL 2024/25</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* ── Category pills ── */}
-      <div className="flex items-center gap-2 mb-5 overflow-x-auto scrollbar-hide">
-        <FilterListIcon className="text-slate-400 flex-shrink-0" sx={{ fontSize: 18 }} />
-        {categories.map((cat) => (
-          <button
-            key={cat.key}
-            onClick={() => setActiveCategory(cat.key)}
-            className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-              activeCategory === cat.key
-                ? 'bg-primary text-white shadow-md scale-105'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-            }`}
-          >
-            {cat.label}
-            {cat.key === 'all' && (
-              <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${
-                activeCategory === 'all' ? 'bg-white/20' : 'bg-slate-200 dark:bg-slate-700'
-              }`}>
-                {casinoGames.length}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Game grid ── */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-16 text-slate-400">
-          <CasinoIcon sx={{ fontSize: 48 }} className="mb-3 opacity-30" />
-          <p>No games in this category yet.</p>
+        {/* ── GPL upcoming banner ────────────────────────────────────────── */}
+        <div
+          className="relative mb-6 rounded-2xl overflow-hidden p-5"
+          style={{
+            backgroundColor: 'var(--card-bg)',
+            border: '1px solid var(--border-light)',
+          }}
+        >
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage: 'radial-gradient(circle, var(--border-light) 1px, transparent 1px)',
+              backgroundSize: '18px 18px',
+              opacity: 0.5,
+            }}
+          />
+          <div className="relative flex items-center gap-4">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-xl"
+              style={{ background: 'linear-gradient(135deg, #eab308, #f97316)' }}
+            >
+              <EmojiEventsIcon style={{ color: '#fff' }} fontSize="medium" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#eab308' }}>
+                  Upcoming
+                </span>
+                <div className="w-1 h-1 rounded-full" style={{ backgroundColor: 'var(--border-light)' }} />
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Ghana Premier League
+                </span>
+              </div>
+              <h2 className="font-bold text-base leading-snug" style={{ color: 'var(--text-main)' }}>
+                GPL 2024/25 Casino Games are almost here 🎰
+              </h2>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                All 4 games coming soon · Amounts in GH₵ · Notify yourself to be first in line.
+              </p>
+            </div>
+            <div
+              className="flex-shrink-0 hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-full"
+              style={{
+                backgroundColor: 'color-mix(in srgb, #eab308 10%, transparent)',
+                border: '1px solid color-mix(in srgb, #eab308 30%, var(--border-light))',
+              }}
+            >
+              <AccessTimeIcon sx={{ fontSize: 14, color: '#eab308' }} />
+              <span className="text-xs font-bold" style={{ color: '#eab308' }}>Coming Soon</span>
+            </div>
+          </div>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {filtered.map((game) => {
-            const isNotified = notified.has(game.slug);
+
+        {/* ── Category pills ─────────────────────────────────────────────── */}
+        <div className="flex items-center gap-2 mb-5 overflow-x-auto scrollbar-hide">
+          <FilterListIcon sx={{ fontSize: 18 }} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          {categories.map((cat) => {
+            const active = activeCategory === cat.key;
             return (
               <button
-                key={game.slug}
-                onClick={() => setPreview(game)}
-                className="card overflow-hidden hover:shadow-xl transition-all hover:-translate-y-0.5 text-left group relative"
+                key={cat.key}
+                onClick={() => setActiveCategory(cat.key)}
+                className="px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all"
+                style={{
+                  backgroundColor: active ? 'var(--primary)' : 'var(--card-bg)',
+                  color: active ? '#fff' : 'var(--text-muted)',
+                  border: `1px solid ${active ? 'var(--primary)' : 'var(--border-light)'}`,
+                  transform: active ? 'scale(1.05)' : 'scale(1)',
+                }}
               >
-                {/* Game Art */}
-                <div className="relative overflow-hidden" style={{ aspectRatio: '16/9' }}>
-                  <game.ArtComponent />
-
-                  {/* Overlay badges */}
-                  <div className="absolute top-2 left-2 flex flex-col gap-1.5">
-                    <span className="flex items-center gap-1 bg-yellow-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md">
-                      <EmojiEventsIcon sx={{ fontSize: 10 }} />
-                      {game.pslTag}
-                    </span>
-                    <span className="flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium px-2 py-0.5 rounded-full">
-                      <AccessTimeIcon sx={{ fontSize: 10 }} />
-                      Upcoming
-                    </span>
-                  </div>
-
-                  {/* Hot badge */}
-                  {game.hot && (
-                    <span className="absolute top-2 right-2 flex items-center gap-0.5 bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-md">
-                      <LocalFireDepartmentIcon sx={{ fontSize: 11 }} />
-                      HOT
-                    </span>
-                  )}
-
-                  {/* Notified overlay */}
-                  {isNotified && (
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                      <div className="bg-green-500 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
-                        <NotificationsActiveIcon sx={{ fontSize: 14 }} />
-                        Notified!
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Card footer */}
-                <div className="p-3.5 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: game.accentColor + '22', border: `1px solid ${game.accentColor}44` }}>
-                      <game.Icon sx={{ fontSize: 18, color: game.accentColor }} />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="text-sm font-bold truncate">{game.name}</h3>
-                      <p className="text-[11px] text-slate-400 truncate">{game.provider} · Max {game.maxPayout}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                    <span className="text-[11px] font-semibold text-primary">View</span>
-                    <ArrowForwardIcon sx={{ fontSize: 14 }} className="text-primary" />
-                  </div>
-                </div>
+                {cat.label}
+                {cat.key === 'all' && (
+                  <span
+                    className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full"
+                    style={{
+                      backgroundColor: active ? 'rgba(255,255,255,0.2)' : 'var(--card-alt)',
+                      color: active ? '#fff' : 'var(--text-muted)',
+                    }}
+                  >
+                    {casinoGames.length}
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
-      )}
 
-      {/* ── Preview modal ── */}
-      {preview && (
-        <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 backdrop-blur-sm"
-          onClick={() => setPreview(null)}
-        >
-          <div
-            className="card m-0 sm:m-4 max-w-lg w-full rounded-t-2xl sm:rounded-2xl overflow-hidden"
-            onClick={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}
-          >
-            {/* Modal header */}
-            <div className="flex justify-between items-center px-4 pt-4 pb-3 border-b border-slate-200 dark:border-slate-700">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-                  style={{ backgroundColor: preview.accentColor + '22', border: `1.5px solid ${preview.accentColor}55` }}>
-                  <preview.Icon sx={{ fontSize: 20, color: preview.accentColor }} />
-                </div>
-                <div>
-                  <h3 className="font-heading text-base font-bold leading-tight">{preview.name}</h3>
-                  <p className="text-xs text-slate-500">{preview.provider}</p>
-                </div>
-              </div>
-              <button onClick={() => setPreview(null)}
-                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                <CloseIcon sx={{ fontSize: 18 }} />
-              </button>
-            </div>
-
-            {/* Game art */}
-            <div className="relative" style={{ aspectRatio: '16/9' }}>
-              <preview.ArtComponent />
-              <div className="absolute top-3 left-3 flex gap-2">
-                <span className="flex items-center gap-1 bg-yellow-500 text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow-lg">
-                  <EmojiEventsIcon sx={{ fontSize: 12 }} />
-                  {preview.pslTag}
-                </span>
-                <span className="flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-[11px] font-medium px-2.5 py-1 rounded-full">
-                  <AccessTimeIcon sx={{ fontSize: 12 }} />
-                  Upcoming
-                </span>
-              </div>
-              {preview.hot && (
-                <span className="absolute top-3 right-3 flex items-center gap-1 bg-orange-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-lg">
-                  <LocalFireDepartmentIcon sx={{ fontSize: 14 }} />
-                  HOT
-                </span>
-              )}
-            </div>
-
-            {/* Stats row */}
-            <div className="grid grid-cols-3 divide-x divide-slate-200 dark:divide-slate-700 border-b border-slate-200 dark:border-slate-700">
-              {[
-                { label: 'Max Payout', value: preview.maxPayout },
-                { label: 'Min Bet', value: preview.minBet },
-                { label: 'Category', value: preview.family.charAt(0).toUpperCase() + preview.family.slice(1) },
-              ].map(({ label, value }) => (
-                <div key={label} className="py-3 text-center">
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wide">{label}</p>
-                  <p className="text-sm font-bold mt-0.5">{value}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Description */}
-            <div className="px-4 py-3.5">
-              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{preview.longDesc}</p>
-            </div>
-
-            {/* Actions */}
-            <div className="px-4 pb-5 flex gap-3">
-              <button
-                onClick={() => setPreview(null)}
-                className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              >
-                Close
-              </button>
-              {notified.has(preview.slug) ? (
+        {/* ── Game grid ──────────────────────────────────────────────────── */}
+        {filtered.length === 0 ? (
+          <div className="text-center py-16" style={{ color: 'var(--text-muted)' }}>
+            <CasinoIcon sx={{ fontSize: 48 }} style={{ opacity: 0.3 }} />
+            <p className="mt-3">No games in this category yet.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {filtered.map((game) => {
+              const isNotified = notified.has(game.slug);
+              const minBet     = getMinBet(game.slug);
+              return (
                 <button
-                  disabled
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-green-500 text-white flex items-center justify-center gap-2 opacity-90 cursor-default"
-                >
-                  <NotificationsActiveIcon sx={{ fontSize: 16 }} />
-                  Notified!
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    handleNotify(preview.slug);
-                    setPreview(null);
+                  key={game.slug}
+                  onClick={() => setPreview(game)}
+                  className="overflow-hidden text-left group relative rounded-2xl transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.99]"
+                  style={{
+                    backgroundColor: 'var(--card-bg)',
+                    border: '1px solid var(--border-light)',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
                   }}
-                  className="flex-1 btn-primary py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+                  onMouseEnter={e =>
+                    ((e.currentTarget as HTMLElement).style.boxShadow = '0 8px 28px rgba(0,0,0,0.16)')
+                  }
+                  onMouseLeave={e =>
+                    ((e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.07)')
+                  }
                 >
-                  <NotificationsActiveIcon sx={{ fontSize: 16 }} />
-                  Notify Me
+                  {/* Game Illustration */}
+                  <div className="relative overflow-hidden" style={{ height: '180px' }}>
+                    <div className="w-full h-full transition-transform duration-300 group-hover:scale-105">
+                      <game.GameIllustration />
+                    </div>
+                    {/* Bottom scrim */}
+                    <div
+                      className="absolute inset-0 pointer-events-none"
+                      style={{
+                        background:
+                          'linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.02) 55%, transparent 100%)',
+                      }}
+                    />
+
+                    {/* Top-left badges */}
+                    <div className="absolute top-2 left-2 flex flex-col gap-1.5">
+                      <span className="flex items-center gap-1 bg-yellow-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md">
+                        <EmojiEventsIcon sx={{ fontSize: 10 }} />
+                        {game.gplTag}
+                      </span>
+                      <span
+                        className="flex items-center gap-1 text-white text-[10px] font-medium px-2 py-0.5 rounded-full"
+                        style={{ backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+                      >
+                        <AccessTimeIcon sx={{ fontSize: 10 }} />
+                        Upcoming
+                      </span>
+                    </div>
+
+                    {/* HOT badge */}
+                    {game.hot && (
+                      <span className="absolute top-2 right-2 flex items-center gap-0.5 bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-md">
+                        <LocalFireDepartmentIcon sx={{ fontSize: 11 }} />
+                        HOT
+                      </span>
+                    )}
+
+                    {/* Notified overlay */}
+                    {isNotified && (
+                      <div
+                        className="absolute inset-0 flex items-center justify-center"
+                        style={{ backgroundColor: 'rgba(0,0,0,0.52)' }}
+                      >
+                        <div className="bg-green-500 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                          <NotificationsActiveIcon sx={{ fontSize: 14 }} />
+                          Notified!
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Card footer */}
+                  <div className="p-3.5 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{
+                          backgroundColor: game.accentColor + '22',
+                          border: `1px solid ${game.accentColor}44`,
+                        }}
+                      >
+                        <game.Icon sx={{ fontSize: 18, color: game.accentColor }} />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-bold truncate" style={{ color: 'var(--text-main)' }}>
+                          {game.name}
+                        </h3>
+                        <p className="text-[11px] truncate" style={{ color: 'var(--text-muted)' }}>
+                          {game.provider} · Min {minBet} · Max {game.maxPayout}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                      <span className="text-[11px] font-semibold" style={{ color: 'var(--primary)' }}>
+                        View
+                      </span>
+                      <ArrowForwardIcon sx={{ fontSize: 14 }} style={{ color: 'var(--primary)' }} />
+                    </div>
+                  </div>
                 </button>
-              )}
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Preview modal ──────────────────────────────────────────────── */}
+        {preview && (
+          <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+            style={{ backgroundColor: 'rgba(0,0,0,0.76)', backdropFilter: 'blur(4px)' }}
+            onClick={() => setPreview(null)}
+          >
+            <div
+              className="m-0 sm:m-4 max-w-lg w-full rounded-t-2xl sm:rounded-2xl overflow-hidden"
+              style={{
+                backgroundColor: 'var(--card-bg)',
+                border: '1px solid var(--border-light)',
+              }}
+              onClick={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}
+            >
+              {/* Modal top bar */}
+              <div
+                className="flex justify-between items-center px-4 pt-4 pb-3"
+                style={{ borderBottom: '1px solid var(--border-light)' }}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center"
+                    style={{
+                      backgroundColor: preview.accentColor + '22',
+                      border: `1.5px solid ${preview.accentColor}55`,
+                    }}
+                  >
+                    <preview.Icon sx={{ fontSize: 20, color: preview.accentColor }} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold leading-tight" style={{ color: 'var(--text-main)' }}>
+                      {preview.name}
+                    </h3>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      {preview.provider}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setPreview(null)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+                  style={{ color: 'var(--text-muted)' }}
+                  onMouseEnter={e =>
+                    ((e.currentTarget as HTMLElement).style.backgroundColor = 'var(--card-alt)')
+                  }
+                  onMouseLeave={e =>
+                    ((e.currentTarget as HTMLElement).style.backgroundColor = 'transparent')
+                  }
+                >
+                  <CloseIcon sx={{ fontSize: 18 }} />
+                </button>
+              </div>
+
+              {/* Modal illustration */}
+              <div className="relative overflow-hidden" style={{ height: '200px' }}>
+                <preview.GameIllustration />
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    background:
+                      'linear-gradient(to top, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.04) 55%, transparent 100%)',
+                  }}
+                />
+                <div className="absolute top-3 left-3 flex gap-2">
+                  <span className="flex items-center gap-1 bg-yellow-500 text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow-lg">
+                    <EmojiEventsIcon sx={{ fontSize: 12 }} />
+                    {preview.gplTag}
+                  </span>
+                  <span
+                    className="flex items-center gap-1 text-white text-[11px] font-medium px-2.5 py-1 rounded-full"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+                  >
+                    <AccessTimeIcon sx={{ fontSize: 12 }} />
+                    Upcoming
+                  </span>
+                </div>
+                {preview.hot && (
+                  <span className="absolute top-3 right-3 flex items-center gap-1 bg-orange-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-lg">
+                    <LocalFireDepartmentIcon sx={{ fontSize: 14 }} />
+                    HOT
+                  </span>
+                )}
+              </div>
+
+              {/* Stats row */}
+              <div
+                className="grid grid-cols-3"
+                style={{
+                  borderTop: '1px solid var(--border-light)',
+                  borderBottom: '1px solid var(--border-light)',
+                }}
+              >
+                {[
+                  { label: 'Max Payout', value: preview.maxPayout },
+                  { label: 'Min Bet',    value: getMinBet(preview.slug) },
+                  { label: 'Category',   value: preview.family.charAt(0).toUpperCase() + preview.family.slice(1) },
+                ].map(({ label, value }, i, arr) => (
+                  <div
+                    key={label}
+                    className="py-3 text-center"
+                    style={{
+                      borderRight: i < arr.length - 1 ? '1px solid var(--border-light)' : 'none',
+                    }}
+                  >
+                    <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                      {label}
+                    </p>
+                    <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--text-main)' }}>
+                      {value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Ghana currency note */}
+              <div
+                className="mx-4 mt-3 flex items-center gap-1.5 px-3 py-2 rounded-xl"
+                style={{
+                  backgroundColor: 'var(--card-alt)',
+                  border: '1px solid var(--border-light)',
+                }}
+              >
+                <span style={{ fontSize: 13 }}>🇬🇭</span>
+                <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  Amounts shown in{' '}
+                  <span className="font-bold" style={{ color: 'var(--text-main)' }}>
+                    Ghana Cedis (GH₵)
+                  </span>
+                </p>
+              </div>
+
+              {/* Description */}
+              <div className="px-4 py-3.5">
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  {preview.longDesc}
+                </p>
+              </div>
+
+              {/* Action buttons */}
+              <div className="px-4 pb-5 flex gap-3">
+                <button
+                  onClick={() => setPreview(null)}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all active:scale-[0.97]"
+                  style={{
+                    backgroundColor: 'var(--card-alt)',
+                    border: '1px solid var(--border-light)',
+                    color: 'var(--text-main)',
+                  }}
+                  onMouseEnter={e =>
+                    ((e.currentTarget as HTMLElement).style.filter = 'brightness(0.95)')
+                  }
+                  onMouseLeave={e =>
+                    ((e.currentTarget as HTMLElement).style.filter = '')
+                  }
+                >
+                  Close
+                </button>
+
+                {notified.has(preview.slug) ? (
+                  <button
+                    disabled
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 cursor-default"
+                    style={{ backgroundColor: '#10b981', color: '#fff', opacity: 0.9 }}
+                  >
+                    <NotificationsActiveIcon sx={{ fontSize: 16 }} />
+                    Notified!
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { handleNotify(preview.slug); setPreview(null); }}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.97]"
+                    style={{ backgroundColor: 'var(--primary)', color: '#fff' }}
+                    onMouseEnter={e =>
+                      ((e.currentTarget as HTMLElement).style.filter = 'brightness(1.08)')
+                    }
+                    onMouseLeave={e =>
+                      ((e.currentTarget as HTMLElement).style.filter = '')
+                    }
+                  >
+                    <NotificationsActiveIcon sx={{ fontSize: 16 }} />
+                    Notify Me
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

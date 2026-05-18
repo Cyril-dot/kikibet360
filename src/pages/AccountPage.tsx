@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '../store';
-import { user as userApi, wallet, affiliate, auth, adminUpgrade } from '../utils/api';
+import { user as userApi, wallet, affiliate, auth } from '../utils/api';
 import type { UpdateProfileRequest, Transaction } from '../utils/api';
 
 import EditIcon from '@mui/icons-material/Edit';
@@ -11,26 +11,35 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import LogoutIcon from '@mui/icons-material/Logout';
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CircularProgress from '@mui/icons-material/Loop';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import PersonIcon from '@mui/icons-material/Person';
-import ShieldIcon from '@mui/icons-material/Shield';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
-import BarChartIcon from '@mui/icons-material/BarChart';
-import QrCodeIcon from '@mui/icons-material/QrCode';
-import PaymentsIcon from '@mui/icons-material/Payments';
-import ChatIcon from '@mui/icons-material/Chat';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import PublicIcon from '@mui/icons-material/Public';
+
+// ---------------------------------------------------------------------------
+// Geo / IP detection
+// ---------------------------------------------------------------------------
+interface GeoInfo {
+  currency: string;
+  countryCode: string;
+  source: 'ip-api' | 'fallback';
+}
+
+async function fetchGeoInfo(): Promise<GeoInfo> {
+  try {
+    const res = await fetch('/api/geo/currency');
+    if (!res.ok) throw new Error('geo fetch failed');
+    return (await res.json()) as GeoInfo;
+  } catch {
+    return { currency: 'GHS', countryCode: 'GH', source: 'fallback' };
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -71,22 +80,197 @@ function isCredit(kind: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Button primitives
+// ---------------------------------------------------------------------------
+
+interface BtnProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  loading?: boolean;
+  icon?: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg';
+}
+
+/** Primary — filled brand colour. Single most important action per region. */
+function BtnPrimary({
+  children,
+  loading,
+  icon,
+  size = 'md',
+  className = '',
+  disabled,
+  ...rest
+}: BtnProps) {
+  const sz =
+    size === 'sm'  ? 'px-3 py-1.5 text-xs rounded-lg' :
+    size === 'lg'  ? 'w-full py-3 text-sm rounded-xl'  :
+                     'px-4 py-2.5 text-sm rounded-xl';
+  return (
+    <button
+      {...rest}
+      disabled={disabled || loading}
+      className={[
+        'inline-flex items-center justify-center gap-2 font-semibold',
+        'btn-primary',
+        'active:scale-[0.97] transition-all duration-150',
+        'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
+        sz,
+        className,
+      ].join(' ')}
+    >
+      {loading
+        ? <CircularProgress fontSize="small" className="animate-spin shrink-0" />
+        : icon && <span className="shrink-0">{icon}</span>}
+      {children}
+    </button>
+  );
+}
+
+/** Ghost — outlined, no fill. Secondary / cancel actions. */
+function BtnGhost({
+  children,
+  loading,
+  icon,
+  size = 'md',
+  className = '',
+  disabled,
+  style,
+  ...rest
+}: BtnProps) {
+  const sz =
+    size === 'sm'  ? 'px-3 py-1.5 text-xs rounded-lg' :
+    size === 'lg'  ? 'w-full py-3 text-sm rounded-xl'  :
+                     'px-4 py-2.5 text-sm rounded-xl';
+  return (
+    <button
+      {...rest}
+      disabled={disabled || loading}
+      style={style}
+      className={[
+        'inline-flex items-center justify-center gap-2 font-semibold',
+        'transition-all duration-150 active:scale-[0.97]',
+        'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
+        sz,
+        className,
+      ].join(' ')}
+    >
+      {loading
+        ? <CircularProgress fontSize="small" className="animate-spin shrink-0" />
+        : icon && <span className="shrink-0">{icon}</span>}
+      {children}
+    </button>
+  );
+}
+
+/** Danger — ghost styled in destructive red. Sign out, self-exclusion, etc. */
+function BtnDanger({
+  children,
+  icon,
+  size = 'md',
+  className = '',
+  ...rest
+}: BtnProps) {
+  const sz =
+    size === 'sm'  ? 'px-3 py-1.5 text-xs rounded-lg' :
+    size === 'lg'  ? 'w-full py-3.5 text-sm rounded-2xl' :
+                     'px-4 py-2.5 text-sm rounded-xl';
+  return (
+    <button
+      {...rest}
+      style={{
+        color: '#e11d48',
+        backgroundColor: 'var(--card-bg)',
+        border: '1px solid color-mix(in srgb, #f43f5e 25%, transparent)',
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLElement).style.backgroundColor =
+          'color-mix(in srgb, #f43f5e 8%, transparent)';
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--card-bg)';
+      }}
+      className={[
+        'inline-flex items-center justify-center gap-2 font-bold',
+        'transition-all duration-150 active:scale-[0.98]',
+        sz,
+        className,
+      ].join(' ')}
+    >
+      {icon && <span className="shrink-0">{icon}</span>}
+      {children}
+    </button>
+  );
+}
+
+/** Icon — square ghost for icon-only utilities (refresh, copy, etc.). */
+function BtnIcon({
+  children,
+  className = '',
+  ...rest
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      {...rest}
+      style={{ color: 'var(--text-muted)' }}
+      onMouseEnter={(e) =>
+        ((e.currentTarget as HTMLElement).style.backgroundColor = 'var(--card-alt)')
+      }
+      onMouseLeave={(e) =>
+        ((e.currentTarget as HTMLElement).style.backgroundColor = '')
+      }
+      className={[
+        'w-7 h-7 rounded-lg flex items-center justify-center transition-colors',
+        'disabled:opacity-40 disabled:cursor-not-allowed',
+        className,
+      ].join(' ')}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Shared UI Atoms
 // ---------------------------------------------------------------------------
 function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm ${className}`}>
+    <div
+      className={`rounded-2xl overflow-hidden shadow-sm ${className}`}
+      style={{
+        backgroundColor: 'var(--card-bg)',
+        border: '1px solid var(--border-light)',
+      }}
+    >
       {children}
     </div>
   );
 }
 
-function CardHeader({ icon, title, action }: { icon: React.ReactNode; title: string; action?: React.ReactNode }) {
+function CardHeader({
+  icon,
+  title,
+  action,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  action?: React.ReactNode;
+}) {
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/30">
+    <div
+      className="flex items-center justify-between px-4 py-3"
+      style={{
+        borderBottom: '1px solid var(--border-light)',
+        backgroundColor: 'var(--card-alt)',
+      }}
+    >
       <div className="flex items-center gap-2">
-        <span className="text-slate-400 dark:text-slate-500 flex items-center">{icon}</span>
-        <span className="text-[11px] font-bold tracking-widest uppercase text-slate-500 dark:text-slate-400">{title}</span>
+        <span style={{ color: 'var(--text-muted)' }} className="flex items-center">
+          {icon}
+        </span>
+        <span
+          className="text-[11px] font-bold tracking-widest uppercase"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          {title}
+        </span>
       </div>
       {action && <div>{action}</div>}
     </div>
@@ -94,13 +278,25 @@ function CardHeader({ icon, title, action }: { icon: React.ReactNode; title: str
 }
 
 function SkeletonLine({ w = 'w-full', h = 'h-4' }: { w?: string; h?: string }) {
-  return <div className={`${h} ${w} bg-slate-200 dark:bg-slate-700/60 rounded-lg animate-pulse`} />;
+  return (
+    <div
+      className={`${h} ${w} rounded-lg animate-pulse`}
+      style={{ backgroundColor: 'var(--border-light)' }}
+    />
+  );
 }
 
 function TxKindBadge({ kind }: { kind: string }) {
   const credit = isCredit(kind);
   return (
-    <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-md tracking-wide ${credit ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'}`}>
+    <span
+      className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-md tracking-wide"
+      style={
+        credit
+          ? { backgroundColor: 'color-mix(in srgb, #10b981 15%, transparent)', color: '#059669' }
+          : { backgroundColor: 'color-mix(in srgb, #f43f5e 15%, transparent)', color: '#e11d48' }
+      }
+    >
       {kind.replace(/_/g, ' ')}
     </span>
   );
@@ -108,331 +304,70 @@ function TxKindBadge({ kind }: { kind: string }) {
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-50 dark:border-slate-800/60 last:border-0">
-      <span className="text-sm text-slate-400 dark:text-slate-500 shrink-0">{label}</span>
-      <span className="text-sm font-semibold text-slate-800 dark:text-slate-100 text-right ml-4 truncate max-w-[60%]">{value}</span>
+    <div
+      className="flex items-center justify-between px-4 py-3.5"
+      style={{ borderBottom: '1px solid var(--border-light)' }}
+    >
+      <span className="text-sm shrink-0" style={{ color: 'var(--text-muted)' }}>
+        {label}
+      </span>
+      <span
+        className="text-sm font-semibold text-right ml-4 truncate max-w-[60%]"
+        style={{ color: 'var(--text-main)' }}
+      >
+        {value}
+      </span>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Admin Upgrade Modal
-//
-// Mobile fix: uses 100dvh (dynamic viewport height) so the browser chrome
-// (address bar, home indicator) never clips the footer/payment button.
-// Falls back to 100vh for browsers that don't support dvh.
-// The panel is a flex column: header (shrink-0) + scrollable body (flex-1
-// overflow-y-auto) + footer (shrink-0) — footer is ALWAYS on screen.
+// Geo Badge
 // ---------------------------------------------------------------------------
-const PERKS = [
-  { icon: <BarChartIcon sx={{ fontSize: 16 }} />,   label: 'Analytics Dashboard',   desc: 'Real-time revenue & user stats'       },
-  { icon: <QrCodeIcon sx={{ fontSize: 16 }} />,     label: 'Booking Code Access',   desc: 'Create & manage booking codes'        },
-  { icon: <GroupAddIcon sx={{ fontSize: 16 }} />,   label: 'Affiliate Tools',       desc: 'Referral links & commission tracking' },
-  { icon: <PaymentsIcon sx={{ fontSize: 16 }} />,   label: 'Withdrawal Management', desc: 'Approve & reject user withdrawals'    },
-  { icon: <ChatIcon sx={{ fontSize: 16 }} />,       label: 'Upgrade Chat Support',  desc: 'Direct chat with super admins'        },
-];
+function GeoBadge({ geo, loading }: { geo: GeoInfo | null; loading: boolean }) {
+  if (loading) return <SkeletonLine w="w-28" h="h-4" />;
+  if (!geo) return null;
 
-function AdminUpgradeModal({ onClose }: { onClose: () => void }) {
-  const { showToast } = useAppStore();
-  const [loading, setLoading] = useState(false);
-  const [done, setDone]       = useState(false);
-  const [step, setStep]       = useState<'overview' | 'confirm'>('overview');
-
-  const handleUpgrade = async () => {
-    setLoading(true);
-    try {
-      const res = await adminUpgrade.initPaystack();
-      if (res.success && res.data) {
-        const d = res.data as Record<string, unknown>;
-        if (typeof d.authorizationUrl === 'string') { window.location.href = d.authorizationUrl; return; }
-        if (typeof d.authorization_url === 'string') { window.location.href = d.authorization_url; return; }
-      }
-      setDone(true);
-      showToast('Upgrade request initiated!', 'success');
-    } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'Failed to initiate upgrade.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Dynamic viewport height: covers the real visible area on mobile browsers
-  // where 100vh overshoots due to the address bar / home indicator.
-  const dvhStyle: React.CSSProperties = {
-    height: '100dvh',
-  };
+  const flag = geo.countryCode
+    ? geo.countryCode
+        .toUpperCase()
+        .split('')
+        .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
+        .join('')
+    : '';
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-stretch justify-start"
-      style={{ backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg w-fit"
+      style={{
+        backgroundColor: 'var(--card-alt)',
+        border: '1px solid var(--border-light)',
+      }}
     >
-      <style>{`
-        @keyframes adminPanelSlideIn {
-          from { transform: translateX(-100%); }
-          to   { transform: translateX(0); }
-        }
-        /* Ensure the panel never overflows on any mobile browser */
-        .admin-upgrade-panel {
-          height: 100vh;
-          height: 100dvh;
-        }
-      `}</style>
-
-      {/*
-        PANEL
-        - w-full on mobile, capped at max-w-sm (384px) on larger screens
-        - admin-upgrade-panel uses 100dvh with 100vh fallback (see style tag above)
-        - flex flex-col: header shrink-0 | body flex-1 overflow-y-auto | footer shrink-0
-        - overflow-hidden clips children; inner scroll area handles its own overflow
-      */}
-      <div
-        className="admin-upgrade-panel relative flex flex-col w-full max-w-sm bg-white dark:bg-slate-900 shadow-2xl overflow-hidden"
-        style={{ animation: 'adminPanelSlideIn 0.30s cubic-bezier(0.22, 1, 0.36, 1) both' }}
-      >
-        {/* Gradient accent bar */}
-        <div className="h-1 w-full bg-gradient-to-r from-primary via-primary/70 to-emerald-400 shrink-0" />
-
-        {/* ── SUCCESS STATE ── */}
-        {done ? (
-          <div className="flex flex-col items-center justify-center flex-1 px-6 py-12 text-center">
-            <div className="w-20 h-20 rounded-full bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center mb-5 ring-4 ring-emerald-100 dark:ring-emerald-900/40">
-              <RocketLaunchIcon className="text-emerald-500" sx={{ fontSize: 36 }} />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">You're on your way!</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-8 leading-relaxed max-w-xs">
-              Your upgrade request has been submitted. Our team will review and activate your admin account shortly.
-            </p>
-            <button onClick={onClose} className="btn-primary w-full py-3.5 rounded-xl text-sm font-bold">
-              Got it, thanks!
-            </button>
-          </div>
-
-        ) : step === 'overview' ? (
-          /* ── OVERVIEW STEP ── */
-          <>
-            {/* HEADER — never scrolls */}
-            <div className="flex items-start justify-between px-5 pt-5 pb-3 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center shrink-0">
-                  <AdminPanelSettingsIcon className="text-primary" sx={{ fontSize: 20 }} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-base text-slate-900 dark:text-white leading-tight">Become an Admin</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Unlock the full platform</p>
-                </div>
-              </div>
-              <button
-                onClick={onClose}
-                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400 shrink-0"
-              >
-                <CloseIcon fontSize="small" />
-              </button>
-            </div>
-
-            {/*
-              SCROLLABLE BODY
-              flex-1 + min-h-0 is the critical combo:
-                flex-1  → takes all space between header and footer
-                min-h-0 → allows shrinking below natural content height (flex default is min-h auto)
-              overflow-y-auto → only this div scrolls
-            */}
-            <div className="flex-1 min-h-0 overflow-y-auto px-5 py-2">
-              {/* Hero banner */}
-              <div className="mb-4 rounded-2xl bg-gradient-to-br from-primary/90 to-primary p-5 text-white relative overflow-hidden">
-                <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-white/10" />
-                <div className="absolute -bottom-8 -left-4 w-20 h-20 rounded-full bg-white/5" />
-                <div className="relative z-10">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <AutoAwesomeIcon sx={{ fontSize: 14 }} className="text-yellow-300" />
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-white/80">Admin Access</span>
-                  </div>
-                  <p className="text-2xl font-black leading-tight mb-1">Run your own<br />betting platform</p>
-                  <p className="text-xs text-white/70 leading-relaxed">One-time upgrade. Manage matches, users, payouts & more.</p>
-                </div>
-              </div>
-
-              {/* Perks list */}
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3">Everything included</p>
-              <div className="space-y-2 pb-4">
-                {PERKS.map((perk) => (
-                  <div key={perk.label} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 dark:bg-primary/20 flex items-center justify-center shrink-0 text-primary">{perk.icon}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-tight">{perk.label}</p>
-                      <p className="text-xs text-slate-400 mt-0.5 truncate">{perk.desc}</p>
-                    </div>
-                    <CheckCircleIcon className="text-emerald-500 shrink-0" sx={{ fontSize: 16 }} />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/*
-              FOOTER — shrink-0 keeps it pinned to the bottom.
-              pb-safe uses env(safe-area-inset-bottom) via Tailwind's safe area
-              utilities to clear the iPhone home indicator.
-            */}
-            <div className="shrink-0 px-5 pt-3 pb-6 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900"
-              style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
-            >
-              <p className="text-[11px] text-slate-400 text-center mb-3 leading-relaxed">
-                A one-time upgrade fee applies. Payment processed securely via Paystack.
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={onClose}
-                  className="flex-1 py-3.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                >
-                  Maybe Later
-                </button>
-                <button
-                  onClick={() => setStep('confirm')}
-                  className="flex-1 btn-primary py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm font-bold"
-                >
-                  Continue
-                  <KeyboardArrowRightIcon fontSize="small" />
-                </button>
-              </div>
-            </div>
-          </>
-
-        ) : (
-          /* ── CONFIRM STEP ── */
-          <>
-            {/* HEADER */}
-            <div className="flex items-center gap-3 px-5 pt-5 pb-3 shrink-0">
-              <button
-                onClick={() => setStep('overview')}
-                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400"
-              >
-                <KeyboardArrowRightIcon fontSize="small" className="rotate-180" />
-              </button>
-              <div>
-                <h3 className="font-bold text-base text-slate-900 dark:text-white">Confirm Upgrade</h3>
-                <p className="text-xs text-slate-400">Review before proceeding</p>
-              </div>
-            </div>
-
-            {/* SCROLLABLE BODY */}
-            <div className="flex-1 min-h-0 overflow-y-auto px-5 py-2 space-y-4">
-              {/* Summary card */}
-              <div className="rounded-2xl border border-primary/20 bg-primary/5 dark:bg-primary/10 p-4">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
-                    <AdminPanelSettingsIcon sx={{ fontSize: 20 }} />
-                  </div>
-                  <div>
-                    <p className="font-bold text-sm text-slate-900 dark:text-white">Admin Account Upgrade</p>
-                    <p className="text-xs text-slate-500">One-time payment via Paystack</p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  {[
-                    'Full admin dashboard access',
-                    'Manage all platform features',
-                    'Affiliate commission earnings',
-                    'Priority support via upgrade chat',
-                  ].map(item => (
-                    <div key={item} className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                      <CheckCircleIcon className="text-primary shrink-0" sx={{ fontSize: 14 }} />
-                      <span className="text-xs">{item}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Notice */}
-              <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 p-3.5 flex gap-2.5">
-                <ShieldIcon className="text-amber-500 shrink-0 mt-0.5" sx={{ fontSize: 16 }} />
-                <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
-                  You'll be redirected to Paystack's secure payment page. After payment, your account will be reviewed and upgraded within 24 hours.
-                </p>
-              </div>
-            </div>
-
-            {/* FOOTER — payment button always visible */}
-            <div
-              className="shrink-0 px-5 pt-3 pb-6 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900"
-              style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
-            >
-              <button
-                onClick={handleUpgrade}
-                disabled={loading}
-                className="btn-primary w-full py-4 rounded-xl flex items-center justify-center gap-2.5 text-sm font-bold disabled:opacity-60 mb-3"
-              >
-                {loading
-                  ? <><CircularProgress fontSize="small" className="animate-spin" />Redirecting to Paystack…</>
-                  : <><RocketLaunchIcon fontSize="small" />Proceed to Payment</>
-                }
-              </button>
-              <button
-                onClick={onClose}
-                disabled={loading}
-                className="w-full py-2.5 text-xs font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </>
-        )}
-      </div>
+      <PublicIcon sx={{ fontSize: 12 }} style={{ color: 'var(--text-muted)' }} />
+      {flag && <span className="text-sm leading-none">{flag}</span>}
+      <span className="text-[11px] font-bold" style={{ color: 'var(--text-main)' }}>
+        {geo.currency}
+      </span>
+      {geo.source === 'fallback' && (
+        <span className="text-[9px] font-medium" style={{ color: 'var(--text-muted)' }}>
+          (default)
+        </span>
+      )}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Tab definitions
+// Tab definitions  (security removed)
 // ---------------------------------------------------------------------------
-type TabId = 'overview' | 'profile' | 'security' | 'preferences';
+type TabId = 'overview' | 'profile' | 'preferences';
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: 'overview',    label: 'Overview',  icon: <TrendingUpIcon sx={{ fontSize: 20 }} /> },
   { id: 'profile',     label: 'Profile',   icon: <PersonIcon sx={{ fontSize: 20 }} /> },
-  { id: 'security',    label: 'Security',  icon: <ShieldIcon sx={{ fontSize: 20 }} /> },
   { id: 'preferences', label: 'More',      icon: <SettingsIcon sx={{ fontSize: 20 }} /> },
 ];
-
-// ---------------------------------------------------------------------------
-// Password field sub-component
-// ---------------------------------------------------------------------------
-function PwField({
-  label, field, form, setForm, show, setShow, disabled,
-}: {
-  label: string;
-  field: 'current' | 'next' | 'confirm';
-  form: Record<string, string>;
-  setForm: React.Dispatch<React.SetStateAction<{ current: string; next: string; confirm: string }>>;
-  show: Record<string, boolean>;
-  setShow: React.Dispatch<React.SetStateAction<{ current: boolean; next: boolean; confirm: boolean }>>;
-  disabled: boolean;
-}) {
-  return (
-    <div>
-      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">{label}</label>
-      <div className="relative">
-        <input
-          type={show[field] ? 'text' : 'password'}
-          value={form[field]}
-          onChange={e => setForm(p => ({ ...p, [field]: e.target.value }))}
-          className="input-field pr-11"
-          disabled={disabled}
-          placeholder="••••••••"
-          autoComplete={field === 'current' ? 'current-password' : 'new-password'}
-        />
-        <button
-          type="button"
-          onClick={() => setShow(p => ({ ...p, [field]: !p[field] }))}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-          tabIndex={-1}
-        >
-          {show[field] ? <VisibilityOffIcon sx={{ fontSize: 18 }} /> : <VisibilityIcon sx={{ fontSize: 18 }} />}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Toggle switch
@@ -444,10 +379,17 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
       role="switch"
       aria-checked={checked}
       onClick={onChange}
-      className={`relative inline-flex items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${checked ? 'bg-primary' : 'bg-slate-200 dark:bg-slate-700'}`}
-      style={{ width: 44, height: 24 }}
+      className="relative inline-flex items-center rounded-full transition-colors duration-200 focus:outline-none"
+      style={{
+        width: 44,
+        height: 24,
+        backgroundColor: checked ? 'var(--primary)' : 'var(--border-light)',
+      }}
     >
-      <span className={`inline-block w-[18px] h-[18px] rounded-full bg-white shadow-md transform transition-transform duration-200 ${checked ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} />
+      <span
+        className="inline-block w-[18px] h-[18px] rounded-full bg-white shadow-md transform transition-transform duration-200"
+        style={{ transform: checked ? 'translateX(22px)' : 'translateX(3px)' }}
+      />
     </button>
   );
 }
@@ -456,42 +398,53 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
 // Main AccountPage
 // ---------------------------------------------------------------------------
 export default function AccountPage() {
-  const { user, logout, setAdminModalOpen, showToast, login } = useAppStore();
+  const { user, logout, showToast, login } = useAppStore();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<TabId>('overview');
 
+  // Geo state
+  const [geoInfo, setGeoInfo]       = useState<GeoInfo | null>(null);
+  const [geoLoading, setGeoLoading] = useState(true);
+
   // Data state
-  const [profileData, setProfileData]       = useState<Record<string, unknown> | null>(null);
-  const [profileLoading, setProfileLoading] = useState(true);
-  const [walletData, setWalletData]         = useState<Record<string, unknown> | null>(null);
-  const [walletLoading, setWalletLoading]   = useState(true);
-  const [transactions, setTransactions]     = useState<Transaction[]>([]);
-  const [affiliateBalance, setAffiliateBalance] = useState<{ balance: number; currency: string } | null>(null);
+  const [profileData, setProfileData]           = useState<Record<string, unknown> | null>(null);
+  const [profileLoading, setProfileLoading]     = useState(true);
+  const [walletData, setWalletData]             = useState<Record<string, unknown> | null>(null);
+  const [walletLoading, setWalletLoading]       = useState(true);
+  const [transactions, setTransactions]         = useState<Transaction[]>([]);
+  const [affiliateBalance, setAffiliateBalance] = useState<{
+    balance: number;
+    currency: string;
+  } | null>(null);
 
   // Profile edit state
   const [editMode, setEditMode]       = useState(false);
   const [editForm, setEditForm]       = useState({ firstName: '', lastName: '', phone: '', country: '' });
   const [editLoading, setEditLoading] = useState(false);
 
-  // Password state
-  const [pwForm, setPwForm]         = useState({ current: '', next: '', confirm: '' });
-  const [showPw, setShowPw]         = useState({ current: false, next: false, confirm: false });
-  const [pwLoading, setPwLoading]   = useState(false);
-  const [pwError, setPwError]       = useState<string | null>(null);
-  const [pwSuccess, setPwSuccess]   = useState(false);
-
   // Preferences state
   const [notifications, setNotifications] = useState({ push: true, sms: false, email: true });
   const [depositLimit, setDepositLimit]   = useState('');
   const [sessionLimit, setSessionLimit]   = useState('');
 
-  // Modal
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  // Inline password change (in preferences tab)
+  const [pwForm, setPwForm]       = useState({ current: '', next: '', confirm: '' });
+  const [showPw, setShowPw]       = useState({ current: false, next: false, confirm: false });
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwError, setPwError]     = useState<string | null>(null);
+  const [pwSuccess, setPwSuccess] = useState(false);
 
   useEffect(() => {
     if (!user) navigate('/login');
   }, [user, navigate]);
+
+  useEffect(() => {
+    setGeoLoading(true);
+    fetchGeoInfo()
+      .then(setGeoInfo)
+      .finally(() => setGeoLoading(false));
+  }, []);
 
   const fetchProfile = useCallback(async () => {
     setProfileLoading(true);
@@ -507,7 +460,11 @@ export default function AccountPage() {
           country:   (d.country   as string) ?? '',
         });
       }
-    } catch { /* silently fall back */ } finally { setProfileLoading(false); }
+    } catch {
+      /* silently fall back */
+    } finally {
+      setProfileLoading(false);
+    }
   }, []);
 
   const fetchWallet = useCallback(async () => {
@@ -519,13 +476,17 @@ export default function AccountPage() {
         affiliate.getBalance(),
       ]);
       if (walletRes.success) setWalletData(walletRes.data);
-      if (txRes.success) setTransactions(txRes.data.content);
+      if (txRes.success)     setTransactions(txRes.data.content);
       if (affRes.success) {
         const d = affRes.data as Record<string, unknown>;
         if (typeof d.balance === 'number' && typeof d.currency === 'string')
           setAffiliateBalance({ balance: d.balance, currency: d.currency });
       }
-    } catch { /* silently fail */ } finally { setWalletLoading(false); }
+    } catch {
+      /* silently fail */
+    } finally {
+      setWalletLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -545,17 +506,17 @@ export default function AccountPage() {
   const apiRole      = (profileData?.role      as string) ?? user.role;
   const displayName  = [apiFirstName, apiLastName].filter(Boolean).join(' ') || user.fullName;
 
-  const walletBalance =
-    typeof walletData?.balance === 'number' ? (walletData.balance as number)
-    : typeof walletData?.availableBalance === 'number' ? (walletData.availableBalance as number)
-    : null;
-  const walletCurrency = (walletData?.currency as string) ?? 'GHS';
+  const detectedCurrency = geoInfo?.currency ?? 'GHS';
 
-  const roleLabel = apiRole.replace('_', ' ');
-  const roleBadgeClass =
-    apiRole === 'SUPER_ADMIN' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-    : apiRole === 'ADMIN'     ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400';
+  const walletBalance =
+    typeof walletData?.balance === 'number'
+      ? (walletData.balance as number)
+      : typeof walletData?.availableBalance === 'number'
+      ? (walletData.availableBalance as number)
+      : null;
+
+  const walletCurrency = (walletData?.currency as string) ?? detectedCurrency;
+  const roleLabel      = apiRole.replace('_', ' ');
 
   // Handlers
   const saveProfile = async () => {
@@ -565,11 +526,12 @@ export default function AccountPage() {
         firstName: editForm.firstName.trim() || undefined,
         lastName:  editForm.lastName.trim()  || undefined,
         phone:     editForm.phone.trim()     || undefined,
-        country:   editForm.country.trim()   || undefined,
+        country:   editForm.country.trim()   || geoInfo?.countryCode || undefined,
       };
       const res = await userApi.update(body);
       if (res.success) {
-        const newName = [res.data.firstName, res.data.lastName].filter(Boolean).join(' ') || user.fullName;
+        const newName =
+          [res.data.firstName, res.data.lastName].filter(Boolean).join(' ') || user.fullName;
         login({ ...user, fullName: newName, phone: res.data.phone ?? user.phone });
         await fetchProfile();
         setEditMode(false);
@@ -577,15 +539,17 @@ export default function AccountPage() {
       }
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : 'Failed to update profile.', 'error');
-    } finally { setEditLoading(false); }
+    } finally {
+      setEditLoading(false);
+    }
   };
 
   const changePassword = async () => {
     setPwError(null);
     setPwSuccess(false);
-    if (!pwForm.current.trim())         { setPwError('Enter your current password.');           return; }
-    if (pwForm.next.length < 8)         { setPwError('New password must be at least 8 chars.'); return; }
-    if (pwForm.next !== pwForm.confirm) { setPwError('Passwords do not match.');                return; }
+    if (!pwForm.current.trim())   { setPwError('Enter your current password.');          return; }
+    if (pwForm.next.length < 8)   { setPwError('New password must be at least 8 chars.'); return; }
+    if (pwForm.next !== pwForm.confirm) { setPwError('Passwords do not match.');          return; }
     setPwLoading(true);
     try {
       await auth.resetPassword({ oldPassword: pwForm.current, newPassword: pwForm.next });
@@ -594,7 +558,9 @@ export default function AccountPage() {
       showToast('Password updated successfully!', 'success');
     } catch (err: unknown) {
       setPwError(err instanceof Error ? err.message : 'Failed to change password.');
-    } finally { setPwLoading(false); }
+    } finally {
+      setPwLoading(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -607,19 +573,25 @@ export default function AccountPage() {
   // Render
   // ---------------------------------------------------------------------------
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-28">
+    <div className="min-h-screen pb-28" style={{ backgroundColor: 'var(--card-alt)' }}>
 
       {/* ═══ HERO HEADER ═══ */}
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
+      <div style={{ backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border-light)' }}>
         <div className="max-w-lg mx-auto">
 
           {/* Profile identity row */}
           <div className="flex items-center gap-3.5 px-4 pt-5 pb-4">
             <div className="relative shrink-0">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-white text-lg font-bold select-none shadow-md">
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-lg font-bold select-none shadow-md"
+                style={{ background: 'linear-gradient(135deg, var(--primary), var(--primary-dark))' }}
+              >
                 {getUserInitials(displayName)}
               </div>
-              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900" />
+              <span
+                className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 bg-emerald-500"
+                style={{ borderColor: 'var(--card-bg)' }}
+              />
             </div>
             <div className="flex-1 min-w-0">
               {profileLoading ? (
@@ -629,27 +601,48 @@ export default function AccountPage() {
                 </div>
               ) : (
                 <>
-                  <h1 className="font-bold text-base text-slate-900 dark:text-white leading-tight truncate">{displayName}</h1>
-                  <p className="text-xs text-slate-500 truncate mt-0.5">{apiEmail}</p>
+                  <h1 className="font-bold text-base leading-tight truncate" style={{ color: 'var(--text-main)' }}>
+                    {displayName}
+                  </h1>
+                  <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    {apiEmail}
+                  </p>
                 </>
               )}
+              <div className="mt-1.5">
+                <GeoBadge geo={geoInfo} loading={geoLoading} />
+              </div>
             </div>
-            <span className={`shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider ${roleBadgeClass}`}>
+            {/* Role badge */}
+            <span
+              className="shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider"
+              style={{
+                backgroundColor:
+                  apiRole === 'SUPER_ADMIN' ? 'color-mix(in srgb, #a855f7 15%, transparent)' :
+                  apiRole === 'ADMIN'        ? 'color-mix(in srgb, #3b82f6 15%, transparent)' :
+                  'var(--card-alt)',
+                color:
+                  apiRole === 'SUPER_ADMIN' ? '#9333ea' :
+                  apiRole === 'ADMIN'        ? '#2563eb' :
+                  'var(--text-muted)',
+                border: '1px solid var(--border-light)',
+              }}
+            >
               {roleLabel}
             </span>
           </div>
 
           {/* Tab bar */}
-          <div className="flex border-b border-slate-100 dark:border-slate-800">
-            {TABS.map(tab => (
+          <div className="flex" style={{ borderBottom: '1px solid var(--border-light)' }}>
+            {TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-semibold transition-all border-b-2 ${
-                  activeTab === tab.id
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
-                }`}
+                className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-semibold transition-all border-b-2"
+                style={{
+                  borderColor: activeTab === tab.id ? 'var(--primary)' : 'transparent',
+                  color:       activeTab === tab.id ? 'var(--primary)' : 'var(--text-muted)',
+                }}
               >
                 <span>{tab.icon}</span>
                 {tab.label}
@@ -665,60 +658,123 @@ export default function AccountPage() {
         {/* ─── OVERVIEW TAB ─── */}
         {activeTab === 'overview' && (
           <>
+            {/* Detected Location */}
+            <Card>
+              <CardHeader icon={<PublicIcon sx={{ fontSize: 15 }} />} title="Detected Location" />
+              <div className="px-4 py-3.5 flex items-center justify-between gap-3">
+                {geoLoading ? (
+                  <div className="space-y-2 flex-1">
+                    <SkeletonLine w="w-32" h="h-4" />
+                    <SkeletonLine w="w-20" h="h-3" />
+                  </div>
+                ) : geoInfo ? (
+                  <>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+                        {geoInfo.countryCode ? `${geoInfo.countryCode} · ${geoInfo.currency}` : geoInfo.currency}
+                      </p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        {geoInfo.source === 'ip-api'
+                          ? 'Detected via your IP address'
+                          : 'Could not detect — using default'}
+                      </p>
+                    </div>
+                    <GeoBadge geo={geoInfo} loading={false} />
+                  </>
+                ) : (
+                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Location unavailable.</p>
+                )}
+              </div>
+            </Card>
+
             {/* Balance cards */}
             <div className="grid grid-cols-2 gap-3">
-              <Link to="/wallet" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4 shadow-sm hover:border-primary/30 active:scale-[0.97] transition-all">
+              <Link
+                to="/wallet"
+                className="rounded-2xl p-4 shadow-sm active:scale-[0.97] transition-all"
+                style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-light)' }}
+              >
                 <div className="flex items-center justify-between mb-3">
-                  <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <AccountBalanceWalletIcon className="text-primary" sx={{ fontSize: 15 }} />
+                  <div
+                    className="w-8 h-8 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: 'color-mix(in srgb, var(--primary) 15%, transparent)' }}
+                  >
+                    <AccountBalanceWalletIcon sx={{ fontSize: 15 }} style={{ color: 'var(--primary)' }} />
                   </div>
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                   </span>
                 </div>
-                {walletLoading ? <SkeletonLine h="h-6" /> : (
-                  <p className="font-bold text-sm tabular-nums text-slate-900 dark:text-white leading-tight">
+                {walletLoading ? (
+                  <SkeletonLine h="h-6" />
+                ) : (
+                  <p className="font-bold text-sm tabular-nums leading-tight" style={{ color: 'var(--text-main)' }}>
                     {walletBalance !== null ? formatCurrency(walletBalance, walletCurrency) : '—'}
                   </p>
                 )}
-                <p className="text-[11px] text-slate-400 mt-1">Main Wallet</p>
+                <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>Main Wallet</p>
               </Link>
 
-              <Link to="/affiliate" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4 shadow-sm hover:border-emerald-400/40 active:scale-[0.97] transition-all group">
+              <Link
+                to="/affiliate"
+                className="rounded-2xl p-4 shadow-sm active:scale-[0.97] transition-all group"
+                style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-light)' }}
+              >
                 <div className="flex items-center justify-between mb-3">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center">
-                    <GroupAddIcon className="text-emerald-600" sx={{ fontSize: 15 }} />
+                  <div
+                    className="w-8 h-8 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: 'color-mix(in srgb, #10b981 12%, transparent)' }}
+                  >
+                    <GroupAddIcon sx={{ fontSize: 15 }} style={{ color: '#10b981' }} />
                   </div>
-                  <OpenInNewIcon sx={{ fontSize: 13 }} className="text-slate-300 dark:text-slate-600 group-hover:text-emerald-500 transition-colors" />
+                  <OpenInNewIcon
+                    sx={{ fontSize: 13 }}
+                    style={{ color: 'var(--text-muted)' }}
+                    className="group-hover:text-emerald-500 transition-colors"
+                  />
                 </div>
-                {walletLoading ? <SkeletonLine h="h-6" /> : (
-                  <p className="font-bold text-sm tabular-nums text-emerald-600 dark:text-emerald-400 leading-tight">
-                    {affiliateBalance !== null ? formatCurrency(affiliateBalance.balance, affiliateBalance.currency) : '—'}
+                {walletLoading ? (
+                  <SkeletonLine h="h-6" />
+                ) : (
+                  <p className="font-bold text-sm tabular-nums leading-tight text-emerald-500">
+                    {affiliateBalance !== null
+                      ? formatCurrency(affiliateBalance.balance, affiliateBalance.currency)
+                      : '—'}
                   </p>
                 )}
-                <p className="text-[11px] text-slate-400 mt-1">Affiliate</p>
+                <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>Affiliate</p>
               </Link>
             </div>
 
-            {/* Recent transactions */}
+            {/* Recent Transactions */}
             <Card>
               <CardHeader
                 icon={<AccountBalanceWalletIcon sx={{ fontSize: 15 }} />}
                 title="Recent Transactions"
                 action={
                   <div className="flex items-center gap-1">
-                    <button onClick={fetchWallet} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400" title="Refresh">
+                    <BtnIcon onClick={fetchWallet} title="Refresh transactions" aria-label="Refresh transactions">
                       <RefreshIcon sx={{ fontSize: 15 }} />
-                    </button>
-                    <Link to="/wallet" className="text-[11px] text-primary font-bold hover:underline px-1">View all</Link>
+                    </BtnIcon>
+                    <Link
+                      to="/wallet"
+                      className="text-[11px] font-bold hover:underline px-1"
+                      style={{ color: 'var(--primary)' }}
+                    >
+                      View all
+                    </Link>
                   </div>
                 }
               />
-              <div className="divide-y divide-slate-50 dark:divide-slate-800/60">
+              <div>
                 {walletLoading ? (
-                  [1, 2, 3].map(i => (
-                    <div key={i} className="flex justify-between items-center px-4 py-3.5 gap-3">
+                  [1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className="flex justify-between items-center px-4 py-3.5 gap-3"
+                      style={{ borderBottom: '1px solid var(--border-light)' }}
+                    >
                       <div className="space-y-2 flex-1">
                         <SkeletonLine w="w-24" h="h-4" />
                         <SkeletonLine w="w-16" h="h-3" />
@@ -728,23 +784,38 @@ export default function AccountPage() {
                   ))
                 ) : transactions.length === 0 ? (
                   <div className="px-4 py-10 text-center">
-                    <AccountBalanceWalletIcon className="text-slate-300 dark:text-slate-600 mb-2" sx={{ fontSize: 30 }} />
-                    <p className="text-sm text-slate-500">No transactions yet.</p>
+                    <AccountBalanceWalletIcon
+                      sx={{ fontSize: 30 }}
+                      style={{ color: 'var(--border-light)' }}
+                      className="mb-2"
+                    />
+                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No transactions yet.</p>
                   </div>
                 ) : (
-                  transactions.map(tx => {
+                  transactions.map((tx) => {
                     const credit = isCredit(tx.kind);
                     return (
-                      <div key={tx.id} className="flex items-center justify-between px-4 py-3.5 gap-3">
+                      <div
+                        key={tx.id}
+                        className="flex items-center justify-between px-4 py-3.5 gap-3"
+                        style={{ borderBottom: '1px solid var(--border-light)' }}
+                      >
                         <div className="flex-1 min-w-0">
                           <TxKindBadge kind={tx.kind} />
-                          <p className="text-[11px] text-slate-400 mt-1">{formatDate(tx.createdAt)}</p>
+                          <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                            {formatDate(tx.createdAt)}
+                          </p>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className={`text-sm font-bold tabular-nums ${credit ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>
+                          <p
+                            className="text-sm font-bold tabular-nums"
+                            style={{ color: credit ? '#10b981' : '#f43f5e' }}
+                          >
                             {credit ? '+' : '-'}{formatCurrency(tx.amount, walletCurrency)}
                           </p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">Bal: {formatCurrency(tx.balanceAfter, walletCurrency)}</p>
+                          <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                            Bal: {formatCurrency(tx.balanceAfter, walletCurrency)}
+                          </p>
                         </div>
                       </div>
                     );
@@ -758,45 +829,36 @@ export default function AccountPage() {
               <CardHeader icon={<VerifiedUserIcon sx={{ fontSize: 15 }} />} title="KYC Verification" />
               <div className="px-4 py-4 flex items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Identity Verification</p>
-                  <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                    {user.kycStatus === 'verified' ? 'Your identity has been verified.'
-                      : user.kycStatus === 'pending' ? 'Verification is in progress.'
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
+                    Identity Verification
+                  </p>
+                  <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                    {user.kycStatus === 'verified'
+                      ? 'Your identity has been verified.'
+                      : user.kycStatus === 'pending'
+                      ? 'Verification is in progress.'
                       : 'Verify your identity to unlock all features.'}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-2 shrink-0">
-                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg ${
-                    user.kycStatus === 'verified' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                    : user.kycStatus === 'pending' ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                    : 'bg-slate-100 text-slate-500 dark:bg-slate-800'
-                  }`}>
+                  <span
+                    className="text-[11px] font-bold px-2.5 py-1 rounded-lg"
+                    style={
+                      user.kycStatus === 'verified'
+                        ? { backgroundColor: 'color-mix(in srgb, #10b981 15%, transparent)', color: '#059669' }
+                        : user.kycStatus === 'pending'
+                        ? { backgroundColor: 'color-mix(in srgb, #f59e0b 15%, transparent)', color: '#d97706' }
+                        : { backgroundColor: 'var(--card-alt)', color: 'var(--text-muted)' }
+                    }
+                  >
                     {user.kycStatus.charAt(0).toUpperCase() + user.kycStatus.slice(1)}
                   </span>
                   {user.kycStatus === 'unverified' && (
-                    <button className="btn-primary text-xs px-3 py-1.5 rounded-lg font-semibold">Start KYC</button>
+                    <BtnPrimary size="sm">Start KYC</BtnPrimary>
                   )}
                 </div>
               </div>
             </Card>
-
-            {/* Admin / Upgrade CTA */}
-            {user.role === 'admin' && (
-              <button onClick={() => setAdminModalOpen(true)} className="btn-primary w-full rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold text-sm">
-                <AdminPanelSettingsIcon fontSize="small" />
-                Open Admin Panel
-              </button>
-            )}
-            {user.role === 'user' && (
-              <button
-                onClick={() => setShowUpgradeModal(true)}
-                className="w-full py-3.5 text-sm font-bold text-primary border-2 border-primary/20 rounded-2xl hover:bg-primary/5 active:bg-primary/10 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-              >
-                <ArrowUpwardIcon fontSize="small" />
-                Upgrade to Admin Account
-                <KeyboardArrowRightIcon fontSize="small" className="ml-auto opacity-40" />
-              </button>
-            )}
           </>
         )}
 
@@ -806,24 +868,31 @@ export default function AccountPage() {
             <CardHeader
               icon={<PersonIcon sx={{ fontSize: 15 }} />}
               title="Personal Info"
-              action={!editMode && (
-                <button onClick={() => setEditMode(true)} className="flex items-center gap-1 text-xs font-bold text-primary hover:underline">
-                  <EditIcon sx={{ fontSize: 13 }} />Edit
-                </button>
-              )}
+              action={
+                !editMode && (
+                  <button
+                    onClick={() => setEditMode(true)}
+                    className="flex items-center gap-1 text-xs font-bold hover:underline"
+                    style={{ color: 'var(--primary)' }}
+                  >
+                    <EditIcon sx={{ fontSize: 13 }} />
+                    Edit
+                  </button>
+                )
+              }
             />
             {editMode ? (
               <div className="px-4 py-4 space-y-4">
                 <div className="grid grid-cols-2 gap-3">
-                  {(['firstName', 'lastName'] as const).map(field => (
+                  {(['firstName', 'lastName'] as const).map((field) => (
                     <div key={field}>
-                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
+                      <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>
                         {field === 'firstName' ? 'First Name' : 'Last Name'}
                       </label>
                       <input
                         type="text"
                         value={editForm[field]}
-                        onChange={e => setEditForm(p => ({ ...p, [field]: e.target.value }))}
+                        onChange={(e) => setEditForm((p) => ({ ...p, [field]: e.target.value }))}
                         className="input-field"
                         disabled={editLoading}
                         placeholder={field === 'firstName' ? 'First' : 'Last'}
@@ -832,38 +901,108 @@ export default function AccountPage() {
                   ))}
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Phone Number</label>
-                  <input type="tel" value={editForm.phone} onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))} className="input-field" disabled={editLoading} placeholder="+233 XX XXX XXXX" />
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))}
+                    className="input-field"
+                    disabled={editLoading}
+                    placeholder="+233 XX XXX XXXX"
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Country</label>
-                  <input type="text" value={editForm.country} onChange={e => setEditForm(p => ({ ...p, country: e.target.value }))} className="input-field" disabled={editLoading} placeholder="e.g. Ghana" />
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                    Country
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.country}
+                    onChange={(e) => setEditForm((p) => ({ ...p, country: e.target.value }))}
+                    className="input-field"
+                    disabled={editLoading}
+                    placeholder={
+                      geoLoading
+                        ? 'Detecting…'
+                        : geoInfo?.countryCode
+                        ? `e.g. ${geoInfo.countryCode} (detected)`
+                        : 'e.g. Ghana'
+                    }
+                  />
+                  {!geoLoading && geoInfo?.countryCode && !editForm.country && (
+                    <button
+                      type="button"
+                      onClick={() => setEditForm((p) => ({ ...p, country: geoInfo.countryCode }))}
+                      className="mt-1.5 text-[11px] font-semibold hover:underline"
+                      style={{ color: 'var(--primary)' }}
+                    >
+                      Use detected: {geoInfo.countryCode}
+                    </button>
+                  )}
                 </div>
+
                 <div className="flex gap-3 pt-1">
-                  <button onClick={() => setEditMode(false)} disabled={editLoading} className="flex-1 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1.5">
-                    <CloseIcon fontSize="small" />Cancel
-                  </button>
-                  <button onClick={saveProfile} disabled={editLoading} className="flex-1 btn-primary py-3 rounded-xl flex items-center justify-center gap-1.5 disabled:opacity-60 text-sm font-semibold">
-                    {editLoading ? <><CircularProgress fontSize="small" className="animate-spin" />Saving…</> : <><SaveIcon fontSize="small" />Save Changes</>}
-                  </button>
+                  <BtnGhost
+                    onClick={() => setEditMode(false)}
+                    disabled={editLoading}
+                    icon={<CloseIcon fontSize="small" />}
+                    className="flex-1"
+                    style={{
+                      border: '1px solid var(--border-light)',
+                      color: 'var(--text-muted)',
+                      backgroundColor: 'transparent',
+                    }}
+                    onMouseEnter={(e) =>
+                      ((e.currentTarget as HTMLElement).style.backgroundColor = 'var(--card-alt)')
+                    }
+                    onMouseLeave={(e) =>
+                      ((e.currentTarget as HTMLElement).style.backgroundColor = 'transparent')
+                    }
+                  >
+                    Cancel
+                  </BtnGhost>
+                  <BtnPrimary
+                    onClick={saveProfile}
+                    loading={editLoading}
+                    icon={<SaveIcon fontSize="small" />}
+                    className="flex-1 py-3 rounded-xl"
+                  >
+                    {editLoading ? 'Saving…' : 'Save Changes'}
+                  </BtnPrimary>
                 </div>
               </div>
             ) : (
-              <div className="divide-y divide-slate-50 dark:divide-slate-800/60">
+              <div>
                 {profileLoading ? (
-                  [1, 2, 3, 4, 5].map(i => (
-                    <div key={i} className="flex justify-between items-center px-4 py-3.5">
+                  [1, 2, 3, 4, 5].map((i) => (
+                    <div
+                      key={i}
+                      className="flex justify-between items-center px-4 py-3.5"
+                      style={{ borderBottom: '1px solid var(--border-light)' }}
+                    >
                       <SkeletonLine w="w-20" h="h-3.5" />
                       <SkeletonLine w="w-28" h="h-3.5" />
                     </div>
                   ))
                 ) : (
                   <>
-                    <InfoRow label="Full Name" value={displayName || '—'} />
-                    <InfoRow label="Email"     value={apiEmail || '—'} />
-                    <InfoRow label="Phone"     value={apiPhone || '—'} />
-                    <InfoRow label="Country"   value={apiCountry || '—'} />
-                    <InfoRow label="Role"      value={roleLabel} />
+                    <InfoRow label="Full Name"         value={displayName || '—'} />
+                    <InfoRow label="Email"             value={apiEmail    || '—'} />
+                    <InfoRow label="Phone"             value={apiPhone    || '—'} />
+                    <InfoRow label="Country"           value={apiCountry  || '—'} />
+                    <InfoRow label="Role"              value={roleLabel} />
+                    <InfoRow
+                      label="Detected Currency"
+                      value={
+                        geoLoading
+                          ? 'Detecting…'
+                          : geoInfo
+                          ? `${geoInfo.currency}${geoInfo.countryCode ? ` (${geoInfo.countryCode})` : ''}`
+                          : '—'
+                      }
+                    />
                   </>
                 )}
               </div>
@@ -871,103 +1010,234 @@ export default function AccountPage() {
           </Card>
         )}
 
-        {/* ─── SECURITY TAB ─── */}
-        {activeTab === 'security' && (
-          <Card>
-            <CardHeader icon={<ShieldIcon sx={{ fontSize: 15 }} />} title="Change Password" />
-            <div className="px-4 py-4 space-y-4">
-              {pwError && (
-                <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 text-sm">
-                  <CloseIcon sx={{ fontSize: 16 }} className="shrink-0 mt-0.5" />
-                  <span>{pwError}</span>
-                </div>
-              )}
-              {pwSuccess && (
-                <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-sm">
-                  <CheckCircleIcon sx={{ fontSize: 16 }} className="shrink-0 mt-0.5" />
-                  <span>Password updated successfully.</span>
-                </div>
-              )}
-              <PwField label="Current Password"     field="current" form={pwForm} setForm={setPwForm} show={showPw} setShow={setShowPw} disabled={pwLoading} />
-              <PwField label="New Password"         field="next"    form={pwForm} setForm={setPwForm} show={showPw} setShow={setShowPw} disabled={pwLoading} />
-              <PwField label="Confirm New Password" field="confirm" form={pwForm} setForm={setPwForm} show={showPw} setShow={setShowPw} disabled={pwLoading} />
-              {pwForm.next.length > 0 && (
-                <div className="space-y-1.5">
-                  <div className="flex gap-1">
-                    {[1, 2, 3, 4].map(lvl => {
-                      const strength = pwForm.next.length >= 12 ? 4 : pwForm.next.length >= 10 ? 3 : pwForm.next.length >= 8 ? 2 : 1;
-                      return (
-                        <div key={lvl} className={`flex-1 h-1 rounded-full transition-colors ${lvl <= strength ? strength >= 4 ? 'bg-emerald-500' : strength >= 3 ? 'bg-yellow-400' : 'bg-rose-400' : 'bg-slate-200 dark:bg-slate-700'}`} />
-                      );
-                    })}
-                  </div>
-                  <p className="text-[11px] text-slate-400">
-                    {pwForm.next.length >= 12 ? 'Strong password' : pwForm.next.length >= 10 ? 'Good password' : 'Minimum 8 characters required'}
-                  </p>
-                </div>
-              )}
-              <button onClick={changePassword} disabled={pwLoading} className="btn-primary w-full py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-60 text-sm font-semibold">
-                {pwLoading ? <><CircularProgress fontSize="small" className="animate-spin" />Updating…</> : 'Update Password'}
-              </button>
-            </div>
-          </Card>
-        )}
-
         {/* ─── PREFERENCES TAB ─── */}
         {activeTab === 'preferences' && (
           <>
+            {/* Notifications */}
             <Card>
               <CardHeader icon={<NotificationsIcon sx={{ fontSize: 15 }} />} title="Notifications" />
-              <div className="divide-y divide-slate-50 dark:divide-slate-800/60">
-                {([
-                  { key: 'push',  label: 'Push Notifications',  sub: 'In-app alerts & updates'     },
-                  { key: 'sms',   label: 'SMS Alerts',          sub: 'Text messages to your phone' },
-                  { key: 'email', label: 'Email Notifications', sub: 'Updates sent to your inbox'  },
-                ] as const).map(({ key, label, sub }) => (
-                  <div key={key} className="flex items-center justify-between px-4 py-3.5 gap-3">
+              <div>
+                {(
+                  [
+                    { key: 'push',  label: 'Push Notifications',  sub: 'In-app alerts & updates' },
+                    { key: 'sms',   label: 'SMS Alerts',          sub: 'Text messages to your phone' },
+                    { key: 'email', label: 'Email Notifications', sub: 'Updates sent to your inbox' },
+                  ] as const
+                ).map(({ key, label, sub }) => (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between px-4 py-3.5 gap-3"
+                    style={{ borderBottom: '1px solid var(--border-light)' }}
+                  >
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{label}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">{sub}</p>
+                      <p className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>{label}</p>
+                      <p className="text-xs mt-0.5"        style={{ color: 'var(--text-muted)' }}>{sub}</p>
                     </div>
-                    <Toggle checked={notifications[key]} onChange={() => setNotifications(p => ({ ...p, [key]: !p[key] }))} />
+                    <Toggle
+                      checked={notifications[key]}
+                      onChange={() => setNotifications((p) => ({ ...p, [key]: !p[key] }))}
+                    />
                   </div>
                 ))}
               </div>
             </Card>
 
+            {/* Change Password */}
+            <Card>
+              <CardHeader icon={<VerifiedUserIcon sx={{ fontSize: 15 }} />} title="Change Password" />
+              <div className="px-4 py-5 space-y-5">
+
+                {/* Alert banners */}
+                {pwError && (
+                  <div
+                    className="flex items-start gap-2.5 px-4 py-3 rounded-2xl text-sm font-medium"
+                    style={{
+                      backgroundColor: 'color-mix(in srgb, #f43f5e 10%, transparent)',
+                      border: '1px solid color-mix(in srgb, #f43f5e 25%, transparent)',
+                      color: '#e11d48',
+                    }}
+                  >
+                    <CloseIcon sx={{ fontSize: 16 }} className="shrink-0 mt-0.5" />
+                    <span>{pwError}</span>
+                  </div>
+                )}
+                {pwSuccess && (
+                  <div
+                    className="flex items-center gap-2.5 px-4 py-3 rounded-2xl text-sm font-medium"
+                    style={{
+                      backgroundColor: 'color-mix(in srgb, #10b981 10%, transparent)',
+                      border: '1px solid color-mix(in srgb, #10b981 25%, transparent)',
+                      color: '#059669',
+                    }}
+                  >
+                    <span>✓ Password updated successfully.</span>
+                  </div>
+                )}
+
+                {/* Grouped stacked fields — share one rounded border container */}
+                <div
+                  className="overflow-hidden"
+                  style={{
+                    border: '1px solid var(--border-light)',
+                    borderRadius: 16,
+                  }}
+                >
+                  {(
+                    [
+                      { label: 'Current Password', field: 'current' as const },
+                      { label: 'New Password',     field: 'next'    as const },
+                      { label: 'Confirm New',      field: 'confirm' as const },
+                    ]
+                  ).map(({ label, field }, idx, arr) => (
+                    <div
+                      key={field}
+                      className="relative"
+                      style={{
+                        borderBottom:
+                          idx < arr.length - 1
+                            ? '1px solid var(--border-light)'
+                            : 'none',
+                      }}
+                    >
+                      {/* floating label inside the row */}
+                      <label
+                        className="absolute left-4 top-3 text-[10px] font-bold uppercase tracking-wider pointer-events-none select-none"
+                        style={{ color: 'var(--text-muted)' }}
+                      >
+                        {label}
+                      </label>
+                      <input
+                        type={showPw[field] ? 'text' : 'password'}
+                        value={pwForm[field]}
+                        onChange={(e) => setPwForm((p) => ({ ...p, [field]: e.target.value }))}
+                        disabled={pwLoading}
+                        placeholder="••••••••"
+                        autoComplete={field === 'current' ? 'current-password' : 'new-password'}
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          paddingTop: '2rem',
+                          paddingBottom: '0.75rem',
+                          paddingLeft: '1rem',
+                          paddingRight: '3rem',
+                          backgroundColor: 'var(--card-bg)',
+                          color: 'var(--text-main)',
+                          fontSize: 15,
+                          fontWeight: 500,
+                          outline: 'none',
+                          border: 'none',
+                          letterSpacing: showPw[field] ? 'normal' : '0.1em',
+                        }}
+                        onFocus={(e) => {
+                          (e.currentTarget.parentElement as HTMLElement).style.backgroundColor =
+                            'var(--card-alt)';
+                        }}
+                        onBlur={(e) => {
+                          (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = '';
+                        }}
+                      />
+                      {/* eye toggle */}
+                      <button
+                        type="button"
+                        onClick={() => setShowPw((p) => ({ ...p, [field]: !p[field] }))}
+                        tabIndex={-1}
+                        aria-label={showPw[field] ? 'Hide password' : 'Show password'}
+                        className="absolute right-0 top-0 h-full w-12 flex items-center justify-center transition-opacity hover:opacity-60"
+                        style={{ color: 'var(--text-muted)' }}
+                      >
+                        {showPw[field]
+                          ? <VisibilityOffIcon sx={{ fontSize: 20 }} />
+                          : <VisibilityIcon   sx={{ fontSize: 20 }} />}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Password strength bar */}
+                {pwForm.next.length > 0 && (() => {
+                  const strength =
+                    pwForm.next.length >= 12 ? 4 :
+                    pwForm.next.length >= 10 ? 3 :
+                    pwForm.next.length >= 8  ? 2 : 1;
+                  const strengthColor =
+                    strength >= 4 ? '#10b981' : strength >= 3 ? '#f59e0b' : '#f43f5e';
+                  const strengthLabel =
+                    strength >= 4 ? 'Strong' : strength >= 3 ? 'Good' : strength >= 2 ? 'Weak' : 'Too short';
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex gap-1.5">
+                        {[1, 2, 3, 4].map((lvl) => (
+                          <div
+                            key={lvl}
+                            className="flex-1 h-1.5 rounded-full transition-all duration-300"
+                            style={{
+                              backgroundColor: lvl <= strength ? strengthColor : 'var(--border-light)',
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[11px] font-semibold" style={{ color: strengthColor }}>
+                          {strengthLabel}
+                        </p>
+                        <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                          {pwForm.next.length} characters
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <BtnPrimary onClick={changePassword} loading={pwLoading} size="lg">
+                  {pwLoading ? 'Updating…' : 'Update Password'}
+                </BtnPrimary>
+              </div>
+            </Card>
+
+            {/* Responsible Gambling */}
             <Card>
               <CardHeader icon={<VerifiedUserIcon sx={{ fontSize: 15 }} />} title="Responsible Gambling" />
               <div className="px-4 py-4 space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Daily Deposit Limit (GH₵)</label>
-                  <input type="number" value={depositLimit} onChange={e => setDepositLimit(e.target.value)} placeholder="No limit set" className="input-field" min="0" />
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                    Daily Deposit Limit ({detectedCurrency})
+                  </label>
+                  <input
+                    type="number"
+                    value={depositLimit}
+                    onChange={(e) => setDepositLimit(e.target.value)}
+                    placeholder="No limit set"
+                    className="input-field"
+                    min="0"
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Session Time Limit (minutes)</label>
-                  <input type="number" value={sessionLimit} onChange={e => setSessionLimit(e.target.value)} placeholder="No limit set" className="input-field" min="0" />
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                    Session Time Limit (minutes)
+                  </label>
+                  <input
+                    type="number"
+                    value={sessionLimit}
+                    onChange={(e) => setSessionLimit(e.target.value)}
+                    placeholder="No limit set"
+                    className="input-field"
+                    min="0"
+                  />
                 </div>
-                <button className="btn-primary w-full py-3 rounded-xl text-sm font-semibold">Save Limits</button>
-                <div className="pt-1 border-t border-slate-100 dark:border-slate-800">
-                  <button className="w-full py-3 text-sm font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/10 rounded-xl transition-colors">
-                    Self-Exclusion
-                  </button>
+                <BtnPrimary size="lg">Save Limits</BtnPrimary>
+                <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem' }}>
+                  <BtnDanger size="lg">Self-Exclusion</BtnDanger>
                 </div>
               </div>
             </Card>
 
-            <button
-              onClick={handleLogout}
-              className="w-full py-3.5 text-sm font-bold text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-900 border border-rose-100 dark:border-rose-900/40 rounded-2xl hover:bg-rose-50 dark:hover:bg-rose-900/10 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-sm"
-            >
-              <LogoutIcon fontSize="small" />
+            {/* Sign Out */}
+            <BtnDanger size="lg" icon={<LogoutIcon fontSize="small" />} onClick={handleLogout}>
               Sign Out
-            </button>
+            </BtnDanger>
           </>
         )}
       </div>
-
-      {/* Admin upgrade modal */}
-      {showUpgradeModal && <AdminUpgradeModal onClose={() => setShowUpgradeModal(false)} />}
     </div>
   );
 }

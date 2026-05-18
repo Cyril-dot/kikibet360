@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { useAppStore } from './store/index';
 import Layout from './components/layout/Layout';
 import HomePage from './pages/HomePage';
 import MatchDetailsPage from './pages/MatchDetailsPage';
@@ -14,10 +16,19 @@ import PromosPage from './pages/PromosPage';
 import AffiliatePage from './pages/AffiliatePage';
 import AdminModal from './pages/AdminModal';
 
-// GameRunner lives at  src/games/GameRunner.tsx
+// GameRunner lives at src/games/GameRunner.tsx
 import GameRunner from './games/GameRunner';
 
 function App() {
+  const theme = useAppStore((s) => s.theme);
+
+  // Keep data-theme in sync with the store at all times.
+  // main.tsx sets it once before mount; this effect keeps it correct
+  // if the store value ever diverges from the DOM attribute.
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
   return (
     <BrowserRouter>
       <Routes>

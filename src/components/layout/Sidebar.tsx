@@ -125,45 +125,72 @@ function WinnersTicker() {
 
   return (
     <div
-      className="relative overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30"
-      style={{ height: '420px' }}
+      className="relative overflow-hidden rounded-xl"
+      style={{
+        height: '420px',
+        border: '1px solid var(--border-light)',
+        backgroundColor: 'var(--card-alt)',
+      }}
     >
       {/* Top fade */}
       <div
         className="absolute top-0 inset-x-0 h-8 z-10 pointer-events-none"
-        style={{ background: 'linear-gradient(to bottom, rgb(248 250 252 / 0.97) 0%, transparent 100%)' }}
+        style={{ background: 'linear-gradient(to bottom, var(--card-alt) 0%, transparent 100%)' }}
       />
       {/* Bottom fade */}
       <div
         className="absolute bottom-0 inset-x-0 h-8 z-10 pointer-events-none"
-        style={{ background: 'linear-gradient(to top, rgb(248 250 252 / 0.97) 0%, transparent 100%)' }}
+        style={{ background: 'linear-gradient(to top, var(--card-alt) 0%, transparent 100%)' }}
       />
 
       <div className="sidebar-winners-track py-2">
         {items.map((winner, idx) => (
           <div
             key={idx}
-            className="flex items-center gap-2.5 px-3 py-2 mx-1 rounded-lg hover:bg-white dark:hover:bg-slate-800/60 transition-colors"
+            className="px-3 py-2 mx-1 rounded-lg transition-colors"
+            style={{ cursor: 'default' }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--card-bg)'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.backgroundColor = ''}
           >
-            {/* Trophy */}
-            <div className="w-7 h-7 shrink-0 rounded-full bg-yellow-50 dark:bg-yellow-900/20 flex items-center justify-center">
-              <EmojiEventsIcon style={{ fontSize: 13 }} className="text-yellow-500" />
-            </div>
+            <div className="flex items-center gap-2">
+              {/* Trophy */}
+              <div
+                className="w-7 h-7 shrink-0 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: 'rgba(234,179,8,0.12)' }}
+              >
+                <EmojiEventsIcon style={{ fontSize: 13, color: '#ca8a04' }} />
+              </div>
 
-            {/* Name + masked phone */}
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 leading-tight truncate">
+              {/* Name · masked phone — same line */}
+              <p
+                className="text-xs font-semibold leading-tight truncate flex-1"
+                style={{ color: 'var(--text-main)' }}
+              >
                 {winner.name}
-              </p>
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight">
-                {maskPhone(winner.phone)} · {winner.minutesAgo}m ago
+                <span
+                  className="font-normal ml-1"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  · {maskPhone(winner.phone)}
+                </span>
               </p>
             </div>
 
-            {/* Amount */}
-            <span className="text-[11px] font-bold text-green-600 dark:text-green-400 shrink-0 tabular-nums whitespace-nowrap">
-              +{formatCedi(winner.amount)}
-            </span>
+            {/* Amount + time — next line, indented under name */}
+            <div className="flex items-center justify-between mt-0.5 pl-9">
+              <span
+                className="text-[11px] font-bold tabular-nums"
+                style={{ color: '#059669' }}
+              >
+                +{formatCedi(winner.amount)}
+              </span>
+              <span
+                className="text-[10px]"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                {winner.minutesAgo}m ago
+              </span>
+            </div>
           </div>
         ))}
       </div>
@@ -194,13 +221,17 @@ function WinnersTicker() {
 function AdsPanel() {
   return (
     <div className="flex flex-col gap-3 mt-5">
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-300 dark:text-slate-600 text-center">
+      <p
+        className="text-[10px] font-semibold uppercase tracking-widest text-center"
+        style={{ color: 'var(--text-muted)' }}
+      >
         Sponsored
       </p>
       {ADS.map((ad, idx) => (
         <div
           key={idx}
-          className="rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800 shadow-sm"
+          className="rounded-xl overflow-hidden shadow-sm"
+          style={{ border: '1px solid var(--border-light)' }}
         >
           {/* Ad image */}
           <div className="relative w-full" style={{ height: '100px' }}>
@@ -209,16 +240,15 @@ function AdsPanel() {
               alt={ad.title}
               className="w-full h-full object-cover"
             />
-            {/* Dark overlay */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
           </div>
 
           {/* Ad text */}
-          <div className="px-3 py-2.5 bg-white dark:bg-slate-900">
-            <p className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-snug">
+          <div className="px-3 py-2.5" style={{ backgroundColor: 'var(--card-bg)' }}>
+            <p className="text-xs font-bold leading-snug" style={{ color: 'var(--text-main)' }}>
               {ad.title}
             </p>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 leading-snug">
+            <p className="text-[11px] mt-0.5 leading-snug" style={{ color: 'var(--text-muted)' }}>
               {ad.subtitle}
             </p>
           </div>
@@ -233,16 +263,25 @@ function AdsPanel() {
 // ---------------------------------------------------------------------------
 export default function Sidebar() {
   return (
-    <aside className="hidden lg:block w-60 shrink-0 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-y-auto h-[calc(100vh-4rem)] sticky top-16">
+    <aside
+      className="hidden lg:block w-60 shrink-0 overflow-y-auto h-[calc(100vh-4rem)] sticky top-16"
+      style={{
+        borderRight: '1px solid var(--border-light)',
+        backgroundColor: 'var(--card-bg)',
+      }}
+    >
       <div className="p-4">
 
         {/* ── Recent Winners header ── */}
         <div className="flex items-center gap-2 mb-3">
-          <EmojiEventsIcon className="text-yellow-500" fontSize="small" />
-          <h3 className="font-heading text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
+          <EmojiEventsIcon style={{ fontSize: 16, color: '#ca8a04' }} />
+          <h3
+            className="text-xs font-bold uppercase tracking-wider"
+            style={{ color: 'var(--text-main)' }}
+          >
             Recent Winners
           </h3>
-          <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-green-500 uppercase tracking-wide">
+          <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#22c55e' }}>
             <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block" />
             Live
           </span>

@@ -1,30 +1,51 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
-  darkMode: 'class',
+  darkMode: ['selector', '[data-theme="super-bet-dark"],[data-theme="super-bet-violet"]'],
+  safelist: [
+    {
+      pattern: /data-theme/,
+      variants: ['lg', 'md', 'sm', 'xs'],
+    },
+    'bg-super-bet-primary',
+    'text-super-bet-primary',
+  ],
   theme: {
     extend: {
       screens: {
         xs: '375px',
+        '3xl': '1700px',
       },
       colors: {
-        primary: {
-          DEFAULT: '#E6192E',
-          dark: '#b11324',
-          light: '#f04455',
-        },
-        surface: {
-          light: '#f6faff',
-          dark: '#0f172a',
-        },
-        card: {
-          light: '#ffffff',
-          dark: '#1e293b',
-        },
+        primary: 'var(--primary)',
+        'primary-dark': 'var(--primary-dark)',
+        'bg-page': 'var(--bg-page)',
+        card: 'var(--card-bg)',
+        'card-alt': 'var(--card-alt)',
+        'text-main': 'var(--text-main)',
+        'text-muted': 'var(--text-muted)',
+        'border-light': 'var(--border-light)',
+        'nav-bg': 'var(--nav-bg)',
+        'super-bet-logo-primary': 'var(--super-bet-logo-primary, var(--primary))',
+        'super-bet-logo-secondary': 'var(--super-bet-logo-secondary, #ffffff)',
+        // Blue/white/black palette
+        'blue-core': '#1d6fe8',
+        'blue-bright': '#3b82f6',
+        'blue-light': '#60a5fa',
+        'blue-pale': '#bfdbfe',
+        'ink': '#0a0f1e',
+        'ink-soft': '#131929',
+        'white-pure': '#ffffff',
+        'white-muted': '#e8edf8',
+        // Legacy accent names (now remapped)
+        'neon-green': '#3b82f6',   /* repurposed → blue-bright */
+        'gold': '#60a5fa',         /* repurposed → blue-light */
+        'blue-accent': '#1d6fe8',
       },
       fontFamily: {
-        heading: ['Lexend', 'sans-serif'],
-        body: ['Inter', 'sans-serif'],
+        display: ['Barlow Condensed', 'sans-serif'],
+        heading: ['Barlow Condensed', 'sans-serif'],
+        sans: ['Inter', 'sans-serif'],
       },
     },
   },

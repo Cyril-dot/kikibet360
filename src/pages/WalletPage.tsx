@@ -17,6 +17,9 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import PublicIcon from '@mui/icons-material/Public';
+import CloseIcon from '@mui/icons-material/Close';
+import CircularProgress from '@mui/icons-material/Loop';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -26,6 +29,33 @@ interface WalletData {
   [key: string]: unknown;
 }
 
+interface GeoInfo {
+  currency: string;
+  countryCode: string;
+  source: 'ip-api' | 'fallback';
+}
+
+// ── Geo / IP detection ────────────────────────────────────────────────────────
+
+async function fetchGeoInfo(): Promise<GeoInfo> {
+  try {
+    const res = await fetch('/api/geo/currency');
+    if (!res.ok) throw new Error('geo fetch failed');
+    return (await res.json()) as GeoInfo;
+  } catch {
+    return { currency: 'GHS', countryCode: 'GH', source: 'fallback' };
+  }
+}
+
+function countryFlag(countryCode: string): string {
+  if (!countryCode) return '';
+  return countryCode
+    .toUpperCase()
+    .split('')
+    .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
+    .join('');
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const INCOMING_KINDS = [
@@ -33,20 +63,8 @@ const INCOMING_KINDS = [
   'VIP_CASHBACK', 'WELCOME_BONUS', 'WITHDRAWAL_REFUND', 'ADJUSTMENT',
 ];
 
-function txIcon(kind: string) {
-  return INCOMING_KINDS.includes(kind)
-    ? <ArrowDownwardIcon className="text-green-500" fontSize="small" />
-    : <ArrowUpwardIcon className="text-red-500" fontSize="small" />;
-}
-
-function txColor(kind: string): string {
-  return INCOMING_KINDS.includes(kind)
-    ? 'text-green-600 dark:text-green-400'
-    : 'text-red-600 dark:text-red-400';
-}
-
-function txSign(kind: string): string {
-  return INCOMING_KINDS.includes(kind) ? '+' : '-';
+function isIncoming(kind: string) {
+  return INCOMING_KINDS.includes(kind);
 }
 
 function txLabel(kind: string): string {
@@ -80,6 +98,368 @@ function formatDate(iso: string): string {
   }
 }
 
+// ── Button primitives ─────────────────────────────────────────────────────────
+
+interface BtnProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  loading?: boolean;
+  icon?: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg';
+}
+
+/** Primary — filled brand colour. */
+function BtnPrimary({
+  children, loading, icon, size = 'md', className = '', disabled, ...rest
+}: BtnProps) {
+  const sz =
+    size === 'sm' ? 'px-3 py-1.5 text-xs rounded-xl' :
+    size === 'lg' ? 'w-full py-3.5 text-sm rounded-2xl' :
+                    'px-5 py-3 text-sm rounded-xl';
+  return (
+    <button
+      {...rest}
+      disabled={disabled || loading}
+      className={[
+        'inline-flex items-center justify-center gap-2 font-semibold',
+        'transition-all duration-150 active:scale-[0.97]',
+        'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
+        sz, className,
+      ].join(' ')}
+      style={{ backgroundColor: 'var(--primary)', color: '#fff', ...rest.style }}
+      onMouseEnter={(e) => { if (!disabled && !loading) (e.currentTarget as HTMLElement).style.filter = 'brightness(1.1)'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.filter = ''; }}
+    >
+      {loading
+        ? <CircularProgress fontSize="small" className="animate-spin shrink-0" />
+        : icon && <span className="shrink-0">{icon}</span>}
+      {children}
+    </button>
+  );
+}
+
+/** Ghost — outlined, no fill. */
+function BtnGhost({
+  children, loading, icon, size = 'md', className = '', disabled, style, ...rest
+}: BtnProps) {
+  const sz =
+    size === 'sm' ? 'px-3 py-1.5 text-xs rounded-xl' :
+    size === 'lg' ? 'w-full py-3.5 text-sm rounded-2xl' :
+                    'px-5 py-3 text-sm rounded-xl';
+  return (
+    <button
+      {...rest}
+      disabled={disabled || loading}
+      style={{
+        backgroundColor: 'var(--card-alt)',
+        border: '1px solid var(--border-light)',
+        color: 'var(--text-main)',
+        ...style,
+      }}
+      className={[
+        'inline-flex items-center justify-center gap-2 font-semibold',
+        'transition-all duration-150 active:scale-[0.97]',
+        'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
+        sz, className,
+      ].join(' ')}
+      onMouseEnter={(e) => { if (!disabled) (e.currentTarget as HTMLElement).style.filter = 'brightness(0.95)'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.filter = ''; }}
+    >
+      {loading
+        ? <CircularProgress fontSize="small" className="animate-spin shrink-0" />
+        : icon && <span className="shrink-0">{icon}</span>}
+      {children}
+    </button>
+  );
+}
+
+/** Icon — square ghost for utilities. */
+function BtnIcon({
+  children, className = '', title, onClick, ...rest
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      {...rest}
+      className={[
+        'w-9 h-9 flex items-center justify-center rounded-xl',
+        'transition-colors duration-150',
+        className,
+      ].join(' ')}
+      style={{ color: 'var(--text-muted)', ...rest.style }}
+      onMouseEnter={(e) =>
+        ((e.currentTarget as HTMLElement).style.backgroundColor = 'var(--card-alt)')
+      }
+      onMouseLeave={(e) =>
+        ((e.currentTarget as HTMLElement).style.backgroundColor = 'transparent')
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
+// ── Shared UI atoms ────────────────────────────────────────────────────────────
+
+function SkeletonLine({ w = 'w-full', h = 'h-4' }: { w?: string; h?: string }) {
+  return (
+    <div
+      className={`${h} ${w} rounded-lg animate-pulse`}
+      style={{ backgroundColor: 'var(--border-light)' }}
+    />
+  );
+}
+
+function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div
+      className={`rounded-2xl overflow-hidden shadow-sm ${className}`}
+      style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-light)' }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ── Grouped field container (same pattern as AccountPage password section) ─────
+
+/**
+ * Wraps multiple <GroupedField> children in a single rounded border container
+ * with hairline dividers between rows.
+ */
+function GroupedFields({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="overflow-hidden"
+      style={{ border: '1px solid var(--border-light)', borderRadius: 16 }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/**
+ * A single row inside a GroupedFields container.
+ * Floating label sits at the top, input/select below it.
+ */
+function GroupedField({
+  label,
+  last = false,
+  children,
+}: {
+  label: string;
+  last?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="relative"
+      style={!last ? { borderBottom: '1px solid var(--border-light)' } : {}}
+    >
+      <label
+        className="absolute left-4 top-3 text-[10px] font-bold uppercase tracking-wider pointer-events-none select-none z-10"
+        style={{ color: 'var(--text-muted)' }}
+      >
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+/** Shared inline style for inputs/selects inside GroupedField */
+const groupedInputStyle: React.CSSProperties = {
+  display: 'block',
+  width: '100%',
+  paddingTop: '2rem',
+  paddingBottom: '0.75rem',
+  paddingLeft: '1rem',
+  paddingRight: '1rem',
+  backgroundColor: 'var(--card-bg)',
+  color: 'var(--text-main)',
+  fontSize: 15,
+  fontWeight: 500,
+  outline: 'none',
+  border: 'none',
+  appearance: 'none' as const,
+};
+
+function GroupedInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      {...props}
+      style={{ ...groupedInputStyle, ...props.style }}
+      onFocus={(e) => {
+        (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = 'var(--card-alt)';
+        props.onFocus?.(e);
+      }}
+      onBlur={(e) => {
+        (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = '';
+        props.onBlur?.(e);
+      }}
+    />
+  );
+}
+
+function GroupedSelect(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <select
+      {...props}
+      style={{ ...groupedInputStyle, paddingRight: '2.5rem', ...props.style }}
+      onFocus={(e) => {
+        (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = 'var(--card-alt)';
+        props.onFocus?.(e);
+      }}
+      onBlur={(e) => {
+        (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = '';
+        props.onBlur?.(e);
+      }}
+    />
+  );
+}
+
+// ── Geo Banner ─────────────────────────────────────────────────────────────────
+
+function GeoBanner({ geoInfo, geoLoading }: { geoInfo: GeoInfo | null; geoLoading: boolean }) {
+  return (
+    <div
+      className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl"
+      style={{ backgroundColor: 'var(--card-alt)', border: '1px solid var(--border-light)' }}
+    >
+      <PublicIcon sx={{ fontSize: 14 }} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+      {geoLoading ? (
+        <SkeletonLine w="w-40" h="h-3" />
+      ) : geoInfo ? (
+        <div className="flex items-center gap-1.5 flex-1 min-w-0 flex-wrap">
+          {geoInfo.countryCode && (
+            <span className="text-base leading-none">{countryFlag(geoInfo.countryCode)}</span>
+          )}
+          <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+            Detected location:
+          </span>
+          <span className="text-xs font-bold" style={{ color: 'var(--text-main)' }}>
+            {geoInfo.countryCode || '—'} · {geoInfo.currency}
+          </span>
+          {geoInfo.source === 'fallback' && (
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>(default)</span>
+          )}
+        </div>
+      ) : (
+        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Location unavailable</span>
+      )}
+    </div>
+  );
+}
+
+// ── Modal shell ────────────────────────────────────────────────────────────────
+
+function ModalShell({
+  open, onClose, children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="relative w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl"
+        style={{
+          backgroundColor: 'var(--card-bg)',
+          border: '1px solid var(--border-light)',
+          paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))',
+        }}
+      >
+        {/* drag handle on mobile */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+          <div
+            className="w-10 h-1 rounded-full"
+            style={{ backgroundColor: 'var(--border-light)' }}
+          />
+        </div>
+        <div className="px-6 pt-4 pb-6">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Modal confirm row
+function ModalRow({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
+  return (
+    <div
+      className="flex justify-between py-3"
+      style={!last ? { borderBottom: '1px solid var(--border-light)' } : {}}
+    >
+      <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{label}</span>
+      <span className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>{value}</span>
+    </div>
+  );
+}
+
+// Inline error / success banners
+function AlertBanner({ type, message }: { type: 'error' | 'success'; message: string }) {
+  const isError = type === 'error';
+  return (
+    <div
+      className="flex items-start gap-2.5 px-4 py-3 rounded-2xl text-sm font-medium"
+      style={{
+        backgroundColor: isError
+          ? 'color-mix(in srgb, #f43f5e 10%, transparent)'
+          : 'color-mix(in srgb, #10b981 10%, transparent)',
+        border: `1px solid ${isError
+          ? 'color-mix(in srgb, #f43f5e 25%, transparent)'
+          : 'color-mix(in srgb, #10b981 25%, transparent)'}`,
+        color: isError ? '#e11d48' : '#059669',
+      }}
+    >
+      {isError && <CloseIcon sx={{ fontSize: 16 }} className="shrink-0 mt-0.5" />}
+      <span>{message}</span>
+    </div>
+  );
+}
+
+// ── Method Toggle ─────────────────────────────────────────────────────────────
+
+function MethodToggle({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <div
+      className="flex gap-1 p-1 rounded-2xl"
+      style={{ backgroundColor: 'var(--card-alt)', border: '1px solid var(--border-light)' }}
+    >
+      {options.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 active:scale-[0.97]"
+            style={{
+              backgroundColor: active ? 'var(--primary)' : 'transparent',
+              color: active ? '#fff' : 'var(--text-muted)',
+              boxShadow: active ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+            }}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Withdraw Modal ────────────────────────────────────────────────────────────
 
 interface WithdrawModalProps {
@@ -107,14 +487,10 @@ function WithdrawModal({ open, onClose, onSuccess, balance }: WithdrawModalProps
   const handleClose = () => { reset(); onClose(); };
 
   const submit = async () => {
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
       await withdrawals.submit({
-        amount: parseFloat(amount),
-        method,
-        accountNumber,
-        accountName,
+        amount: parseFloat(amount), method, accountNumber, accountName,
         network: method === 'momo' ? network : undefined,
       });
       setStep('done');
@@ -126,145 +502,173 @@ function WithdrawModal({ open, onClose, onSuccess, balance }: WithdrawModalProps
     }
   };
 
-  if (!open) return null;
+  const canProceed =
+    !!amount && parseFloat(amount) > 0 && !!accountNumber && !!accountName;
 
   return (
-    // z-[99999] beats BottomNav's z-[9999]
-    <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div
-        className="w-full max-w-md bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-2xl p-6 shadow-2xl"
-        style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
-      >
+    <ModalShell open={open} onClose={handleClose}>
+      {/* ── Done state ── */}
+      {step === 'done' && (
+        <div className="text-center py-4 space-y-5">
+          <div
+            className="w-16 h-16 rounded-full flex items-center justify-center mx-auto"
+            style={{ backgroundColor: 'color-mix(in srgb, #10b981 15%, transparent)' }}
+          >
+            <PaymentsIcon style={{ color: '#10b981', fontSize: 32 }} />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold mb-1" style={{ color: 'var(--text-main)' }}>
+              Withdrawal Requested
+            </h3>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              Your request is being reviewed. Funds will be sent shortly.
+            </p>
+          </div>
+          <BtnPrimary size="lg" onClick={handleClose}>Done</BtnPrimary>
+        </div>
+      )}
 
-        {step === 'done' ? (
-          <div className="text-center py-6">
-            <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center mx-auto mb-4">
-              <PaymentsIcon className="text-green-600" />
-            </div>
-            <h3 className="font-heading text-xl font-bold mb-2">Withdrawal Requested</h3>
-            <p className="text-slate-500 text-sm mb-6">Your request is being reviewed. Funds will be sent shortly.</p>
-            <button onClick={handleClose} className="btn-primary w-full">Done</button>
+      {/* ── Confirm state ── */}
+      {step === 'confirm' && (
+        <div className="space-y-5">
+          <h3 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>
+            Confirm Withdrawal
+          </h3>
+          <div
+            className="rounded-2xl overflow-hidden"
+            style={{ border: '1px solid var(--border-light)' }}
+          >
+            <ModalRow label="Amount"  value={formatCurrency(parseFloat(amount))} />
+            <ModalRow label="Method"  value={method === 'momo' ? 'Mobile Money' : 'Bank Transfer'} />
+            {method === 'momo' && <ModalRow label="Network" value={network} />}
+            <ModalRow label="Account" value={accountNumber} />
+            <ModalRow label="Name"    value={accountName} last />
+          </div>
+          {error && <AlertBanner type="error" message={error} />}
+          <div className="flex gap-3">
+            <BtnGhost onClick={() => setStep('form')} disabled={loading} className="flex-1">
+              Back
+            </BtnGhost>
+            <BtnPrimary loading={loading} onClick={submit} className="flex-1 py-3 rounded-xl">
+              {loading ? 'Processing…' : 'Confirm'}
+            </BtnPrimary>
+          </div>
+        </div>
+      )}
+
+      {/* ── Form state ── */}
+      {step === 'form' && (
+        <div className="space-y-5">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>
+              Withdraw Funds
+            </h3>
+            <BtnIcon onClick={handleClose} aria-label="Close">
+              <CloseIcon fontSize="small" />
+            </BtnIcon>
           </div>
 
-        ) : step === 'confirm' ? (
-          <>
-            <h3 className="font-heading text-lg font-bold mb-4">Confirm Withdrawal</h3>
-            <div className="space-y-2 mb-6 text-sm">
-              <div className="flex justify-between py-2 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-500">Amount</span>
-                <span className="font-bold">{formatCurrency(parseFloat(amount))}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-500">Method</span>
-                <span>{method === 'momo' ? 'Mobile Money' : 'Bank Transfer'}</span>
-              </div>
-              {method === 'momo' && (
-                <div className="flex justify-between py-2 border-b border-slate-100 dark:border-slate-800">
-                  <span className="text-slate-500">Network</span>
-                  <span>{network}</span>
-                </div>
-              )}
-              <div className="flex justify-between py-2 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-500">Account</span>
-                <span className="font-mono">{accountNumber}</span>
-              </div>
-              <div className="flex justify-between py-2">
-                <span className="text-slate-500">Name</span>
-                <span>{accountName}</span>
-              </div>
-            </div>
-            {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
-            <div className="flex gap-3">
-              <button onClick={() => setStep('form')} className="btn-secondary flex-1" disabled={loading}>Back</button>
-              <button onClick={submit} className="btn-primary flex-1" disabled={loading}>
-                {loading ? 'Processing…' : 'Confirm'}
-              </button>
-            </div>
-          </>
+          {/* Available balance chip */}
+          <div
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm"
+            style={{ backgroundColor: 'var(--card-alt)', border: '1px solid var(--border-light)' }}
+          >
+            <span style={{ color: 'var(--text-muted)' }}>Available</span>
+            <span className="font-bold" style={{ color: 'var(--text-main)' }}>
+              {formatCurrency(balance)}
+            </span>
+          </div>
 
-        ) : (
-          <>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-heading text-lg font-bold">Withdraw Funds</h3>
-              <button onClick={handleClose} className="text-slate-400 hover:text-slate-700 text-xl leading-none">×</button>
-            </div>
-            <p className="text-xs text-slate-400 mb-4">
-              Available: <strong className="text-slate-700 dark:text-slate-200">{formatCurrency(balance)}</strong>
+          {/* Method toggle */}
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+              Method
             </p>
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 block">Amount (GH₵)</label>
-                <input
-                  type="number" value={amount} onChange={e => setAmount(e.target.value)}
-                  placeholder="0.00" className="input-field" min="1" step="0.01"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 block">Method</label>
-                <div className="flex gap-2">
-                  {['momo', 'bank'].map(m => (
-                    <button
-                      key={m} onClick={() => setMethod(m)}
-                      className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        method === m
-                          ? 'bg-primary text-white'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                      }`}
-                    >
-                      {m === 'momo' ? 'Mobile Money' : 'Bank Transfer'}
-                    </button>
+            <MethodToggle
+              value={method}
+              onChange={setMethod}
+              options={[
+                { value: 'momo', label: 'Mobile Money' },
+                { value: 'bank', label: 'Bank Transfer' },
+              ]}
+            />
+          </div>
+
+          {/* Grouped fields */}
+          <GroupedFields>
+            {/* Amount */}
+            <GroupedField label="Amount (GH₵)">
+              <GroupedInput
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                min="1"
+                step="0.01"
+              />
+            </GroupedField>
+
+            {/* Network / Bank Name */}
+            {method === 'momo' ? (
+              <GroupedField label="Network">
+                <GroupedSelect value={network} onChange={(e) => setNetwork(e.target.value)}>
+                  {['MTN', 'AirtelTigo', 'Telecel'].map((n) => (
+                    <option key={n} value={n}>{n}</option>
                   ))}
-                </div>
-              </div>
-              {method === 'momo' ? (
-                <div>
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 block">Network</label>
-                  <select value={network} onChange={e => setNetwork(e.target.value)} className="input-field">
-                    {['MTN', 'AirtelTigo', 'Telecel'].map(n => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div>
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 block">Bank Name</label>
-                  <input
-                    type="text" value={network} onChange={e => setNetwork(e.target.value)}
-                    placeholder="e.g. GCB Bank" className="input-field"
-                  />
-                </div>
-              )}
-              <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 block">
-                  {method === 'momo' ? 'Phone Number' : 'Account Number'}
-                </label>
-                <input
-                  type="text" value={accountNumber} onChange={e => setAccountNumber(e.target.value)}
-                  placeholder={method === 'momo' ? '0XX XXX XXXX' : 'Account number'}
-                  className="input-field"
+                </GroupedSelect>
+                {/* chevron icon */}
+                <span
+                  className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-xs"
+                  style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}
+                >
+                  ▾
+                </span>
+              </GroupedField>
+            ) : (
+              <GroupedField label="Bank Name">
+                <GroupedInput
+                  type="text"
+                  value={network}
+                  onChange={(e) => setNetwork(e.target.value)}
+                  placeholder="e.g. GCB Bank"
                 />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 block">Account Name</label>
-                <input
-                  type="text" value={accountName} onChange={e => setAccountName(e.target.value)}
-                  placeholder="Full name on account" className="input-field"
-                />
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                if (amount && parseFloat(amount) > 0 && accountNumber && accountName) setStep('confirm');
-              }}
-              disabled={!amount || parseFloat(amount) <= 0 || !accountNumber || !accountName}
-              className="btn-primary w-full mt-5 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Continue
-            </button>
-          </>
-        )}
-      </div>
-    </div>
+              </GroupedField>
+            )}
+
+            {/* Phone / Account Number */}
+            <GroupedField label={method === 'momo' ? 'Phone Number' : 'Account Number'}>
+              <GroupedInput
+                type="text"
+                value={accountNumber}
+                onChange={(e) => setAccountNumber(e.target.value)}
+                placeholder={method === 'momo' ? '0XX XXX XXXX' : 'Account number'}
+              />
+            </GroupedField>
+
+            {/* Account Name */}
+            <GroupedField label="Account Name" last>
+              <GroupedInput
+                type="text"
+                value={accountName}
+                onChange={(e) => setAccountName(e.target.value)}
+                placeholder="Full name on account"
+              />
+            </GroupedField>
+          </GroupedFields>
+
+          {error && <AlertBanner type="error" message={error} />}
+
+          <BtnPrimary
+            size="lg"
+            disabled={!canProceed}
+            onClick={() => canProceed && setStep('confirm')}
+          >
+            Continue
+          </BtnPrimary>
+        </div>
+      )}
+    </ModalShell>
   );
 }
 
@@ -295,15 +699,12 @@ function AffiliateWithdrawModal({ open, onClose, onSuccess, availableBalance }: 
   const handleClose = () => { reset(); onClose(); };
 
   const submit = async () => {
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
       await affiliate.requestWithdrawal({
         amount: parseFloat(amount),
         accountDetails: {
-          bankName,
-          accountNumber,
-          accountName,
+          bankName, accountNumber, accountName,
           mobileMoneyNumber: momoNumber || undefined,
         },
       });
@@ -316,72 +717,115 @@ function AffiliateWithdrawModal({ open, onClose, onSuccess, availableBalance }: 
     }
   };
 
-  if (!open) return null;
+  const canSubmit =
+    !!amount && parseFloat(amount) > 0 && !!bankName && !!accountNumber && !!accountName;
 
   return (
-    // z-[99999] beats BottomNav's z-[9999]
-    <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div
-        className="w-full max-w-md bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-2xl p-6 shadow-2xl"
-        style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
-      >
-        {step === 'done' ? (
-          <div className="text-center py-6">
-            <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center mx-auto mb-4">
-              <PaymentsIcon className="text-blue-600" />
-            </div>
-            <h3 className="font-heading text-xl font-bold mb-2">Request Submitted</h3>
-            <p className="text-slate-500 text-sm mb-6">Your affiliate earnings withdrawal is being processed.</p>
-            <button onClick={handleClose} className="btn-primary w-full">Done</button>
+    <ModalShell open={open} onClose={handleClose}>
+      {/* ── Done state ── */}
+      {step === 'done' && (
+        <div className="text-center py-4 space-y-5">
+          <div
+            className="w-16 h-16 rounded-full flex items-center justify-center mx-auto"
+            style={{ backgroundColor: 'color-mix(in srgb, #3b82f6 15%, transparent)' }}
+          >
+            <PaymentsIcon style={{ color: '#3b82f6', fontSize: 32 }} />
           </div>
-        ) : (
-          <>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-heading text-lg font-bold">Withdraw Affiliate Earnings</h3>
-              <button onClick={handleClose} className="text-slate-400 hover:text-slate-700 text-xl leading-none">×</button>
-            </div>
-            <p className="text-xs text-slate-400 mb-4">
-              Available: <strong className="text-slate-700 dark:text-slate-200">{formatCurrency(availableBalance)}</strong>
+          <div>
+            <h3 className="text-xl font-bold mb-1" style={{ color: 'var(--text-main)' }}>
+              Request Submitted
+            </h3>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              Your affiliate earnings withdrawal is being processed.
             </p>
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 block">Amount (GH₵)</label>
-                <input
-                  type="number" value={amount} onChange={e => setAmount(e.target.value)}
-                  placeholder="0.00" className="input-field" min="1" step="0.01" max={availableBalance}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 block">Bank Name</label>
-                <input type="text" value={bankName} onChange={e => setBankName(e.target.value)} placeholder="e.g. GCB Bank" className="input-field" />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 block">Account Number</label>
-                <input type="text" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} placeholder="Account number" className="input-field" />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 block">Account Name</label>
-                <input type="text" value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="Full name on account" className="input-field" />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 block">
-                  Mobile Money Number <span className="text-slate-400 font-normal">(optional)</span>
-                </label>
-                <input type="tel" value={momoNumber} onChange={e => setMomoNumber(e.target.value)} placeholder="0XX XXX XXXX" className="input-field" />
-              </div>
-            </div>
-            {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
-            <button
-              onClick={submit}
-              disabled={loading || !amount || parseFloat(amount) <= 0 || !bankName || !accountNumber || !accountName}
-              className="btn-primary w-full mt-5 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Submitting…' : 'Submit Request'}
-            </button>
-          </>
-        )}
-      </div>
-    </div>
+          </div>
+          <BtnPrimary size="lg" onClick={handleClose}>Done</BtnPrimary>
+        </div>
+      )}
+
+      {/* ── Form state ── */}
+      {step === 'form' && (
+        <div className="space-y-5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>
+              Withdraw Affiliate Earnings
+            </h3>
+            <BtnIcon onClick={handleClose} aria-label="Close">
+              <CloseIcon fontSize="small" />
+            </BtnIcon>
+          </div>
+
+          {/* Available chip */}
+          <div
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm"
+            style={{ backgroundColor: 'var(--card-alt)', border: '1px solid var(--border-light)' }}
+          >
+            <span style={{ color: 'var(--text-muted)' }}>Available</span>
+            <span className="font-bold" style={{ color: '#10b981' }}>
+              {formatCurrency(availableBalance)}
+            </span>
+          </div>
+
+          {/* Grouped fields */}
+          <GroupedFields>
+            <GroupedField label="Amount (GH₵)">
+              <GroupedInput
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                min="1"
+                step="0.01"
+                max={availableBalance}
+              />
+            </GroupedField>
+            <GroupedField label="Bank Name">
+              <GroupedInput
+                type="text"
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                placeholder="e.g. GCB Bank"
+              />
+            </GroupedField>
+            <GroupedField label="Account Number">
+              <GroupedInput
+                type="text"
+                value={accountNumber}
+                onChange={(e) => setAccountNumber(e.target.value)}
+                placeholder="Account number"
+              />
+            </GroupedField>
+            <GroupedField label="Account Name">
+              <GroupedInput
+                type="text"
+                value={accountName}
+                onChange={(e) => setAccountName(e.target.value)}
+                placeholder="Full name on account"
+              />
+            </GroupedField>
+            <GroupedField label="Mobile Money Number (optional)" last>
+              <GroupedInput
+                type="tel"
+                value={momoNumber}
+                onChange={(e) => setMomoNumber(e.target.value)}
+                placeholder="0XX XXX XXXX"
+              />
+            </GroupedField>
+          </GroupedFields>
+
+          {error && <AlertBanner type="error" message={error} />}
+
+          <BtnPrimary
+            size="lg"
+            loading={loading}
+            disabled={!canSubmit}
+            onClick={submit}
+          >
+            {loading ? 'Submitting…' : 'Submit Request'}
+          </BtnPrimary>
+        </div>
+      )}
+    </ModalShell>
   );
 }
 
@@ -404,14 +848,18 @@ export default function WalletPage() {
   const [showWithdraw, setShowWithdraw]       = useState(false);
   const [showAffWithdraw, setShowAffWithdraw] = useState(false);
 
-  // ── Auth guard ────────────────────────────────────────────────────────────
+  const [geoInfo, setGeoInfo]       = useState<GeoInfo | null>(null);
+  const [geoLoading, setGeoLoading] = useState(true);
+
   useEffect(() => {
-    if (!currentUser) {
-      navigate('/login', { replace: true, state: { from: '/wallet' } });
-    }
+    if (!currentUser) navigate('/login', { replace: true, state: { from: '/wallet' } });
   }, [currentUser, navigate]);
 
-  // ── Data loaders ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    setGeoLoading(true);
+    fetchGeoInfo().then(setGeoInfo).finally(() => setGeoLoading(false));
+  }, []);
+
   const fetchWallet = useCallback(async () => {
     const res = await walletApi.getWallet();
     setWalletData(res.data as WalletData);
@@ -421,7 +869,7 @@ export default function WalletPage() {
     setTxLoading(true);
     try {
       const res = await walletApi.getTransactions(page, 20);
-      setTransactions(prev => page === 0 ? res.data.content : [...prev, ...res.data.content]);
+      setTransactions((prev) => page === 0 ? res.data.content : [...prev, ...res.data.content]);
       setTxTotalPages(res.data.totalPages);
       setTxPage(page);
     } finally {
@@ -433,14 +881,11 @@ export default function WalletPage() {
     try {
       const res = await affiliate.getStats();
       setAffiliateStats(res.data);
-    } catch {
-      // Not all users are affiliates — silently ignore
-    }
+    } catch { /* not all users are affiliates */ }
   }, []);
 
   const initLoad = useCallback(async () => {
-    setLoading(true);
-    setFetchError('');
+    setLoading(true); setFetchError('');
     try {
       await Promise.all([fetchWallet(), fetchTransactions(0), fetchAffiliateStats()]);
     } catch (e: unknown) {
@@ -454,19 +899,23 @@ export default function WalletPage() {
     if (currentUser) initLoad();
   }, [currentUser, initLoad]);
 
-  // ── Derived ───────────────────────────────────────────────────────────────
   const mainBalance      = walletData?.balance ?? 0;
   const affiliateBalance = affiliateStats?.availableBalance ?? 0;
+  const displayCurrency  = walletData?.currency ?? geoInfo?.currency ?? 'GHS';
 
-  // ── Loading skeleton ──────────────────────────────────────────────────────
+  // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="max-w-lg mx-auto p-4 space-y-4">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="card p-5 animate-pulse">
-            <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/3 mb-4" />
-            <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-1/2 mb-4" />
-            <div className="h-10 bg-slate-200 dark:bg-slate-700 rounded" />
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="rounded-2xl p-5 animate-pulse"
+            style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-light)' }}
+          >
+            <SkeletonLine w="w-1/3" h="h-4" />
+            <div className="mt-3"><SkeletonLine w="w-1/2" h="h-8" /></div>
+            <div className="mt-4"><SkeletonLine h="h-10" /></div>
           </div>
         ))}
       </div>
@@ -475,178 +924,262 @@ export default function WalletPage() {
 
   if (fetchError) {
     return (
-      <div className="max-w-lg mx-auto p-4 text-center py-16">
-        <p className="text-red-500 mb-4">{fetchError}</p>
-        <button onClick={initLoad} className="btn-primary">Retry</button>
+      <div className="max-w-lg mx-auto p-4 text-center py-16 space-y-4">
+        <AlertBanner type="error" message={fetchError} />
+        <BtnPrimary onClick={initLoad}>Retry</BtnPrimary>
       </div>
     );
   }
 
+  // ── Main render ───────────────────────────────────────────────────────────
   return (
     <>
-      <div className="max-w-lg mx-auto p-4 space-y-4 pb-10">
+      <div className="min-h-screen pb-10" style={{ backgroundColor: 'var(--card-alt)' }}>
+        <div className="max-w-lg mx-auto p-4 space-y-4">
 
-        {/* ── Header ─────────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-heading text-2xl font-bold flex items-center gap-2">
-              <AccountBalanceWalletIcon className="text-primary" />
-              Wallet
-            </h1>
-            {currentUser && (
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                {currentUser.fullName}
+          {/* ── Page Header ──────────────────────────────────────────────── */}
+          <div className="flex items-center justify-between pt-1">
+            <div>
+              <h1
+                className="text-2xl font-bold flex items-center gap-2"
+                style={{ color: 'var(--text-main)' }}
+              >
+                <AccountBalanceWalletIcon style={{ color: 'var(--primary)' }} />
+                Wallet
+              </h1>
+              {currentUser && (
+                <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  {currentUser.fullName}
+                </p>
+              )}
+            </div>
+            <BtnIcon onClick={initLoad} title="Refresh wallet">
+              <RefreshIcon fontSize="small" />
+            </BtnIcon>
+          </div>
+
+          {/* ── Geo Banner ───────────────────────────────────────────────── */}
+          <GeoBanner geoInfo={geoInfo} geoLoading={geoLoading} />
+
+          {/* ── Main Balance Hero Card ────────────────────────────────────── */}
+          <div
+            className="rounded-3xl p-5 sm:p-6 shadow-lg"
+            style={{
+              background:
+                'linear-gradient(135deg, var(--primary), var(--primary-dark, color-mix(in srgb, var(--primary) 70%, #000)))',
+            }}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-bold uppercase tracking-wider text-white/70">
+                Main Balance
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowBalance((v) => !v)}
+                className="p-1 rounded-lg transition-colors"
+                style={{ color: 'rgba(255,255,255,0.6)' }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = '#fff')}
+                onMouseLeave={(e) =>
+                  ((e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.6)')
+                }
+              >
+                {showBalance
+                  ? <VisibilityIcon fontSize="small" />
+                  : <VisibilityOffIcon fontSize="small" />}
+              </button>
+            </div>
+
+            <p className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-1">
+              {showBalance ? formatCurrency(mainBalance) : `${displayCurrency} ••••`}
+            </p>
+            {!geoLoading && geoInfo && (
+              <p className="text-xs text-white/50 mb-5">
+                Displaying in {displayCurrency}
+                {geoInfo.countryCode ? ` · ${geoInfo.countryCode}` : ''}
               </p>
             )}
-          </div>
-          <button
-            onClick={initLoad}
-            className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-            title="Refresh"
-          >
-            <RefreshIcon fontSize="small" />
-          </button>
-        </div>
+            {(geoLoading || !geoInfo) && <div className="mb-5" />}
 
-        {/* ── Main Balance Hero ───────────────────────────────────────────── */}
-        <div className="card p-6 bg-gradient-to-br from-primary to-primary/80 text-white rounded-2xl">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-sm font-medium text-white/70 uppercase tracking-wider">Main Balance</span>
-            <button
-              onClick={() => setShowBalance(v => !v)}
-              className="p-1 text-white/60 hover:text-white transition-colors"
-            >
-              {showBalance ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
-            </button>
-          </div>
-
-          <p className="font-heading text-4xl font-bold tracking-tight mb-6">
-            {showBalance ? formatCurrency(mainBalance) : 'GH₵ ••••'}
-          </p>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Link
-              to="/deposit"
-              className="flex items-center justify-center gap-2 py-3 px-4 bg-white text-primary font-semibold text-sm rounded-xl hover:bg-white/90 transition-colors"
-            >
-              <AddCardIcon fontSize="small" />
-              Deposit
-            </Link>
-            <button
-              onClick={() => setShowWithdraw(true)}
-              className="flex items-center justify-center gap-2 py-3 px-4 bg-white/15 text-white font-semibold text-sm rounded-xl hover:bg-white/25 transition-colors border border-white/20"
-            >
-              <PaymentsIcon fontSize="small" />
-              Withdraw
-            </button>
-          </div>
-        </div>
-
-        {/* ── Affiliate Earnings Card ─────────────────────────────────────── */}
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                💰 Affiliate Earnings
-              </h2>
-              <p className="text-xs text-slate-400 mt-0.5">Withdraw to your bank account</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Link
+                to="/deposit"
+                className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-sm font-semibold transition-all active:scale-[0.97] bg-white"
+                style={{ color: 'var(--primary)' }}
+              >
+                <AddCardIcon fontSize="small" />
+                Deposit
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowWithdraw(true)}
+                className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-sm font-semibold text-white transition-all active:scale-[0.97]"
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.15)',
+                  border: '1px solid rgba(255,255,255,0.25)',
+                }}
+                onMouseEnter={(e) =>
+                  ((e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255,255,255,0.25)')
+                }
+                onMouseLeave={(e) =>
+                  ((e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255,255,255,0.15)')
+                }
+              >
+                <PaymentsIcon fontSize="small" />
+                Withdraw
+              </button>
             </div>
-            <button
-              onClick={() => setShowAffBalance(v => !v)}
-              className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              {showAffBalance ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
-            </button>
           </div>
 
-          <p className="font-heading text-3xl font-bold text-slate-900 dark:text-slate-100 mb-4">
-            {showAffBalance ? formatCurrency(affiliateBalance) : 'GH₵ ••••'}
-          </p>
-
-          {/* Affiliate stats row */}
-          {affiliateStats && (
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 text-center">
-                <p className="text-lg mb-0.5">📈</p>
-                <p className="text-xs text-slate-500 mb-0.5">Total Earned</p>
-                <p className="text-sm font-bold text-green-600">
-                  {formatCurrency(affiliateStats.lifetimeCommission)}
+          {/* ── Affiliate Earnings Card ───────────────────────────────────── */}
+          <Card className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-bold" style={{ color: 'var(--text-main)' }}>
+                  💰 Affiliate Earnings
+                </h2>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  Withdraw to your bank account
                 </p>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 text-center">
-                <p className="text-lg mb-0.5">👥</p>
-                <p className="text-xs text-slate-500 mb-0.5">Referrals</p>
-                <p className="text-sm font-bold text-blue-600">
-                  {affiliateStats.totalReferrals}
-                </p>
+              <button
+                type="button"
+                onClick={() => setShowAffBalance((v) => !v)}
+                className="p-1 rounded-lg transition-colors"
+                style={{ color: 'var(--text-muted)' }}
+                onMouseEnter={(e) =>
+                  ((e.currentTarget as HTMLElement).style.color = 'var(--text-main)')
+                }
+                onMouseLeave={(e) =>
+                  ((e.currentTarget as HTMLElement).style.color = 'var(--text-muted)')
+                }
+              >
+                {showAffBalance
+                  ? <VisibilityIcon fontSize="small" />
+                  : <VisibilityOffIcon fontSize="small" />}
+              </button>
+            </div>
+
+            <p className="text-3xl font-bold mb-4" style={{ color: 'var(--text-main)' }}>
+              {showAffBalance ? formatCurrency(affiliateBalance) : `${displayCurrency} ••••`}
+            </p>
+
+            {affiliateStats && (
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                {[
+                  { emoji: '📈', label: 'Total Earned',   value: formatCurrency(affiliateStats.lifetimeCommission), color: '#10b981' },
+                  { emoji: '👥', label: 'Referrals',      value: String(affiliateStats.totalReferrals),             color: '#3b82f6' },
+                  { emoji: '💳', label: 'Available',      value: formatCurrency(affiliateStats.availableBalance),   color: 'var(--text-main)' },
+                ].map(({ emoji, label, value, color }) => (
+                  <div
+                    key={label}
+                    className="rounded-2xl p-3 text-center"
+                    style={{ backgroundColor: 'var(--card-alt)', border: '1px solid var(--border-light)' }}
+                  >
+                    <p className="text-lg mb-0.5">{emoji}</p>
+                    <p className="text-[10px] mb-0.5" style={{ color: 'var(--text-muted)' }}>{label}</p>
+                    <p className="text-xs font-bold" style={{ color }}>{value}</p>
+                  </div>
+                ))}
               </div>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 text-center">
-                <p className="text-lg mb-0.5">💳</p>
-                <p className="text-xs text-slate-500 mb-0.5">Available</p>
-                <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
-                  {formatCurrency(affiliateStats.availableBalance)}
-                </p>
-              </div>
-            </div>
-          )}
+            )}
 
-          <button
-            onClick={() => setShowAffWithdraw(true)}
-            className="btn-secondary w-full flex items-center justify-center gap-2 text-sm"
-          >
-            <PaymentsIcon fontSize="small" />
-            Withdraw Affiliate Earnings
-          </button>
-        </div>
-
-        {/* ── Recent Transactions ─────────────────────────────────────────── */}
-        <div className="card p-5">
-          <h2 className="font-heading text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">
-            Recent Transactions
-          </h2>
-
-          {transactions.length === 0 ? (
-            <div className="text-center py-10">
-              <AccountBalanceWalletIcon className="text-slate-300 dark:text-slate-600 mx-auto mb-2" sx={{ fontSize: 40 }} />
-              <p className="text-sm text-slate-400">No transactions yet</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {transactions.map((tx) => (
-                <div key={tx.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                  <div className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center flex-shrink-0">
-                    {txIcon(tx.kind)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">{txLabel(tx.kind)}</p>
-                    <p className="text-xs text-slate-400">{formatDate(tx.createdAt)}</p>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className={`text-sm font-bold ${txColor(tx.kind)}`}>
-                      {txSign(tx.kind)}{formatCurrency(tx.amount)}
-                    </p>
-                    {tx.balanceAfter !== undefined && (
-                      <p className="text-xs text-slate-400">
-                        Bal: {formatCurrency(tx.balanceAfter)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {txPage + 1 < txTotalPages && (
-            <button
-              onClick={() => fetchTransactions(txPage + 1)}
-              disabled={txLoading}
-              className="btn-secondary w-full mt-4 text-sm disabled:opacity-50"
+            <BtnGhost
+              size="lg"
+              icon={<PaymentsIcon fontSize="small" />}
+              onClick={() => setShowAffWithdraw(true)}
             >
-              {txLoading ? 'Loading…' : 'Load More'}
-            </button>
-          )}
-        </div>
+              Withdraw Affiliate Earnings
+            </BtnGhost>
+          </Card>
 
+          {/* ── Recent Transactions ───────────────────────────────────────── */}
+          <Card className="p-5">
+            <h2
+              className="text-[11px] font-bold uppercase tracking-widest mb-4"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              Recent Transactions
+            </h2>
+
+            {transactions.length === 0 ? (
+              <div className="text-center py-10">
+                <AccountBalanceWalletIcon
+                  sx={{ fontSize: 40 }}
+                  style={{ color: 'var(--border-light)' }}
+                  className="mx-auto mb-2"
+                />
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No transactions yet</p>
+              </div>
+            ) : (
+              <div>
+                {transactions.map((tx, idx) => {
+                  const incoming = isIncoming(tx.kind);
+                  const isLast   = idx === transactions.length - 1;
+                  return (
+                    <div
+                      key={tx.id}
+                      className="flex items-center gap-3 py-3.5"
+                      style={!isLast ? { borderBottom: '1px solid var(--border-light)' } : {}}
+                    >
+                      {/* Icon bubble */}
+                      <div
+                        className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{
+                          backgroundColor: incoming
+                            ? 'color-mix(in srgb, #10b981 15%, transparent)'
+                            : 'color-mix(in srgb, #f43f5e 15%, transparent)',
+                        }}
+                      >
+                        {incoming
+                          ? <ArrowDownwardIcon sx={{ fontSize: 16 }} style={{ color: '#10b981' }} />
+                          : <ArrowUpwardIcon   sx={{ fontSize: 16 }} style={{ color: '#f43f5e' }} />}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className="text-sm font-semibold truncate"
+                          style={{ color: 'var(--text-main)' }}
+                        >
+                          {txLabel(tx.kind)}
+                        </p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                          {formatDate(tx.createdAt)}
+                        </p>
+                      </div>
+
+                      <div className="text-right flex-shrink-0">
+                        <p
+                          className="text-sm font-bold tabular-nums"
+                          style={{ color: incoming ? '#10b981' : '#f43f5e' }}
+                        >
+                          {incoming ? '+' : '-'}{formatCurrency(tx.amount)}
+                        </p>
+                        {tx.balanceAfter !== undefined && (
+                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                            Bal: {formatCurrency(tx.balanceAfter)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {txPage + 1 < txTotalPages && (
+              <div className="mt-4">
+                <BtnGhost
+                  size="lg"
+                  loading={txLoading}
+                  onClick={() => fetchTransactions(txPage + 1)}
+                >
+                  {txLoading ? 'Loading…' : 'Load More'}
+                </BtnGhost>
+              </div>
+            )}
+          </Card>
+
+        </div>
       </div>
 
       {/* ── Modals ──────────────────────────────────────────────────────────── */}

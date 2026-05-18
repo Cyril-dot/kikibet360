@@ -8,7 +8,6 @@ export default function HomePage() {
   return (
     <div className="flex">
       <div className="flex-1 min-w-0">
-        <SportsCategoryBar />
         <HeroCarousel />
         <LeagueCards />
         <MatchList />
