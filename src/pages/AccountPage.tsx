@@ -20,32 +20,12 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import PersonIcon from '@mui/icons-material/Person';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import PublicIcon from '@mui/icons-material/Public';
-
-// ---------------------------------------------------------------------------
-// Geo / IP detection
-// ---------------------------------------------------------------------------
-interface GeoInfo {
-  currency: string;
-  countryCode: string;
-  source: 'ip-api' | 'fallback';
-}
-
-async function fetchGeoInfo(): Promise<GeoInfo> {
-  try {
-    const res = await fetch('/api/geo/currency');
-    if (!res.ok) throw new Error('geo fetch failed');
-    return (await res.json()) as GeoInfo;
-  } catch {
-    return { currency: 'GHS', countryCode: 'GH', source: 'fallback' };
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-function formatCurrency(amount: number, currency = 'GHS') {
-  return `${currency} ${amount.toLocaleString('en-GH', {
+function formatUSD(amount: number) {
+  return `$${amount.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
@@ -80,40 +60,67 @@ function isCredit(kind: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Geo lookup — tries ipapi.co first (CORS-safe, no key needed, 1k req/day),
+// then falls back to ipwho.is (also CORS-safe, no key needed, unlimited).
+// Both run in the browser. Fails silently — country field just stays empty.
+// ---------------------------------------------------------------------------
+async function fetchCountryCode(): Promise<string> {
+  const timeout = 5_000;
+
+  // Primary: ipapi.co
+  try {
+    const res = await fetch('https://ipapi.co/json/', {
+      signal: AbortSignal.timeout(timeout),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const code = (data.country_code as string | undefined) ?? '';
+      if (code) return code;
+    }
+  } catch {
+    // fall through to backup
+  }
+
+  // Fallback: ipwho.is
+  try {
+    const res = await fetch('https://ipwho.is/', {
+      signal: AbortSignal.timeout(timeout),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const code = (data.country_code as string | undefined) ?? '';
+      if (code) return code;
+    }
+  } catch {
+    // both failed — return empty string
+  }
+
+  return '';
+}
+
+// ---------------------------------------------------------------------------
 // Button primitives
 // ---------------------------------------------------------------------------
-
 interface BtnProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
   icon?: React.ReactNode;
   size?: 'sm' | 'md' | 'lg';
 }
 
-/** Primary — filled brand colour. Single most important action per region. */
-function BtnPrimary({
-  children,
-  loading,
-  icon,
-  size = 'md',
-  className = '',
-  disabled,
-  ...rest
-}: BtnProps) {
+function BtnPrimary({ children, loading, icon, size = 'md', className = '', disabled, ...rest }: BtnProps) {
   const sz =
-    size === 'sm'  ? 'px-3 py-1.5 text-xs rounded-lg' :
-    size === 'lg'  ? 'w-full py-3 text-sm rounded-xl'  :
-                     'px-4 py-2.5 text-sm rounded-xl';
+    size === 'sm' ? 'px-3 py-1.5 text-xs rounded-lg' :
+    size === 'lg' ? 'w-full py-3 text-sm rounded-xl' :
+                    'px-4 py-2.5 text-sm rounded-xl';
   return (
     <button
       {...rest}
       disabled={disabled || loading}
       className={[
-        'inline-flex items-center justify-center gap-2 font-semibold',
-        'btn-primary',
+        'inline-flex items-center justify-center gap-2 font-semibold btn-primary',
         'active:scale-[0.97] transition-all duration-150',
         'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
-        sz,
-        className,
+        sz, className,
       ].join(' ')}
     >
       {loading
@@ -124,21 +131,11 @@ function BtnPrimary({
   );
 }
 
-/** Ghost — outlined, no fill. Secondary / cancel actions. */
-function BtnGhost({
-  children,
-  loading,
-  icon,
-  size = 'md',
-  className = '',
-  disabled,
-  style,
-  ...rest
-}: BtnProps) {
+function BtnGhost({ children, loading, icon, size = 'md', className = '', disabled, style, ...rest }: BtnProps) {
   const sz =
-    size === 'sm'  ? 'px-3 py-1.5 text-xs rounded-lg' :
-    size === 'lg'  ? 'w-full py-3 text-sm rounded-xl'  :
-                     'px-4 py-2.5 text-sm rounded-xl';
+    size === 'sm' ? 'px-3 py-1.5 text-xs rounded-lg' :
+    size === 'lg' ? 'w-full py-3 text-sm rounded-xl' :
+                    'px-4 py-2.5 text-sm rounded-xl';
   return (
     <button
       {...rest}
@@ -148,8 +145,7 @@ function BtnGhost({
         'inline-flex items-center justify-center gap-2 font-semibold',
         'transition-all duration-150 active:scale-[0.97]',
         'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
-        sz,
-        className,
+        sz, className,
       ].join(' ')}
     >
       {loading
@@ -160,18 +156,11 @@ function BtnGhost({
   );
 }
 
-/** Danger — ghost styled in destructive red. Sign out, self-exclusion, etc. */
-function BtnDanger({
-  children,
-  icon,
-  size = 'md',
-  className = '',
-  ...rest
-}: BtnProps) {
+function BtnDanger({ children, icon, size = 'md', className = '', ...rest }: BtnProps) {
   const sz =
-    size === 'sm'  ? 'px-3 py-1.5 text-xs rounded-lg' :
-    size === 'lg'  ? 'w-full py-3.5 text-sm rounded-2xl' :
-                     'px-4 py-2.5 text-sm rounded-xl';
+    size === 'sm' ? 'px-3 py-1.5 text-xs rounded-lg' :
+    size === 'lg' ? 'w-full py-3.5 text-sm rounded-2xl' :
+                    'px-4 py-2.5 text-sm rounded-xl';
   return (
     <button
       {...rest}
@@ -181,8 +170,7 @@ function BtnDanger({
         border: '1px solid color-mix(in srgb, #f43f5e 25%, transparent)',
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.backgroundColor =
-          'color-mix(in srgb, #f43f5e 8%, transparent)';
+        (e.currentTarget as HTMLElement).style.backgroundColor = 'color-mix(in srgb, #f43f5e 8%, transparent)';
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--card-bg)';
@@ -190,8 +178,7 @@ function BtnDanger({
       className={[
         'inline-flex items-center justify-center gap-2 font-bold',
         'transition-all duration-150 active:scale-[0.98]',
-        sz,
-        className,
+        sz, className,
       ].join(' ')}
     >
       {icon && <span className="shrink-0">{icon}</span>}
@@ -200,22 +187,13 @@ function BtnDanger({
   );
 }
 
-/** Icon — square ghost for icon-only utilities (refresh, copy, etc.). */
-function BtnIcon({
-  children,
-  className = '',
-  ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+function BtnIcon({ children, className = '', ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       {...rest}
       style={{ color: 'var(--text-muted)' }}
-      onMouseEnter={(e) =>
-        ((e.currentTarget as HTMLElement).style.backgroundColor = 'var(--card-alt)')
-      }
-      onMouseLeave={(e) =>
-        ((e.currentTarget as HTMLElement).style.backgroundColor = '')
-      }
+      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.backgroundColor = 'var(--card-alt)')}
+      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.backgroundColor = '')}
       className={[
         'w-7 h-7 rounded-lg flex items-center justify-center transition-colors',
         'disabled:opacity-40 disabled:cursor-not-allowed',
@@ -234,41 +212,22 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
   return (
     <div
       className={`rounded-2xl overflow-hidden shadow-sm ${className}`}
-      style={{
-        backgroundColor: 'var(--card-bg)',
-        border: '1px solid var(--border-light)',
-      }}
+      style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-light)' }}
     >
       {children}
     </div>
   );
 }
 
-function CardHeader({
-  icon,
-  title,
-  action,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  action?: React.ReactNode;
-}) {
+function CardHeader({ icon, title, action }: { icon: React.ReactNode; title: string; action?: React.ReactNode }) {
   return (
     <div
       className="flex items-center justify-between px-4 py-3"
-      style={{
-        borderBottom: '1px solid var(--border-light)',
-        backgroundColor: 'var(--card-alt)',
-      }}
+      style={{ borderBottom: '1px solid var(--border-light)', backgroundColor: 'var(--card-alt)' }}
     >
       <div className="flex items-center gap-2">
-        <span style={{ color: 'var(--text-muted)' }} className="flex items-center">
-          {icon}
-        </span>
-        <span
-          className="text-[11px] font-bold tracking-widest uppercase"
-          style={{ color: 'var(--text-muted)' }}
-        >
+        <span style={{ color: 'var(--text-muted)' }} className="flex items-center">{icon}</span>
+        <span className="text-[11px] font-bold tracking-widest uppercase" style={{ color: 'var(--text-muted)' }}>
           {title}
         </span>
       </div>
@@ -279,10 +238,7 @@ function CardHeader({
 
 function SkeletonLine({ w = 'w-full', h = 'h-4' }: { w?: string; h?: string }) {
   return (
-    <div
-      className={`${h} ${w} rounded-lg animate-pulse`}
-      style={{ backgroundColor: 'var(--border-light)' }}
-    />
+    <div className={`${h} ${w} rounded-lg animate-pulse`} style={{ backgroundColor: 'var(--border-light)' }} />
   );
 }
 
@@ -302,64 +258,23 @@ function TxKindBadge({ kind }: { kind: string }) {
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div
       className="flex items-center justify-between px-4 py-3.5"
       style={{ borderBottom: '1px solid var(--border-light)' }}
     >
-      <span className="text-sm shrink-0" style={{ color: 'var(--text-muted)' }}>
-        {label}
-      </span>
-      <span
-        className="text-sm font-semibold text-right ml-4 truncate max-w-[60%]"
-        style={{ color: 'var(--text-main)' }}
-      >
-        {value}
-      </span>
+      <span className="text-sm shrink-0" style={{ color: 'var(--text-muted)' }}>{label}</span>
+      <div className="text-right ml-4 min-w-0">
+        <span className="text-sm font-semibold truncate block" style={{ color: 'var(--text-main)' }}>{value}</span>
+        {sub && <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{sub}</span>}
+      </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Geo Badge
-// ---------------------------------------------------------------------------
-function GeoBadge({ geo, loading }: { geo: GeoInfo | null; loading: boolean }) {
-  if (loading) return <SkeletonLine w="w-28" h="h-4" />;
-  if (!geo) return null;
-
-  const flag = geo.countryCode
-    ? geo.countryCode
-        .toUpperCase()
-        .split('')
-        .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
-        .join('')
-    : '';
-
-  return (
-    <div
-      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg w-fit"
-      style={{
-        backgroundColor: 'var(--card-alt)',
-        border: '1px solid var(--border-light)',
-      }}
-    >
-      <PublicIcon sx={{ fontSize: 12 }} style={{ color: 'var(--text-muted)' }} />
-      {flag && <span className="text-sm leading-none">{flag}</span>}
-      <span className="text-[11px] font-bold" style={{ color: 'var(--text-main)' }}>
-        {geo.currency}
-      </span>
-      {geo.source === 'fallback' && (
-        <span className="text-[9px] font-medium" style={{ color: 'var(--text-muted)' }}>
-          (default)
-        </span>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Tab definitions  (security removed)
+// Tab definitions
 // ---------------------------------------------------------------------------
 type TabId = 'overview' | 'profile' | 'preferences';
 
@@ -380,11 +295,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
       aria-checked={checked}
       onClick={onChange}
       className="relative inline-flex items-center rounded-full transition-colors duration-200 focus:outline-none"
-      style={{
-        width: 44,
-        height: 24,
-        backgroundColor: checked ? 'var(--primary)' : 'var(--border-light)',
-      }}
+      style={{ width: 44, height: 24, backgroundColor: checked ? 'var(--primary)' : 'var(--border-light)' }}
     >
       <span
         className="inline-block w-[18px] h-[18px] rounded-full bg-white shadow-md transform transition-transform duration-200"
@@ -403,32 +314,22 @@ export default function AccountPage() {
 
   const [activeTab, setActiveTab] = useState<TabId>('overview');
 
-  // Geo state
-  const [geoInfo, setGeoInfo]       = useState<GeoInfo | null>(null);
-  const [geoLoading, setGeoLoading] = useState(true);
-
-  // Data state
   const [profileData, setProfileData]           = useState<Record<string, unknown> | null>(null);
   const [profileLoading, setProfileLoading]     = useState(true);
   const [walletData, setWalletData]             = useState<Record<string, unknown> | null>(null);
   const [walletLoading, setWalletLoading]       = useState(true);
   const [transactions, setTransactions]         = useState<Transaction[]>([]);
-  const [affiliateBalance, setAffiliateBalance] = useState<{
-    balance: number;
-    currency: string;
-  } | null>(null);
+  const [affiliateBalance, setAffiliateBalance] = useState<{ balance: number } | null>(null);
 
-  // Profile edit state
   const [editMode, setEditMode]       = useState(false);
   const [editForm, setEditForm]       = useState({ firstName: '', lastName: '', phone: '', country: '' });
   const [editLoading, setEditLoading] = useState(false);
+  const [geoLoading, setGeoLoading]   = useState(false);
 
-  // Preferences state
   const [notifications, setNotifications] = useState({ push: true, sms: false, email: true });
   const [depositLimit, setDepositLimit]   = useState('');
   const [sessionLimit, setSessionLimit]   = useState('');
 
-  // Inline password change (in preferences tab)
   const [pwForm, setPwForm]       = useState({ current: '', next: '', confirm: '' });
   const [showPw, setShowPw]       = useState({ current: false, next: false, confirm: false });
   const [pwLoading, setPwLoading] = useState(false);
@@ -438,13 +339,6 @@ export default function AccountPage() {
   useEffect(() => {
     if (!user) navigate('/login');
   }, [user, navigate]);
-
-  useEffect(() => {
-    setGeoLoading(true);
-    fetchGeoInfo()
-      .then(setGeoInfo)
-      .finally(() => setGeoLoading(false));
-  }, []);
 
   const fetchProfile = useCallback(async () => {
     setProfileLoading(true);
@@ -460,11 +354,8 @@ export default function AccountPage() {
           country:   (d.country   as string) ?? '',
         });
       }
-    } catch {
-      /* silently fall back */
-    } finally {
-      setProfileLoading(false);
-    }
+    } catch { /* silently fall back */ }
+    finally { setProfileLoading(false); }
   }, []);
 
   const fetchWallet = useCallback(async () => {
@@ -479,14 +370,11 @@ export default function AccountPage() {
       if (txRes.success)     setTransactions(txRes.data.content);
       if (affRes.success) {
         const d = affRes.data as Record<string, unknown>;
-        if (typeof d.balance === 'number' && typeof d.currency === 'string')
-          setAffiliateBalance({ balance: d.balance, currency: d.currency });
+        if (typeof d.balance === 'number')
+          setAffiliateBalance({ balance: d.balance });
       }
-    } catch {
-      /* silently fail */
-    } finally {
-      setWalletLoading(false);
-    }
+    } catch { /* silently fail */ }
+    finally { setWalletLoading(false); }
   }, []);
 
   useEffect(() => {
@@ -495,9 +383,20 @@ export default function AccountPage() {
     fetchWallet();
   }, [user, fetchProfile, fetchWallet]);
 
+  // Auto-detect country when edit mode opens and country is empty
+  const handleOpenEdit = useCallback(async () => {
+    setEditMode(true);
+    // Only auto-fetch if country is not already set
+    if (!editForm.country) {
+      setGeoLoading(true);
+      const code = await fetchCountryCode();
+      if (code) setEditForm((p) => ({ ...p, country: p.country || code }));
+      setGeoLoading(false);
+    }
+  }, [editForm.country]);
+
   if (!user) return null;
 
-  // Derived values
   const apiFirstName = (profileData?.firstName as string) ?? '';
   const apiLastName  = (profileData?.lastName  as string) ?? '';
   const apiEmail     = (profileData?.email     as string) ?? user.email;
@@ -505,8 +404,7 @@ export default function AccountPage() {
   const apiCountry   = (profileData?.country   as string) ?? '';
   const apiRole      = (profileData?.role      as string) ?? user.role;
   const displayName  = [apiFirstName, apiLastName].filter(Boolean).join(' ') || user.fullName;
-
-  const detectedCurrency = geoInfo?.currency ?? 'GHS';
+  const roleLabel    = apiRole.replace('_', ' ');
 
   const walletBalance =
     typeof walletData?.balance === 'number'
@@ -515,10 +413,8 @@ export default function AccountPage() {
       ? (walletData.availableBalance as number)
       : null;
 
-  const walletCurrency = (walletData?.currency as string) ?? detectedCurrency;
-  const roleLabel      = apiRole.replace('_', ' ');
+  const affBalance = affiliateBalance?.balance ?? null;
 
-  // Handlers
   const saveProfile = async () => {
     setEditLoading(true);
     try {
@@ -526,12 +422,11 @@ export default function AccountPage() {
         firstName: editForm.firstName.trim() || undefined,
         lastName:  editForm.lastName.trim()  || undefined,
         phone:     editForm.phone.trim()     || undefined,
-        country:   editForm.country.trim()   || geoInfo?.countryCode || undefined,
+        country:   editForm.country.trim()   || undefined,
       };
       const res = await userApi.update(body);
       if (res.success) {
-        const newName =
-          [res.data.firstName, res.data.lastName].filter(Boolean).join(' ') || user.fullName;
+        const newName = [res.data.firstName, res.data.lastName].filter(Boolean).join(' ') || user.fullName;
         login({ ...user, fullName: newName, phone: res.data.phone ?? user.phone });
         await fetchProfile();
         setEditMode(false);
@@ -547,9 +442,9 @@ export default function AccountPage() {
   const changePassword = async () => {
     setPwError(null);
     setPwSuccess(false);
-    if (!pwForm.current.trim())   { setPwError('Enter your current password.');          return; }
-    if (pwForm.next.length < 8)   { setPwError('New password must be at least 8 chars.'); return; }
-    if (pwForm.next !== pwForm.confirm) { setPwError('Passwords do not match.');          return; }
+    if (!pwForm.current.trim())          { setPwError('Enter your current password.');           return; }
+    if (pwForm.next.length < 8)          { setPwError('New password must be at least 8 chars.'); return; }
+    if (pwForm.next !== pwForm.confirm)  { setPwError('Passwords do not match.');                return; }
     setPwLoading(true);
     try {
       await auth.resetPassword({ oldPassword: pwForm.current, newPassword: pwForm.next });
@@ -609,9 +504,6 @@ export default function AccountPage() {
                   </p>
                 </>
               )}
-              <div className="mt-1.5">
-                <GeoBadge geo={geoInfo} loading={geoLoading} />
-              </div>
             </div>
             {/* Role badge */}
             <span
@@ -658,35 +550,6 @@ export default function AccountPage() {
         {/* ─── OVERVIEW TAB ─── */}
         {activeTab === 'overview' && (
           <>
-            {/* Detected Location */}
-            <Card>
-              <CardHeader icon={<PublicIcon sx={{ fontSize: 15 }} />} title="Detected Location" />
-              <div className="px-4 py-3.5 flex items-center justify-between gap-3">
-                {geoLoading ? (
-                  <div className="space-y-2 flex-1">
-                    <SkeletonLine w="w-32" h="h-4" />
-                    <SkeletonLine w="w-20" h="h-3" />
-                  </div>
-                ) : geoInfo ? (
-                  <>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>
-                        {geoInfo.countryCode ? `${geoInfo.countryCode} · ${geoInfo.currency}` : geoInfo.currency}
-                      </p>
-                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                        {geoInfo.source === 'ip-api'
-                          ? 'Detected via your IP address'
-                          : 'Could not detect — using default'}
-                      </p>
-                    </div>
-                    <GeoBadge geo={geoInfo} loading={false} />
-                  </>
-                ) : (
-                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Location unavailable.</p>
-                )}
-              </div>
-            </Card>
-
             {/* Balance cards */}
             <div className="grid grid-cols-2 gap-3">
               <Link
@@ -710,7 +573,7 @@ export default function AccountPage() {
                   <SkeletonLine h="h-6" />
                 ) : (
                   <p className="font-bold text-sm tabular-nums leading-tight" style={{ color: 'var(--text-main)' }}>
-                    {walletBalance !== null ? formatCurrency(walletBalance, walletCurrency) : '—'}
+                    {walletBalance !== null ? formatUSD(walletBalance) : '—'}
                   </p>
                 )}
                 <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>Main Wallet</p>
@@ -738,9 +601,7 @@ export default function AccountPage() {
                   <SkeletonLine h="h-6" />
                 ) : (
                   <p className="font-bold text-sm tabular-nums leading-tight text-emerald-500">
-                    {affiliateBalance !== null
-                      ? formatCurrency(affiliateBalance.balance, affiliateBalance.currency)
-                      : '—'}
+                    {affBalance !== null ? formatUSD(affBalance) : '—'}
                   </p>
                 )}
                 <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>Affiliate</p>
@@ -811,10 +672,10 @@ export default function AccountPage() {
                             className="text-sm font-bold tabular-nums"
                             style={{ color: credit ? '#10b981' : '#f43f5e' }}
                           >
-                            {credit ? '+' : '-'}{formatCurrency(tx.amount, walletCurrency)}
+                            {credit ? '+' : '-'}{formatUSD(tx.amount)}
                           </p>
                           <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                            Bal: {formatCurrency(tx.balanceAfter, walletCurrency)}
+                            Bal: {formatUSD(tx.balanceAfter)}
                           </p>
                         </div>
                       </div>
@@ -853,9 +714,7 @@ export default function AccountPage() {
                   >
                     {user.kycStatus.charAt(0).toUpperCase() + user.kycStatus.slice(1)}
                   </span>
-                  {user.kycStatus === 'unverified' && (
-                    <BtnPrimary size="sm">Start KYC</BtnPrimary>
-                  )}
+                  {user.kycStatus === 'unverified' && <BtnPrimary size="sm">Start KYC</BtnPrimary>}
                 </div>
               </div>
             </Card>
@@ -871,7 +730,7 @@ export default function AccountPage() {
               action={
                 !editMode && (
                   <button
-                    onClick={() => setEditMode(true)}
+                    onClick={handleOpenEdit}
                     className="flex items-center gap-1 text-xs font-bold hover:underline"
                     style={{ color: 'var(--primary)' }}
                   >
@@ -916,31 +775,21 @@ export default function AccountPage() {
                 <div>
                   <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>
                     Country
+                    {geoLoading && (
+                      <span className="ml-2 text-[10px] font-normal" style={{ color: 'var(--text-muted)' }}>
+                        (detecting…)
+                      </span>
+                    )}
                   </label>
                   <input
                     type="text"
                     value={editForm.country}
                     onChange={(e) => setEditForm((p) => ({ ...p, country: e.target.value }))}
                     className="input-field"
-                    disabled={editLoading}
-                    placeholder={
-                      geoLoading
-                        ? 'Detecting…'
-                        : geoInfo?.countryCode
-                        ? `e.g. ${geoInfo.countryCode} (detected)`
-                        : 'e.g. Ghana'
-                    }
+                    disabled={editLoading || geoLoading}
+                    placeholder={geoLoading ? 'Detecting…' : 'e.g. GH'}
+                    maxLength={2}
                   />
-                  {!geoLoading && geoInfo?.countryCode && !editForm.country && (
-                    <button
-                      type="button"
-                      onClick={() => setEditForm((p) => ({ ...p, country: geoInfo.countryCode }))}
-                      className="mt-1.5 text-[11px] font-semibold hover:underline"
-                      style={{ color: 'var(--primary)' }}
-                    >
-                      Use detected: {geoInfo.countryCode}
-                    </button>
-                  )}
                 </div>
 
                 <div className="flex gap-3 pt-1">
@@ -954,12 +803,8 @@ export default function AccountPage() {
                       color: 'var(--text-muted)',
                       backgroundColor: 'transparent',
                     }}
-                    onMouseEnter={(e) =>
-                      ((e.currentTarget as HTMLElement).style.backgroundColor = 'var(--card-alt)')
-                    }
-                    onMouseLeave={(e) =>
-                      ((e.currentTarget as HTMLElement).style.backgroundColor = 'transparent')
-                    }
+                    onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.backgroundColor = 'var(--card-alt)')}
+                    onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.backgroundColor = 'transparent')}
                   >
                     Cancel
                   </BtnGhost>
@@ -988,21 +833,11 @@ export default function AccountPage() {
                   ))
                 ) : (
                   <>
-                    <InfoRow label="Full Name"         value={displayName || '—'} />
-                    <InfoRow label="Email"             value={apiEmail    || '—'} />
-                    <InfoRow label="Phone"             value={apiPhone    || '—'} />
-                    <InfoRow label="Country"           value={apiCountry  || '—'} />
-                    <InfoRow label="Role"              value={roleLabel} />
-                    <InfoRow
-                      label="Detected Currency"
-                      value={
-                        geoLoading
-                          ? 'Detecting…'
-                          : geoInfo
-                          ? `${geoInfo.currency}${geoInfo.countryCode ? ` (${geoInfo.countryCode})` : ''}`
-                          : '—'
-                      }
-                    />
+                    <InfoRow label="Full Name" value={displayName || '—'} />
+                    <InfoRow label="Email"     value={apiEmail    || '—'} />
+                    <InfoRow label="Phone"     value={apiPhone    || '—'} />
+                    <InfoRow label="Country"   value={apiCountry  || '—'} />
+                    <InfoRow label="Role"      value={roleLabel} />
                   </>
                 )}
               </div>
@@ -1047,7 +882,6 @@ export default function AccountPage() {
               <CardHeader icon={<VerifiedUserIcon sx={{ fontSize: 15 }} />} title="Change Password" />
               <div className="px-4 py-5 space-y-5">
 
-                {/* Alert banners */}
                 {pwError && (
                   <div
                     className="flex items-start gap-2.5 px-4 py-3 rounded-2xl text-sm font-medium"
@@ -1074,13 +908,9 @@ export default function AccountPage() {
                   </div>
                 )}
 
-                {/* Grouped stacked fields — share one rounded border container */}
                 <div
                   className="overflow-hidden"
-                  style={{
-                    border: '1px solid var(--border-light)',
-                    borderRadius: 16,
-                  }}
+                  style={{ border: '1px solid var(--border-light)', borderRadius: 16 }}
                 >
                   {(
                     [
@@ -1092,14 +922,8 @@ export default function AccountPage() {
                     <div
                       key={field}
                       className="relative"
-                      style={{
-                        borderBottom:
-                          idx < arr.length - 1
-                            ? '1px solid var(--border-light)'
-                            : 'none',
-                      }}
+                      style={{ borderBottom: idx < arr.length - 1 ? '1px solid var(--border-light)' : 'none' }}
                     >
-                      {/* floating label inside the row */}
                       <label
                         className="absolute left-4 top-3 text-[10px] font-bold uppercase tracking-wider pointer-events-none select-none"
                         style={{ color: 'var(--text-muted)' }}
@@ -1129,14 +953,12 @@ export default function AccountPage() {
                           letterSpacing: showPw[field] ? 'normal' : '0.1em',
                         }}
                         onFocus={(e) => {
-                          (e.currentTarget.parentElement as HTMLElement).style.backgroundColor =
-                            'var(--card-alt)';
+                          (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = 'var(--card-alt)';
                         }}
                         onBlur={(e) => {
                           (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = '';
                         }}
                       />
-                      {/* eye toggle */}
                       <button
                         type="button"
                         onClick={() => setShowPw((p) => ({ ...p, [field]: !p[field] }))}
@@ -1153,7 +975,6 @@ export default function AccountPage() {
                   ))}
                 </div>
 
-                {/* Password strength bar */}
                 {pwForm.next.length > 0 && (() => {
                   const strength =
                     pwForm.next.length >= 12 ? 4 :
@@ -1170,9 +991,7 @@ export default function AccountPage() {
                           <div
                             key={lvl}
                             className="flex-1 h-1.5 rounded-full transition-all duration-300"
-                            style={{
-                              backgroundColor: lvl <= strength ? strengthColor : 'var(--border-light)',
-                            }}
+                            style={{ backgroundColor: lvl <= strength ? strengthColor : 'var(--border-light)' }}
                           />
                         ))}
                       </div>
@@ -1200,7 +1019,7 @@ export default function AccountPage() {
               <div className="px-4 py-4 space-y-4">
                 <div>
                   <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                    Daily Deposit Limit ({detectedCurrency})
+                    Daily Deposit Limit (USD)
                   </label>
                   <input
                     type="number"

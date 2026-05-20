@@ -34,31 +34,6 @@ const navLinks = [
 ];
 
 // ---------------------------------------------------------------------------
-// Geo / currency detection
-// ---------------------------------------------------------------------------
-interface GeoInfo {
-  currency: string;
-  countryCode: string;
-  source: string;
-}
-let geoCachePromise: Promise<GeoInfo> | null = null;
-async function detectGeo(): Promise<GeoInfo> {
-  if (!geoCachePromise) {
-    geoCachePromise = fetch('/api/geo/currency')
-      .then(r => {
-        if (!r.ok) throw new Error('Geo fetch failed');
-        return r.json() as Promise<GeoInfo>;
-      })
-      .catch(() => ({
-        currency: 'GHS',
-        countryCode: 'GH',
-        source: 'fallback',
-      }));
-  }
-  return geoCachePromise;
-}
-
-// ---------------------------------------------------------------------------
 // Helper – user initials
 // ---------------------------------------------------------------------------
 function getUserInitials(fullName: string): string {
@@ -68,29 +43,19 @@ function getUserInitials(fullName: string): string {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 }
 
-/* ---------------------------------------------------------------
-   SuperBetLogo – fixed so both words are visible on all themes.
-
-   Light mode:  "Super" → primary blue   |  "Bet" → near-black
-   Dark  mode:  "Super" → primary blue   |  "Bet" → white
-   --------------------------------------------------------------- */
+// ---------------------------------------------------------------------------
+// SuperBetLogo
+// ---------------------------------------------------------------------------
 function SuperBetLogo() {
   return (
     <div className="flex items-center gap-1.5 font-display super-bet-logo select-none">
-      {/* Football icon – primary blue on every theme */}
       <SportsSoccerIcon
         sx={{ fontSize: 20 }}
         style={{ color: 'var(--primary)' }}
         aria-hidden="true"
       />
-      {/* "Super" – always the primary blue accent */}
-      <span style={{ color: 'var(--primary)', fontWeight: 800 }}>
-        Super
-      </span>
-      {/* "Bet" – text-main so it's black on light, white on dark */}
-      <span style={{ color: 'var(--text-main)', fontWeight: 900 }}>
-        Bet
-      </span>
+      <span style={{ color: 'var(--primary)', fontWeight: 800 }}>Super</span>
+      <span style={{ color: 'var(--text-main)', fontWeight: 900 }}>Bet</span>
     </div>
   );
 }
@@ -102,30 +67,16 @@ export default function Header() {
   const { theme, toggleTheme, user } = useAppStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // -------- Wallet state ----------
+  // -------- Wallet state – always USD ----------
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
-  const [walletCurrency, setWalletCurrency] = useState<string>('GHS');
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [balanceFlash, setBalanceFlash] = useState(false);
-
-  // -------- Geo / country ----------
-  const [countryCode, setCountryCode] = useState<string>('GH');
-  const [geoResolved, setGeoResolved] = useState(false);
 
   const location = useLocation();
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevBalanceRef = useRef<number | null>(null);
 
   const isDark = theme.endsWith('-dark');
-
-  // ---------------- Geo detection (once) ----------------
-  useEffect(() => {
-    detectGeo().then(g => {
-      setCountryCode(g.countryCode);
-      setWalletCurrency(prev => (prev === 'GHS' ? g.currency : prev));
-      setGeoResolved(true);
-    });
-  }, []);
 
   // ---------------- Wallet polling ----------------
   const fetchBalance = async () => {
@@ -136,13 +87,13 @@ export default function Header() {
         const d = res.data as Record<string, unknown>;
 
         const newBal =
-          typeof d.balance === 'number'
+          typeof d.balanceUsd === 'number'
+            ? d.balanceUsd
+            : typeof d.balance === 'number'
             ? d.balance
             : typeof d.availableBalance === 'number'
             ? d.availableBalance
             : null;
-
-        if (typeof d.currency === 'string') setWalletCurrency(d.currency);
 
         if (newBal !== null) {
           if (prevBalanceRef.current !== null && prevBalanceRef.current !== newBal) {
@@ -175,13 +126,10 @@ export default function Header() {
 
   // ---------------- Helpers ----------------
   const formatBalance = (a: number) =>
-    a.toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-  const countryFlag = countryCode
-    ? String.fromCodePoint(
-        ...[...countryCode.toUpperCase()].map(c => 0x1f1e6 + c.charCodeAt(0) - 65)
-      )
-    : '';
+    a.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
 
   // ---------------- Render ----------------
   return (
@@ -228,22 +176,6 @@ export default function Header() {
         {/* ---------- RIGHT ACTIONS ---------- */}
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
 
-          {/* Country flag pill – desktop only */}
-          {geoResolved && countryFlag && (
-            <span
-              className="hidden lg:flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold select-none"
-              style={{
-                backgroundColor: 'var(--card-alt)',
-                color: 'var(--text-muted)',
-                border: '1px solid var(--border-light)',
-              }}
-              title={`Detected country: ${countryCode}`}
-            >
-              <span className="text-base leading-none">{countryFlag}</span>
-              <span>{countryCode}</span>
-            </span>
-          )}
-
           {/* Theme toggle */}
           <button
             onClick={toggleTheme}
@@ -264,7 +196,7 @@ export default function Header() {
           {user ? (
             <div className="flex items-center gap-2">
 
-              {/* Wallet balance pill */}
+              {/* Wallet balance pill – USD */}
               <Link
                 to="/wallet"
                 className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all touch-manipulation"
@@ -274,7 +206,7 @@ export default function Header() {
                     ? 'color-mix(in srgb, #4ade80 15%, transparent)'
                     : 'var(--card-alt)',
                 }}
-                title="Wallet balance"
+                title="Wallet balance (USD)"
               >
                 {/* Green live dot */}
                 <span className="relative flex h-2 w-2">
@@ -287,9 +219,11 @@ export default function Header() {
                     Loading…
                   </span>
                 ) : walletBalance !== null ? (
-                  <span className="text-sm font-bold tabular-nums"
-                    style={{ color: balanceFlash ? '#16a34a' : 'var(--text-main)' }}>
-                    {walletCurrency} {formatBalance(walletBalance)}
+                  <span
+                    className="text-sm font-bold tabular-nums"
+                    style={{ color: balanceFlash ? '#16a34a' : 'var(--text-main)' }}
+                  >
+                    ${formatBalance(walletBalance)}
                   </span>
                 ) : (
                   <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
@@ -309,8 +243,10 @@ export default function Header() {
                 >
                   {getUserInitials(user.fullName)}
                 </div>
-                <span className="hidden sm:inline text-sm font-medium"
-                  style={{ color: 'var(--text-main)' }}>
+                <span
+                  className="hidden sm:inline text-sm font-medium"
+                  style={{ color: 'var(--text-main)' }}
+                >
                   {user.fullName.split(' ')[0]}
                 </span>
               </Link>
@@ -318,16 +254,16 @@ export default function Header() {
           ) : (
             /* USER NOT LOGGED IN */
             <div className="flex items-center gap-1 sm:gap-2">
-              {/* Login – hidden on mobile */}
+              {/* Login – now visible on ALL screen sizes */}
               <Link
                 to="/login"
-                className="hidden sm:flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors touch-manipulation"
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-2 text-sm font-medium rounded-lg transition-colors touch-manipulation"
                 style={{ color: 'var(--text-main)' }}
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--card-alt)'}
                 onMouseLeave={e => (e.currentTarget as HTMLElement).style.backgroundColor = ''}
               >
                 <LoginIcon fontSize="small" />
-                Login
+                <span>Login</span>
               </Link>
 
               {/* Register – primary blue button */}
@@ -392,22 +328,12 @@ export default function Header() {
               );
             })}
 
-            {/* Bottom block (geo, wallet, account, login/register) */}
+            {/* Bottom block */}
             <div className="border-t mt-1 pt-2 flex flex-col gap-1" style={{ borderColor: 'var(--border-light)' }}>
-              {/* Geo info pill on mobile */}
-              {geoResolved && countryFlag && (
-                <div
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold"
-                  style={{ backgroundColor: 'var(--card-alt)', color: 'var(--text-muted)' }}
-                >
-                  <span className="text-base leading-none">{countryFlag}</span>
-                  <span>{countryCode} · {walletCurrency}</span>
-                </div>
-              )}
 
               {user ? (
                 <>
-                  {/* Wallet */}
+                  {/* Wallet – USD */}
                   <Link
                     to="/wallet"
                     onClick={() => setMobileMenuOpen(false)}
@@ -425,7 +351,7 @@ export default function Header() {
                       </span>
                       <span className="text-sm font-bold tabular-nums" style={{ color: 'var(--text-main)' }}>
                         {walletBalance !== null
-                          ? `${walletCurrency} ${formatBalance(walletBalance)}`
+                          ? `$${formatBalance(walletBalance)}`
                           : '—'}
                       </span>
                     </div>
@@ -451,7 +377,7 @@ export default function Header() {
                 </>
               ) : (
                 <>
-                  {/* Login */}
+                  {/* Login – always visible in mobile menu */}
                   <Link
                     to="/login"
                     onClick={() => setMobileMenuOpen(false)}
@@ -464,7 +390,6 @@ export default function Header() {
                     Login
                   </Link>
 
-                  {/* Register – primary button */}
                   <Link
                     to="/register"
                     onClick={() => setMobileMenuOpen(false)}

@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { formatCurrency } from '../utils';
 import { useAppStore } from '../store';
 import {
   wallet as walletApi,
@@ -9,17 +8,26 @@ import {
   Transaction,
   AffiliateStatsDTO,
 } from '../utils/api';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
-import AddCardIcon from '@mui/icons-material/AddCard';
-import PaymentsIcon from '@mui/icons-material/Payments';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import PublicIcon from '@mui/icons-material/Public';
-import CloseIcon from '@mui/icons-material/Close';
-import CircularProgress from '@mui/icons-material/Loop';
+
+// ── Google Material Icons (all swapped to more fitting choices) ───────────────
+import WalletIcon              from '@mui/icons-material/Wallet';                  // main wallet header
+import SavingsIcon             from '@mui/icons-material/Savings';                 // affiliate earnings card
+import NorthEastIcon           from '@mui/icons-material/NorthEast';               // outgoing transaction
+import SouthWestIcon           from '@mui/icons-material/SouthWest';               // incoming transaction
+import SyncIcon                from '@mui/icons-material/Sync';                    // refresh
+import CurrencyExchangeIcon    from '@mui/icons-material/CurrencyExchange';        // conversion / exchange
+import MoneyOffIcon            from '@mui/icons-material/MoneyOff';                // empty tx state
+import AddCircleOutlineIcon    from '@mui/icons-material/AddCircleOutlined';       // deposit button
+import SendIcon                from '@mui/icons-material/Send';                    // withdraw button (send funds)
+import VolunteerActivismIcon   from '@mui/icons-material/VolunteerActivism';       // withdraw affiliate earnings
+import TaskAltIcon             from '@mui/icons-material/TaskAlt';                 // success state
+import VisibilityIcon          from '@mui/icons-material/Visibility';
+import VisibilityOffIcon       from '@mui/icons-material/VisibilityOff';
+import CancelIcon              from '@mui/icons-material/Cancel';                  // close / error X
+import LoopIcon                from '@mui/icons-material/Loop';                    // spinner
+import PeopleAltIcon           from '@mui/icons-material/PeopleAlt';              // referrals stat
+import PaidIcon                from '@mui/icons-material/Paid';                    // total earned stat
+import AccountBalanceIcon      from '@mui/icons-material/AccountBalance';          // available balance stat
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -29,73 +37,83 @@ interface WalletData {
   [key: string]: unknown;
 }
 
-interface GeoInfo {
-  currency: string;
-  countryCode: string;
-  source: 'ip-api' | 'fallback';
+interface ExchangeRates {
+  usdToGhs: number;
+  ghsToUsd: number;
+  fetchedAt: number;
 }
 
-// ── Geo / IP detection ────────────────────────────────────────────────────────
+// ── Currency helpers ──────────────────────────────────────────────────────────
 
-async function fetchGeoInfo(): Promise<GeoInfo> {
+function formatUSD(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+async function fetchExchangeRates(): Promise<ExchangeRates> {
+  const FALLBACK = 15.5;
   try {
-    const res = await fetch('/api/geo/currency');
-    if (!res.ok) throw new Error('geo fetch failed');
-    return (await res.json()) as GeoInfo;
-  } catch {
-    return { currency: 'GHS', countryCode: 'GH', source: 'fallback' };
-  }
+    const res = await fetch('https://open.er-api.com/v6/latest/USD', {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    const usdToGhs = data.rates?.GHS ?? FALLBACK;
+    return { usdToGhs, ghsToUsd: 1 / usdToGhs, fetchedAt: Date.now() };
+  } catch { /* fall through */ }
+  try {
+    const res = await fetch('https://api.exchangerate.host/convert?from=USD&to=GHS&amount=1', {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (res.ok) {
+      const d = await res.json();
+      if (d.success && d.result)
+        return { usdToGhs: d.result, ghsToUsd: 1 / d.result, fetchedAt: Date.now() };
+    }
+  } catch { /* fall through */ }
+  return { usdToGhs: FALLBACK, ghsToUsd: 1 / FALLBACK, fetchedAt: Date.now() };
 }
 
-function countryFlag(countryCode: string): string {
-  if (!countryCode) return '';
-  return countryCode
-    .toUpperCase()
-    .split('')
-    .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
-    .join('');
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Tx helpers ────────────────────────────────────────────────────────────────
 
 const INCOMING_KINDS = [
   'DEPOSIT', 'BET_WIN', 'REFERRAL_COMMISSION', 'PAYOUT',
   'VIP_CASHBACK', 'WELCOME_BONUS', 'WITHDRAWAL_REFUND', 'ADJUSTMENT',
 ];
 
-function isIncoming(kind: string) {
-  return INCOMING_KINDS.includes(kind);
-}
+function isIncoming(kind: string) { return INCOMING_KINDS.includes(kind); }
 
 function txLabel(kind: string): string {
   const map: Record<string, string> = {
-    DEPOSIT: 'Deposit',
-    WITHDRAW: 'Withdrawal',
-    WITHDRAW_HOLD: 'Withdrawal Hold',
-    WITHDRAW_RELEASE: 'Withdrawal Released',
-    BET_STAKE: 'Bet Placed',
-    BET_WIN: 'Bet Won',
-    REFERRAL_COMMISSION: 'Affiliate Commission',
-    PAYOUT: 'Payout',
-    ADJUSTMENT: 'Adjustment',
-    VIP_CASHBACK: 'VIP Cashback',
-    VIP_MEMBERSHIP: 'VIP Membership',
-    WELCOME_BONUS: 'Welcome Bonus',
-    WITHDRAWAL_REFUND: 'Withdrawal Refund',
-    ADMIN_UPGRADE_FEE: 'Admin Upgrade Fee',
+    DEPOSIT:            'Deposit',
+    WITHDRAW:           'Withdrawal',
+    WITHDRAW_HOLD:      'Withdrawal Hold',
+    WITHDRAW_RELEASE:   'Withdrawal Released',
+    BET_STAKE:          'Bet Placed',
+    BET_WIN:            'Bet Won',
+    REFERRAL_COMMISSION:'Affiliate Commission',
+    PAYOUT:             'Payout',
+    ADJUSTMENT:         'Adjustment',
+    VIP_CASHBACK:       'VIP Cashback',
+    VIP_MEMBERSHIP:     'VIP Membership',
+    WELCOME_BONUS:      'Welcome Bonus',
+    WITHDRAWAL_REFUND:  'Withdrawal Refund',
+    ADMIN_UPGRADE_FEE:  'Admin Upgrade Fee',
   };
   return map[kind] ?? kind;
 }
 
 function formatDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleString('en-GH', {
+    return new Date(iso).toLocaleString('en-US', {
       day: '2-digit', month: 'short', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
     });
-  } catch {
-    return iso;
-  }
+  } catch { return iso; }
 }
 
 // ── Button primitives ─────────────────────────────────────────────────────────
@@ -106,10 +124,7 @@ interface BtnProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   size?: 'sm' | 'md' | 'lg';
 }
 
-/** Primary — filled brand colour. */
-function BtnPrimary({
-  children, loading, icon, size = 'md', className = '', disabled, ...rest
-}: BtnProps) {
+function BtnPrimary({ children, loading, icon, size = 'md', className = '', disabled, ...rest }: BtnProps) {
   const sz =
     size === 'sm' ? 'px-3 py-1.5 text-xs rounded-xl' :
     size === 'lg' ? 'w-full py-3.5 text-sm rounded-2xl' :
@@ -118,28 +133,20 @@ function BtnPrimary({
     <button
       {...rest}
       disabled={disabled || loading}
-      className={[
-        'inline-flex items-center justify-center gap-2 font-semibold',
-        'transition-all duration-150 active:scale-[0.97]',
-        'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
-        sz, className,
-      ].join(' ')}
+      className={['inline-flex items-center justify-center gap-2 font-semibold transition-all duration-150 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none', sz, className].join(' ')}
       style={{ backgroundColor: 'var(--primary)', color: '#fff', ...rest.style }}
-      onMouseEnter={(e) => { if (!disabled && !loading) (e.currentTarget as HTMLElement).style.filter = 'brightness(1.1)'; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.filter = ''; }}
+      onMouseEnter={e => { if (!disabled && !loading) (e.currentTarget as HTMLElement).style.filter = 'brightness(1.1)'; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.filter = ''; }}
     >
       {loading
-        ? <CircularProgress fontSize="small" className="animate-spin shrink-0" />
+        ? <LoopIcon fontSize="small" className="animate-spin shrink-0" />
         : icon && <span className="shrink-0">{icon}</span>}
       {children}
     </button>
   );
 }
 
-/** Ghost — outlined, no fill. */
-function BtnGhost({
-  children, loading, icon, size = 'md', className = '', disabled, style, ...rest
-}: BtnProps) {
+function BtnGhost({ children, loading, icon, size = 'md', className = '', disabled, style, ...rest }: BtnProps) {
   const sz =
     size === 'sm' ? 'px-3 py-1.5 text-xs rounded-xl' :
     size === 'lg' ? 'w-full py-3.5 text-sm rounded-2xl' :
@@ -148,66 +155,40 @@ function BtnGhost({
     <button
       {...rest}
       disabled={disabled || loading}
-      style={{
-        backgroundColor: 'var(--card-alt)',
-        border: '1px solid var(--border-light)',
-        color: 'var(--text-main)',
-        ...style,
-      }}
-      className={[
-        'inline-flex items-center justify-center gap-2 font-semibold',
-        'transition-all duration-150 active:scale-[0.97]',
-        'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
-        sz, className,
-      ].join(' ')}
-      onMouseEnter={(e) => { if (!disabled) (e.currentTarget as HTMLElement).style.filter = 'brightness(0.95)'; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.filter = ''; }}
+      style={{ backgroundColor: 'var(--card-alt)', border: '1px solid var(--border-light)', color: 'var(--text-main)', ...style }}
+      className={['inline-flex items-center justify-center gap-2 font-semibold transition-all duration-150 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none', sz, className].join(' ')}
+      onMouseEnter={e => { if (!disabled) (e.currentTarget as HTMLElement).style.filter = 'brightness(0.95)'; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.filter = ''; }}
     >
       {loading
-        ? <CircularProgress fontSize="small" className="animate-spin shrink-0" />
+        ? <LoopIcon fontSize="small" className="animate-spin shrink-0" />
         : icon && <span className="shrink-0">{icon}</span>}
       {children}
     </button>
   );
 }
 
-/** Icon — square ghost for utilities. */
-function BtnIcon({
-  children, className = '', title, onClick, ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+function BtnIcon({ children, className = '', title, onClick, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
       {...rest}
-      className={[
-        'w-9 h-9 flex items-center justify-center rounded-xl',
-        'transition-colors duration-150',
-        className,
-      ].join(' ')}
+      className={['w-9 h-9 flex items-center justify-center rounded-xl transition-colors duration-150', className].join(' ')}
       style={{ color: 'var(--text-muted)', ...rest.style }}
-      onMouseEnter={(e) =>
-        ((e.currentTarget as HTMLElement).style.backgroundColor = 'var(--card-alt)')
-      }
-      onMouseLeave={(e) =>
-        ((e.currentTarget as HTMLElement).style.backgroundColor = 'transparent')
-      }
+      onMouseEnter={e => ((e.currentTarget as HTMLElement).style.backgroundColor = 'var(--card-alt)')}
+      onMouseLeave={e => ((e.currentTarget as HTMLElement).style.backgroundColor = 'transparent')}
     >
       {children}
     </button>
   );
 }
 
-// ── Shared UI atoms ────────────────────────────────────────────────────────────
+// ── Shared UI atoms ───────────────────────────────────────────────────────────
 
 function SkeletonLine({ w = 'w-full', h = 'h-4' }: { w?: string; h?: string }) {
-  return (
-    <div
-      className={`${h} ${w} rounded-lg animate-pulse`}
-      style={{ backgroundColor: 'var(--border-light)' }}
-    />
-  );
+  return <div className={`${h} ${w} rounded-lg animate-pulse`} style={{ backgroundColor: 'var(--border-light)' }} />;
 }
 
 function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
@@ -221,45 +202,18 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
   );
 }
 
-// ── Grouped field container (same pattern as AccountPage password section) ─────
-
-/**
- * Wraps multiple <GroupedField> children in a single rounded border container
- * with hairline dividers between rows.
- */
 function GroupedFields({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className="overflow-hidden"
-      style={{ border: '1px solid var(--border-light)', borderRadius: 16 }}
-    >
+    <div className="overflow-hidden" style={{ border: '1px solid var(--border-light)', borderRadius: 16 }}>
       {children}
     </div>
   );
 }
 
-/**
- * A single row inside a GroupedFields container.
- * Floating label sits at the top, input/select below it.
- */
-function GroupedField({
-  label,
-  last = false,
-  children,
-}: {
-  label: string;
-  last?: boolean;
-  children: React.ReactNode;
-}) {
+function GroupedField({ label, last = false, children }: { label: string; last?: boolean; children: React.ReactNode }) {
   return (
-    <div
-      className="relative"
-      style={!last ? { borderBottom: '1px solid var(--border-light)' } : {}}
-    >
-      <label
-        className="absolute left-4 top-3 text-[10px] font-bold uppercase tracking-wider pointer-events-none select-none z-10"
-        style={{ color: 'var(--text-muted)' }}
-      >
+    <div className="relative" style={!last ? { borderBottom: '1px solid var(--border-light)' } : {}}>
+      <label className="absolute left-4 top-3 text-[10px] font-bold uppercase tracking-wider pointer-events-none select-none z-10" style={{ color: 'var(--text-muted)' }}>
         {label}
       </label>
       {children}
@@ -267,21 +221,13 @@ function GroupedField({
   );
 }
 
-/** Shared inline style for inputs/selects inside GroupedField */
 const groupedInputStyle: React.CSSProperties = {
-  display: 'block',
-  width: '100%',
-  paddingTop: '2rem',
-  paddingBottom: '0.75rem',
-  paddingLeft: '1rem',
-  paddingRight: '1rem',
-  backgroundColor: 'var(--card-bg)',
-  color: 'var(--text-main)',
-  fontSize: 15,
-  fontWeight: 500,
-  outline: 'none',
-  border: 'none',
-  appearance: 'none' as const,
+  display: 'block', width: '100%',
+  paddingTop: '2rem', paddingBottom: '0.75rem',
+  paddingLeft: '1rem', paddingRight: '1rem',
+  backgroundColor: 'var(--card-bg)', color: 'var(--text-main)',
+  fontSize: 15, fontWeight: 500,
+  outline: 'none', border: 'none', appearance: 'none' as const,
 };
 
 function GroupedInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
@@ -289,14 +235,8 @@ function GroupedInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       style={{ ...groupedInputStyle, ...props.style }}
-      onFocus={(e) => {
-        (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = 'var(--card-alt)';
-        props.onFocus?.(e);
-      }}
-      onBlur={(e) => {
-        (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = '';
-        props.onBlur?.(e);
-      }}
+      onFocus={e => { (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = 'var(--card-alt)'; props.onFocus?.(e); }}
+      onBlur={e => { (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = ''; props.onBlur?.(e); }}
     />
   );
 }
@@ -306,101 +246,41 @@ function GroupedSelect(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
     <select
       {...props}
       style={{ ...groupedInputStyle, paddingRight: '2.5rem', ...props.style }}
-      onFocus={(e) => {
-        (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = 'var(--card-alt)';
-        props.onFocus?.(e);
-      }}
-      onBlur={(e) => {
-        (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = '';
-        props.onBlur?.(e);
-      }}
+      onFocus={e => { (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = 'var(--card-alt)'; props.onFocus?.(e); }}
+      onBlur={e => { (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = ''; props.onBlur?.(e); }}
     />
   );
 }
 
-// ── Geo Banner ─────────────────────────────────────────────────────────────────
+// ── Modal shell ───────────────────────────────────────────────────────────────
 
-function GeoBanner({ geoInfo, geoLoading }: { geoInfo: GeoInfo | null; geoLoading: boolean }) {
-  return (
-    <div
-      className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl"
-      style={{ backgroundColor: 'var(--card-alt)', border: '1px solid var(--border-light)' }}
-    >
-      <PublicIcon sx={{ fontSize: 14 }} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-      {geoLoading ? (
-        <SkeletonLine w="w-40" h="h-3" />
-      ) : geoInfo ? (
-        <div className="flex items-center gap-1.5 flex-1 min-w-0 flex-wrap">
-          {geoInfo.countryCode && (
-            <span className="text-base leading-none">{countryFlag(geoInfo.countryCode)}</span>
-          )}
-          <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-            Detected location:
-          </span>
-          <span className="text-xs font-bold" style={{ color: 'var(--text-main)' }}>
-            {geoInfo.countryCode || '—'} · {geoInfo.currency}
-          </span>
-          {geoInfo.source === 'fallback' && (
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>(default)</span>
-          )}
-        </div>
-      ) : (
-        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Location unavailable</span>
-      )}
-    </div>
-  );
-}
-
-// ── Modal shell ────────────────────────────────────────────────────────────────
-
-function ModalShell({
-  open, onClose, children,
-}: {
-  open: boolean;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
+function ModalShell({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div
         className="relative w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl"
-        style={{
-          backgroundColor: 'var(--card-bg)',
-          border: '1px solid var(--border-light)',
-          paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))',
-        }}
+        style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-light)', paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
       >
-        {/* drag handle on mobile */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden">
-          <div
-            className="w-10 h-1 rounded-full"
-            style={{ backgroundColor: 'var(--border-light)' }}
-          />
+          <div className="w-10 h-1 rounded-full" style={{ backgroundColor: 'var(--border-light)' }} />
         </div>
-        <div className="px-6 pt-4 pb-6">
-          {children}
-        </div>
+        <div className="px-6 pt-4 pb-6">{children}</div>
       </div>
     </div>
   );
 }
 
-// Modal confirm row
 function ModalRow({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
   return (
-    <div
-      className="flex justify-between py-3"
-      style={!last ? { borderBottom: '1px solid var(--border-light)' } : {}}
-    >
+    <div className="flex justify-between py-3" style={!last ? { borderBottom: '1px solid var(--border-light)' } : {}}>
       <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{label}</span>
       <span className="text-sm font-semibold" style={{ color: 'var(--text-main)' }}>{value}</span>
     </div>
   );
 }
 
-// Inline error / success banners
 function AlertBanner({ type, message }: { type: 'error' | 'success'; message: string }) {
   const isError = type === 'error';
   return (
@@ -416,29 +296,16 @@ function AlertBanner({ type, message }: { type: 'error' | 'success'; message: st
         color: isError ? '#e11d48' : '#059669',
       }}
     >
-      {isError && <CloseIcon sx={{ fontSize: 16 }} className="shrink-0 mt-0.5" />}
+      {isError && <CancelIcon sx={{ fontSize: 16 }} className="shrink-0 mt-0.5" />}
       <span>{message}</span>
     </div>
   );
 }
 
-// ── Method Toggle ─────────────────────────────────────────────────────────────
-
-function MethodToggle({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-}) {
+function MethodToggle({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
   return (
-    <div
-      className="flex gap-1 p-1 rounded-2xl"
-      style={{ backgroundColor: 'var(--card-alt)', border: '1px solid var(--border-light)' }}
-    >
-      {options.map((opt) => {
+    <div className="flex gap-1 p-1 rounded-2xl" style={{ backgroundColor: 'var(--card-alt)', border: '1px solid var(--border-light)' }}>
+      {options.map(opt => {
         const active = value === opt.value;
         return (
           <button
@@ -466,10 +333,11 @@ interface WithdrawModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  balance: number;
+  balanceUsd: number;
+  rates: ExchangeRates | null;
 }
 
-function WithdrawModal({ open, onClose, onSuccess, balance }: WithdrawModalProps) {
+function WithdrawModal({ open, onClose, onSuccess, balanceUsd, rates }: WithdrawModalProps) {
   const [step, setStep]                   = useState<'form' | 'confirm' | 'done'>('form');
   const [amount, setAmount]               = useState('');
   const [method, setMethod]               = useState('momo');
@@ -478,6 +346,9 @@ function WithdrawModal({ open, onClose, onSuccess, balance }: WithdrawModalProps
   const [accountName, setAccountName]     = useState('');
   const [loading, setLoading]             = useState(false);
   const [error, setError]                 = useState('');
+
+  const amountUsd = parseFloat(amount) || 0;
+  const amountGhs = rates ? Math.round(amountUsd * rates.usdToGhs * 100) / 100 : amountUsd;
 
   const reset = () => {
     setStep('form'); setAmount(''); setMethod('momo');
@@ -490,7 +361,10 @@ function WithdrawModal({ open, onClose, onSuccess, balance }: WithdrawModalProps
     setLoading(true); setError('');
     try {
       await withdrawals.submit({
-        amount: parseFloat(amount), method, accountNumber, accountName,
+        amount: amountGhs,
+        method,
+        accountNumber,
+        accountName,
         network: method === 'momo' ? network : undefined,
       });
       setStep('done');
@@ -502,24 +376,22 @@ function WithdrawModal({ open, onClose, onSuccess, balance }: WithdrawModalProps
     }
   };
 
-  const canProceed =
-    !!amount && parseFloat(amount) > 0 && !!accountNumber && !!accountName;
+  const canProceed = amountUsd > 0 && amountUsd <= balanceUsd && !!accountNumber && !!accountName;
 
   return (
     <ModalShell open={open} onClose={handleClose}>
-      {/* ── Done state ── */}
+      {/* ── Done ── */}
       {step === 'done' && (
         <div className="text-center py-4 space-y-5">
           <div
             className="w-16 h-16 rounded-full flex items-center justify-center mx-auto"
             style={{ backgroundColor: 'color-mix(in srgb, #10b981 15%, transparent)' }}
           >
-            <PaymentsIcon style={{ color: '#10b981', fontSize: 32 }} />
+            {/* TaskAlt = rounded checkmark tick — better than generic PaymentsIcon */}
+            <TaskAltIcon style={{ color: '#10b981', fontSize: 34 }} />
           </div>
           <div>
-            <h3 className="text-xl font-bold mb-1" style={{ color: 'var(--text-main)' }}>
-              Withdrawal Requested
-            </h3>
+            <h3 className="text-xl font-bold mb-1" style={{ color: 'var(--text-main)' }}>Withdrawal Requested</h3>
             <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
               Your request is being reviewed. Funds will be sent shortly.
             </p>
@@ -528,27 +400,21 @@ function WithdrawModal({ open, onClose, onSuccess, balance }: WithdrawModalProps
         </div>
       )}
 
-      {/* ── Confirm state ── */}
+      {/* ── Confirm ── */}
       {step === 'confirm' && (
         <div className="space-y-5">
-          <h3 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>
-            Confirm Withdrawal
-          </h3>
-          <div
-            className="rounded-2xl overflow-hidden"
-            style={{ border: '1px solid var(--border-light)' }}
-          >
-            <ModalRow label="Amount"  value={formatCurrency(parseFloat(amount))} />
-            <ModalRow label="Method"  value={method === 'momo' ? 'Mobile Money' : 'Bank Transfer'} />
+          <h3 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>Confirm Withdrawal</h3>
+          <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border-light)' }}>
+            <ModalRow label="Amount (USD)" value={formatUSD(amountUsd)} />
+            <ModalRow label="Amount (GHS)" value={`GHS ${amountGhs.toFixed(2)}`} />
+            <ModalRow label="Method"       value={method === 'momo' ? 'Mobile Money' : 'Bank Transfer'} />
             {method === 'momo' && <ModalRow label="Network" value={network} />}
-            <ModalRow label="Account" value={accountNumber} />
-            <ModalRow label="Name"    value={accountName} last />
+            <ModalRow label="Account"      value={accountNumber} />
+            <ModalRow label="Name"         value={accountName} last />
           </div>
           {error && <AlertBanner type="error" message={error} />}
           <div className="flex gap-3">
-            <BtnGhost onClick={() => setStep('form')} disabled={loading} className="flex-1">
-              Back
-            </BtnGhost>
+            <BtnGhost onClick={() => setStep('form')} disabled={loading} className="flex-1">Back</BtnGhost>
             <BtnPrimary loading={loading} onClick={submit} className="flex-1 py-3 rounded-xl">
               {loading ? 'Processing…' : 'Confirm'}
             </BtnPrimary>
@@ -556,114 +422,80 @@ function WithdrawModal({ open, onClose, onSuccess, balance }: WithdrawModalProps
         </div>
       )}
 
-      {/* ── Form state ── */}
+      {/* ── Form ── */}
       {step === 'form' && (
         <div className="space-y-5">
-          {/* Header */}
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>
-              Withdraw Funds
-            </h3>
+            <h3 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>Withdraw Funds</h3>
             <BtnIcon onClick={handleClose} aria-label="Close">
-              <CloseIcon fontSize="small" />
+              {/* CancelIcon is cleaner than plain CloseIcon */}
+              <CancelIcon fontSize="small" />
             </BtnIcon>
           </div>
 
-          {/* Available balance chip */}
           <div
             className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm"
             style={{ backgroundColor: 'var(--card-alt)', border: '1px solid var(--border-light)' }}
           >
             <span style={{ color: 'var(--text-muted)' }}>Available</span>
-            <span className="font-bold" style={{ color: 'var(--text-main)' }}>
-              {formatCurrency(balance)}
-            </span>
+            <span className="font-bold" style={{ color: 'var(--text-main)' }}>{formatUSD(balanceUsd)}</span>
           </div>
 
-          {/* Method toggle */}
           <div className="space-y-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-              Method
-            </p>
+            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Method</p>
             <MethodToggle
               value={method}
               onChange={setMethod}
-              options={[
-                { value: 'momo', label: 'Mobile Money' },
-                { value: 'bank', label: 'Bank Transfer' },
-              ]}
+              options={[{ value: 'momo', label: 'Mobile Money' }, { value: 'bank', label: 'Bank Transfer' }]}
             />
           </div>
 
-          {/* Grouped fields */}
           <GroupedFields>
-            {/* Amount */}
-            <GroupedField label="Amount (GH₵)">
+            <GroupedField label="Amount (USD)">
               <GroupedInput
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-                min="1"
-                step="0.01"
+                type="number" value={amount}
+                onChange={e => setAmount(e.target.value)}
+                placeholder="0.00" min="1" step="0.01" max={balanceUsd}
               />
             </GroupedField>
 
-            {/* Network / Bank Name */}
+            {amountUsd > 0 && rates && (
+              <div className="px-4 py-2" style={{ backgroundColor: 'var(--card-alt)', borderBottom: '1px solid var(--border-light)' }}>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  ≈ GHS {amountGhs.toFixed(2)} at live rate
+                </p>
+              </div>
+            )}
+
             {method === 'momo' ? (
               <GroupedField label="Network">
-                <GroupedSelect value={network} onChange={(e) => setNetwork(e.target.value)}>
-                  {['MTN', 'AirtelTigo', 'Telecel'].map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
+                <GroupedSelect value={network} onChange={e => setNetwork(e.target.value)}>
+                  {['MTN', 'AirtelTigo', 'Telecel'].map(n => <option key={n} value={n}>{n}</option>)}
                 </GroupedSelect>
-                {/* chevron icon */}
-                <span
-                  className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-xs"
-                  style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}
-                >
-                  ▾
-                </span>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-xs" style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>▾</span>
               </GroupedField>
             ) : (
               <GroupedField label="Bank Name">
-                <GroupedInput
-                  type="text"
-                  value={network}
-                  onChange={(e) => setNetwork(e.target.value)}
-                  placeholder="e.g. GCB Bank"
-                />
+                <GroupedInput type="text" value={network} onChange={e => setNetwork(e.target.value)} placeholder="e.g. GCB Bank" />
               </GroupedField>
             )}
 
-            {/* Phone / Account Number */}
             <GroupedField label={method === 'momo' ? 'Phone Number' : 'Account Number'}>
               <GroupedInput
-                type="text"
-                value={accountNumber}
-                onChange={(e) => setAccountNumber(e.target.value)}
+                type="text" value={accountNumber}
+                onChange={e => setAccountNumber(e.target.value)}
                 placeholder={method === 'momo' ? '0XX XXX XXXX' : 'Account number'}
               />
             </GroupedField>
 
-            {/* Account Name */}
             <GroupedField label="Account Name" last>
-              <GroupedInput
-                type="text"
-                value={accountName}
-                onChange={(e) => setAccountName(e.target.value)}
-                placeholder="Full name on account"
-              />
+              <GroupedInput type="text" value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="Full name on account" />
             </GroupedField>
           </GroupedFields>
 
           {error && <AlertBanner type="error" message={error} />}
 
-          <BtnPrimary
-            size="lg"
-            disabled={!canProceed}
-            onClick={() => canProceed && setStep('confirm')}
-          >
+          <BtnPrimary size="lg" disabled={!canProceed} onClick={() => canProceed && setStep('confirm')}>
             Continue
           </BtnPrimary>
         </div>
@@ -672,16 +504,17 @@ function WithdrawModal({ open, onClose, onSuccess, balance }: WithdrawModalProps
   );
 }
 
-// ── Affiliate Withdraw Modal ───────────────────────────────────────────────────
+// ── Affiliate Withdraw Modal ──────────────────────────────────────────────────
 
 interface AffiliateWithdrawModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  availableBalance: number;
+  availableBalanceUsd: number;
+  rates: ExchangeRates | null;
 }
 
-function AffiliateWithdrawModal({ open, onClose, onSuccess, availableBalance }: AffiliateWithdrawModalProps) {
+function AffiliateWithdrawModal({ open, onClose, onSuccess, availableBalanceUsd, rates }: AffiliateWithdrawModalProps) {
   const [step, setStep]                   = useState<'form' | 'done'>('form');
   const [amount, setAmount]               = useState('');
   const [bankName, setBankName]           = useState('');
@@ -690,6 +523,9 @@ function AffiliateWithdrawModal({ open, onClose, onSuccess, availableBalance }: 
   const [momoNumber, setMomoNumber]       = useState('');
   const [loading, setLoading]             = useState(false);
   const [error, setError]                 = useState('');
+
+  const amountUsd = parseFloat(amount) || 0;
+  const amountGhs = rates ? Math.round(amountUsd * rates.usdToGhs * 100) / 100 : amountUsd;
 
   const reset = () => {
     setStep('form'); setAmount(''); setBankName('');
@@ -702,11 +538,8 @@ function AffiliateWithdrawModal({ open, onClose, onSuccess, availableBalance }: 
     setLoading(true); setError('');
     try {
       await affiliate.requestWithdrawal({
-        amount: parseFloat(amount),
-        accountDetails: {
-          bankName, accountNumber, accountName,
-          mobileMoneyNumber: momoNumber || undefined,
-        },
+        amount: amountGhs,
+        accountDetails: { bankName, accountNumber, accountName, mobileMoneyNumber: momoNumber || undefined },
       });
       setStep('done');
       onSuccess();
@@ -717,110 +550,74 @@ function AffiliateWithdrawModal({ open, onClose, onSuccess, availableBalance }: 
     }
   };
 
-  const canSubmit =
-    !!amount && parseFloat(amount) > 0 && !!bankName && !!accountNumber && !!accountName;
+  const canSubmit = amountUsd > 0 && amountUsd <= availableBalanceUsd && !!bankName && !!accountNumber && !!accountName;
 
   return (
     <ModalShell open={open} onClose={handleClose}>
-      {/* ── Done state ── */}
       {step === 'done' && (
         <div className="text-center py-4 space-y-5">
           <div
             className="w-16 h-16 rounded-full flex items-center justify-center mx-auto"
             style={{ backgroundColor: 'color-mix(in srgb, #3b82f6 15%, transparent)' }}
           >
-            <PaymentsIcon style={{ color: '#3b82f6', fontSize: 32 }} />
+            {/* TaskAlt again for consistent success iconography */}
+            <TaskAltIcon style={{ color: '#3b82f6', fontSize: 34 }} />
           </div>
           <div>
-            <h3 className="text-xl font-bold mb-1" style={{ color: 'var(--text-main)' }}>
-              Request Submitted
-            </h3>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              Your affiliate earnings withdrawal is being processed.
-            </p>
+            <h3 className="text-xl font-bold mb-1" style={{ color: 'var(--text-main)' }}>Request Submitted</h3>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Your affiliate earnings withdrawal is being processed.</p>
           </div>
           <BtnPrimary size="lg" onClick={handleClose}>Done</BtnPrimary>
         </div>
       )}
 
-      {/* ── Form state ── */}
       {step === 'form' && (
         <div className="space-y-5">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>
-              Withdraw Affiliate Earnings
-            </h3>
-            <BtnIcon onClick={handleClose} aria-label="Close">
-              <CloseIcon fontSize="small" />
-            </BtnIcon>
+            <h3 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>Withdraw Affiliate Earnings</h3>
+            <BtnIcon onClick={handleClose} aria-label="Close"><CancelIcon fontSize="small" /></BtnIcon>
           </div>
 
-          {/* Available chip */}
           <div
             className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm"
             style={{ backgroundColor: 'var(--card-alt)', border: '1px solid var(--border-light)' }}
           >
             <span style={{ color: 'var(--text-muted)' }}>Available</span>
-            <span className="font-bold" style={{ color: '#10b981' }}>
-              {formatCurrency(availableBalance)}
-            </span>
+            <span className="font-bold" style={{ color: '#10b981' }}>{formatUSD(availableBalanceUsd)}</span>
           </div>
 
-          {/* Grouped fields */}
           <GroupedFields>
-            <GroupedField label="Amount (GH₵)">
+            <GroupedField label="Amount (USD)">
               <GroupedInput
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-                min="1"
-                step="0.01"
-                max={availableBalance}
+                type="number" value={amount}
+                onChange={e => setAmount(e.target.value)}
+                placeholder="0.00" min="1" step="0.01" max={availableBalanceUsd}
               />
             </GroupedField>
+            {amountUsd > 0 && rates && (
+              <div className="px-4 py-2" style={{ backgroundColor: 'var(--card-alt)', borderBottom: '1px solid var(--border-light)' }}>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  ≈ GHS {amountGhs.toFixed(2)} at live rate
+                </p>
+              </div>
+            )}
             <GroupedField label="Bank Name">
-              <GroupedInput
-                type="text"
-                value={bankName}
-                onChange={(e) => setBankName(e.target.value)}
-                placeholder="e.g. GCB Bank"
-              />
+              <GroupedInput type="text" value={bankName} onChange={e => setBankName(e.target.value)} placeholder="e.g. GCB Bank" />
             </GroupedField>
             <GroupedField label="Account Number">
-              <GroupedInput
-                type="text"
-                value={accountNumber}
-                onChange={(e) => setAccountNumber(e.target.value)}
-                placeholder="Account number"
-              />
+              <GroupedInput type="text" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} placeholder="Account number" />
             </GroupedField>
             <GroupedField label="Account Name">
-              <GroupedInput
-                type="text"
-                value={accountName}
-                onChange={(e) => setAccountName(e.target.value)}
-                placeholder="Full name on account"
-              />
+              <GroupedInput type="text" value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="Full name on account" />
             </GroupedField>
             <GroupedField label="Mobile Money Number (optional)" last>
-              <GroupedInput
-                type="tel"
-                value={momoNumber}
-                onChange={(e) => setMomoNumber(e.target.value)}
-                placeholder="0XX XXX XXXX"
-              />
+              <GroupedInput type="tel" value={momoNumber} onChange={e => setMomoNumber(e.target.value)} placeholder="0XX XXX XXXX" />
             </GroupedField>
           </GroupedFields>
 
           {error && <AlertBanner type="error" message={error} />}
 
-          <BtnPrimary
-            size="lg"
-            loading={loading}
-            disabled={!canSubmit}
-            onClick={submit}
-          >
+          <BtnPrimary size="lg" loading={loading} disabled={!canSubmit} onClick={submit}>
             {loading ? 'Submitting…' : 'Submit Request'}
           </BtnPrimary>
         </div>
@@ -835,29 +632,28 @@ export default function WalletPage() {
   const navigate = useNavigate();
   const { user: currentUser } = useAppStore();
 
-  const [walletData, setWalletData]           = useState<WalletData | null>(null);
-  const [transactions, setTransactions]       = useState<Transaction[]>([]);
-  const [affiliateStats, setAffiliateStats]   = useState<AffiliateStatsDTO | null>(null);
-  const [txPage, setTxPage]                   = useState(0);
-  const [txTotalPages, setTxTotalPages]       = useState(1);
-  const [loading, setLoading]                 = useState(true);
-  const [txLoading, setTxLoading]             = useState(false);
-  const [fetchError, setFetchError]           = useState('');
-  const [showBalance, setShowBalance]         = useState(true);
-  const [showAffBalance, setShowAffBalance]   = useState(true);
-  const [showWithdraw, setShowWithdraw]       = useState(false);
+  const [walletData,      setWalletData]      = useState<WalletData | null>(null);
+  const [transactions,    setTransactions]    = useState<Transaction[]>([]);
+  const [affiliateStats,  setAffiliateStats]  = useState<AffiliateStatsDTO | null>(null);
+  const [txPage,          setTxPage]          = useState(0);
+  const [txTotalPages,    setTxTotalPages]    = useState(1);
+  const [loading,         setLoading]         = useState(true);
+  const [txLoading,       setTxLoading]       = useState(false);
+  const [fetchError,      setFetchError]      = useState('');
+  const [showBalance,     setShowBalance]     = useState(true);
+  const [showAffBalance,  setShowAffBalance]  = useState(true);
+  const [showWithdraw,    setShowWithdraw]    = useState(false);
   const [showAffWithdraw, setShowAffWithdraw] = useState(false);
-
-  const [geoInfo, setGeoInfo]       = useState<GeoInfo | null>(null);
-  const [geoLoading, setGeoLoading] = useState(true);
+  const [rates,           setRates]           = useState<ExchangeRates | null>(null);
+  const [rateLoading,     setRateLoading]     = useState(true);
 
   useEffect(() => {
     if (!currentUser) navigate('/login', { replace: true, state: { from: '/wallet' } });
   }, [currentUser, navigate]);
 
   useEffect(() => {
-    setGeoLoading(true);
-    fetchGeoInfo().then(setGeoInfo).finally(() => setGeoLoading(false));
+    setRateLoading(true);
+    fetchExchangeRates().then(setRates).finally(() => setRateLoading(false));
   }, []);
 
   const fetchWallet = useCallback(async () => {
@@ -869,7 +665,7 @@ export default function WalletPage() {
     setTxLoading(true);
     try {
       const res = await walletApi.getTransactions(page, 20);
-      setTransactions((prev) => page === 0 ? res.data.content : [...prev, ...res.data.content]);
+      setTransactions(prev => page === 0 ? res.data.content : [...prev, ...res.data.content]);
       setTxTotalPages(res.data.totalPages);
       setTxPage(page);
     } finally {
@@ -881,7 +677,7 @@ export default function WalletPage() {
     try {
       const res = await affiliate.getStats();
       setAffiliateStats(res.data);
-    } catch { /* not all users are affiliates */ }
+    } catch { /* non-affiliate users */ }
   }, []);
 
   const initLoad = useCallback(async () => {
@@ -899,20 +695,22 @@ export default function WalletPage() {
     if (currentUser) initLoad();
   }, [currentUser, initLoad]);
 
-  const mainBalance      = walletData?.balance ?? 0;
-  const affiliateBalance = affiliateStats?.availableBalance ?? 0;
-  const displayCurrency  = walletData?.currency ?? geoInfo?.currency ?? 'GHS';
+  // ── Conversions ───────────────────────────────────────────────────────────
+  const ghsBalance     = walletData?.balance ?? 0;
+  const mainBalanceUsd = rates ? ghsBalance * rates.ghsToUsd : ghsBalance / 15.5;
 
-  // ── Loading ───────────────────────────────────────────────────────────────
-  if (loading) {
+  const affBalanceGhs  = affiliateStats?.availableBalance ?? 0;
+  const affBalanceUsd  = rates ? affBalanceGhs * rates.ghsToUsd : affBalanceGhs / 15.5;
+
+  const affLifetimeGhs = affiliateStats?.lifetimeCommission ?? 0;
+  const affLifetimeUsd = rates ? affLifetimeGhs * rates.ghsToUsd : affLifetimeGhs / 15.5;
+
+  // ── Loading skeleton ──────────────────────────────────────────────────────
+  if (loading || rateLoading) {
     return (
       <div className="max-w-lg mx-auto p-4 space-y-4">
-        {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="rounded-2xl p-5 animate-pulse"
-            style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-light)' }}
-          >
+        {[1, 2, 3].map(i => (
+          <div key={i} className="rounded-2xl p-5 animate-pulse" style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-light)' }}>
             <SkeletonLine w="w-1/3" h="h-4" />
             <div className="mt-3"><SkeletonLine w="w-1/2" h="h-8" /></div>
             <div className="mt-4"><SkeletonLine h="h-10" /></div>
@@ -937,191 +735,159 @@ export default function WalletPage() {
       <div className="min-h-screen pb-10" style={{ backgroundColor: 'var(--card-alt)' }}>
         <div className="max-w-lg mx-auto p-4 space-y-4">
 
-          {/* ── Page Header ──────────────────────────────────────────────── */}
+          {/* Header */}
           <div className="flex items-center justify-between pt-1">
             <div>
-              <h1
-                className="text-2xl font-bold flex items-center gap-2"
-                style={{ color: 'var(--text-main)' }}
-              >
-                <AccountBalanceWalletIcon style={{ color: 'var(--primary)' }} />
+              <h1 className="text-2xl font-bold flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
+                {/* WalletIcon — cleaner than AccountBalanceWallet */}
+                <WalletIcon style={{ color: 'var(--primary)' }} />
                 Wallet
               </h1>
               {currentUser && (
-                <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  {currentUser.fullName}
-                </p>
+                <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>{currentUser.fullName}</p>
               )}
             </div>
+            {/* SyncIcon — more intuitive "sync / refresh" signal */}
             <BtnIcon onClick={initLoad} title="Refresh wallet">
-              <RefreshIcon fontSize="small" />
+              <SyncIcon fontSize="small" />
             </BtnIcon>
           </div>
 
-          {/* ── Geo Banner ───────────────────────────────────────────────── */}
-          <GeoBanner geoInfo={geoInfo} geoLoading={geoLoading} />
-
-          {/* ── Main Balance Hero Card ────────────────────────────────────── */}
+          {/* ── Main Balance Hero Card ── */}
           <div
             className="rounded-3xl p-5 sm:p-6 shadow-lg"
-            style={{
-              background:
-                'linear-gradient(135deg, var(--primary), var(--primary-dark, color-mix(in srgb, var(--primary) 70%, #000)))',
-            }}
+            style={{ background: 'linear-gradient(135deg, var(--primary), var(--primary-dark, color-mix(in srgb, var(--primary) 70%, #000)))' }}
           >
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-white/70">
-                Main Balance
-              </span>
+              <span className="text-xs font-bold uppercase tracking-wider text-white/70">Main Balance · USD</span>
               <button
                 type="button"
-                onClick={() => setShowBalance((v) => !v)}
+                onClick={() => setShowBalance(v => !v)}
                 className="p-1 rounded-lg transition-colors"
                 style={{ color: 'rgba(255,255,255,0.6)' }}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = '#fff')}
-                onMouseLeave={(e) =>
-                  ((e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.6)')
-                }
+                onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#fff')}
+                onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.6)')}
               >
-                {showBalance
-                  ? <VisibilityIcon fontSize="small" />
-                  : <VisibilityOffIcon fontSize="small" />}
+                {showBalance ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
               </button>
             </div>
 
-            <p className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-1">
-              {showBalance ? formatCurrency(mainBalance) : `${displayCurrency} ••••`}
+            <p className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-5">
+              {showBalance ? formatUSD(mainBalanceUsd) : 'USD ••••'}
             </p>
-            {!geoLoading && geoInfo && (
-              <p className="text-xs text-white/50 mb-5">
-                Displaying in {displayCurrency}
-                {geoInfo.countryCode ? ` · ${geoInfo.countryCode}` : ''}
-              </p>
-            )}
-            {(geoLoading || !geoInfo) && <div className="mb-5" />}
 
             <div className="grid grid-cols-2 gap-3">
+              {/* Deposit: AddCircleOutline — "add money" intent is clearer */}
               <Link
                 to="/deposit"
                 className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-sm font-semibold transition-all active:scale-[0.97] bg-white"
                 style={{ color: 'var(--primary)' }}
               >
-                <AddCardIcon fontSize="small" />
+                <AddCircleOutlineIcon fontSize="small" />
                 Deposit
               </Link>
+              {/* Withdraw: SendIcon — "sending money out" is intuitive */}
               <button
                 type="button"
                 onClick={() => setShowWithdraw(true)}
                 className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-sm font-semibold text-white transition-all active:scale-[0.97]"
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.15)',
-                  border: '1px solid rgba(255,255,255,0.25)',
-                }}
-                onMouseEnter={(e) =>
-                  ((e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255,255,255,0.25)')
-                }
-                onMouseLeave={(e) =>
-                  ((e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255,255,255,0.15)')
-                }
+                style={{ backgroundColor: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)' }}
+                onMouseEnter={e => ((e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255,255,255,0.25)')}
+                onMouseLeave={e => ((e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255,255,255,0.15)')}
               >
-                <PaymentsIcon fontSize="small" />
+                <SendIcon fontSize="small" />
                 Withdraw
               </button>
             </div>
           </div>
 
-          {/* ── Affiliate Earnings Card ───────────────────────────────────── */}
+          {/* ── Affiliate Earnings Card ── */}
           <Card className="p-5">
             <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-sm font-bold" style={{ color: 'var(--text-main)' }}>
-                  💰 Affiliate Earnings
-                </h2>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  Withdraw to your bank account
-                </p>
+              <div className="flex items-center gap-2">
+                {/* SavingsIcon — piggy bank feel, perfect for "earnings" */}
+                <SavingsIcon style={{ color: '#10b981', fontSize: 22 }} />
+                <div>
+                  <h2 className="text-sm font-bold" style={{ color: 'var(--text-main)' }}>Affiliate Earnings</h2>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Withdraw to your bank account</p>
+                </div>
               </div>
               <button
                 type="button"
-                onClick={() => setShowAffBalance((v) => !v)}
+                onClick={() => setShowAffBalance(v => !v)}
                 className="p-1 rounded-lg transition-colors"
                 style={{ color: 'var(--text-muted)' }}
-                onMouseEnter={(e) =>
-                  ((e.currentTarget as HTMLElement).style.color = 'var(--text-main)')
-                }
-                onMouseLeave={(e) =>
-                  ((e.currentTarget as HTMLElement).style.color = 'var(--text-muted)')
-                }
+                onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = 'var(--text-main)')}
+                onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'var(--text-muted)')}
               >
-                {showAffBalance
-                  ? <VisibilityIcon fontSize="small" />
-                  : <VisibilityOffIcon fontSize="small" />}
+                {showAffBalance ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
               </button>
             </div>
 
             <p className="text-3xl font-bold mb-4" style={{ color: 'var(--text-main)' }}>
-              {showAffBalance ? formatCurrency(affiliateBalance) : `${displayCurrency} ••••`}
+              {showAffBalance ? formatUSD(affBalanceUsd) : 'USD ••••'}
             </p>
 
             {affiliateStats && (
               <div className="grid grid-cols-3 gap-2 mb-4">
-                {[
-                  { emoji: '📈', label: 'Total Earned',   value: formatCurrency(affiliateStats.lifetimeCommission), color: '#10b981' },
-                  { emoji: '👥', label: 'Referrals',      value: String(affiliateStats.totalReferrals),             color: '#3b82f6' },
-                  { emoji: '💳', label: 'Available',      value: formatCurrency(affiliateStats.availableBalance),   color: 'var(--text-main)' },
-                ].map(({ emoji, label, value, color }) => (
-                  <div
-                    key={label}
-                    className="rounded-2xl p-3 text-center"
-                    style={{ backgroundColor: 'var(--card-alt)', border: '1px solid var(--border-light)' }}
-                  >
-                    <p className="text-lg mb-0.5">{emoji}</p>
-                    <p className="text-[10px] mb-0.5" style={{ color: 'var(--text-muted)' }}>{label}</p>
-                    <p className="text-xs font-bold" style={{ color }}>{value}</p>
-                  </div>
-                ))}
+                {/* PaidIcon = coin with $ — Total Earned */}
+                <div className="rounded-2xl p-3 text-center" style={{ backgroundColor: 'var(--card-alt)', border: '1px solid var(--border-light)' }}>
+                  <PaidIcon style={{ color: '#10b981', fontSize: 20 }} className="mx-auto mb-1" />
+                  <p className="text-[10px] mb-0.5" style={{ color: 'var(--text-muted)' }}>Total Earned</p>
+                  <p className="text-xs font-bold" style={{ color: '#10b981' }}>{formatUSD(affLifetimeUsd)}</p>
+                </div>
+                {/* PeopleAltIcon = group of people — Referrals */}
+                <div className="rounded-2xl p-3 text-center" style={{ backgroundColor: 'var(--card-alt)', border: '1px solid var(--border-light)' }}>
+                  <PeopleAltIcon style={{ color: '#3b82f6', fontSize: 20 }} className="mx-auto mb-1" />
+                  <p className="text-[10px] mb-0.5" style={{ color: 'var(--text-muted)' }}>Referrals</p>
+                  <p className="text-xs font-bold" style={{ color: '#3b82f6' }}>{affiliateStats.totalReferrals}</p>
+                </div>
+                {/* AccountBalanceIcon = bank building — Available balance */}
+                <div className="rounded-2xl p-3 text-center" style={{ backgroundColor: 'var(--card-alt)', border: '1px solid var(--border-light)' }}>
+                  <AccountBalanceIcon style={{ color: 'var(--text-main)', fontSize: 20 }} className="mx-auto mb-1" />
+                  <p className="text-[10px] mb-0.5" style={{ color: 'var(--text-muted)' }}>Available</p>
+                  <p className="text-xs font-bold" style={{ color: 'var(--text-main)' }}>{formatUSD(affBalanceUsd)}</p>
+                </div>
               </div>
             )}
 
+            {/* VolunteerActivismIcon = hand holding heart/coin — affiliate withdraw */}
             <BtnGhost
               size="lg"
-              icon={<PaymentsIcon fontSize="small" />}
+              icon={<VolunteerActivismIcon fontSize="small" />}
               onClick={() => setShowAffWithdraw(true)}
             >
               Withdraw Affiliate Earnings
             </BtnGhost>
           </Card>
 
-          {/* ── Recent Transactions ───────────────────────────────────────── */}
+          {/* ── Recent Transactions ── */}
           <Card className="p-5">
-            <h2
-              className="text-[11px] font-bold uppercase tracking-widest mb-4"
-              style={{ color: 'var(--text-muted)' }}
-            >
+            <h2 className="text-[11px] font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--text-muted)' }}>
               Recent Transactions
             </h2>
 
             {transactions.length === 0 ? (
               <div className="text-center py-10">
-                <AccountBalanceWalletIcon
-                  sx={{ fontSize: 40 }}
-                  style={{ color: 'var(--border-light)' }}
-                  className="mx-auto mb-2"
-                />
+                {/* MoneyOffIcon — empty state: "no money activity" */}
+                <MoneyOffIcon sx={{ fontSize: 40 }} style={{ color: 'var(--border-light)' }} className="mx-auto mb-2" />
                 <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No transactions yet</p>
               </div>
             ) : (
               <div>
                 {transactions.map((tx, idx) => {
-                  const incoming = isIncoming(tx.kind);
-                  const isLast   = idx === transactions.length - 1;
+                  const incoming    = isIncoming(tx.kind);
+                  const isLast      = idx === transactions.length - 1;
+                  const amountUsd   = rates ? tx.amount * rates.ghsToUsd : tx.amount / 15.5;
+                  const balAfterUsd = tx.balanceAfter !== undefined
+                    ? (rates ? tx.balanceAfter * rates.ghsToUsd : tx.balanceAfter / 15.5)
+                    : undefined;
                   return (
                     <div
                       key={tx.id}
                       className="flex items-center gap-3 py-3.5"
                       style={!isLast ? { borderBottom: '1px solid var(--border-light)' } : {}}
                     >
-                      {/* Icon bubble */}
                       <div
                         className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
                         style={{
@@ -1130,33 +896,25 @@ export default function WalletPage() {
                             : 'color-mix(in srgb, #f43f5e 15%, transparent)',
                         }}
                       >
+                        {/* SouthWest = down-left arrow = money coming IN */}
+                        {/* NorthEast = up-right arrow  = money going OUT */}
                         {incoming
-                          ? <ArrowDownwardIcon sx={{ fontSize: 16 }} style={{ color: '#10b981' }} />
-                          : <ArrowUpwardIcon   sx={{ fontSize: 16 }} style={{ color: '#f43f5e' }} />}
+                          ? <SouthWestIcon sx={{ fontSize: 16 }} style={{ color: '#10b981' }} />
+                          : <NorthEastIcon sx={{ fontSize: 16 }} style={{ color: '#f43f5e' }} />}
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <p
-                          className="text-sm font-semibold truncate"
-                          style={{ color: 'var(--text-main)' }}
-                        >
-                          {txLabel(tx.kind)}
-                        </p>
-                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                          {formatDate(tx.createdAt)}
-                        </p>
+                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-main)' }}>{txLabel(tx.kind)}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{formatDate(tx.createdAt)}</p>
                       </div>
 
                       <div className="text-right flex-shrink-0">
-                        <p
-                          className="text-sm font-bold tabular-nums"
-                          style={{ color: incoming ? '#10b981' : '#f43f5e' }}
-                        >
-                          {incoming ? '+' : '-'}{formatCurrency(tx.amount)}
+                        <p className="text-sm font-bold tabular-nums" style={{ color: incoming ? '#10b981' : '#f43f5e' }}>
+                          {incoming ? '+' : '-'}{formatUSD(amountUsd)}
                         </p>
-                        {tx.balanceAfter !== undefined && (
+                        {balAfterUsd !== undefined && (
                           <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                            Bal: {formatCurrency(tx.balanceAfter)}
+                            Bal: {formatUSD(balAfterUsd)}
                           </p>
                         )}
                       </div>
@@ -1168,9 +926,11 @@ export default function WalletPage() {
 
             {txPage + 1 < txTotalPages && (
               <div className="mt-4">
+                {/* CurrencyExchangeIcon on Load More — "load more financial history" */}
                 <BtnGhost
                   size="lg"
                   loading={txLoading}
+                  icon={!txLoading ? <CurrencyExchangeIcon fontSize="small" /> : undefined}
                   onClick={() => fetchTransactions(txPage + 1)}
                 >
                   {txLoading ? 'Loading…' : 'Load More'}
@@ -1182,18 +942,20 @@ export default function WalletPage() {
         </div>
       </div>
 
-      {/* ── Modals ──────────────────────────────────────────────────────────── */}
+      {/* Modals */}
       <WithdrawModal
         open={showWithdraw}
         onClose={() => setShowWithdraw(false)}
         onSuccess={() => { setShowWithdraw(false); fetchWallet(); fetchTransactions(0); }}
-        balance={mainBalance}
+        balanceUsd={mainBalanceUsd}
+        rates={rates}
       />
       <AffiliateWithdrawModal
         open={showAffWithdraw}
         onClose={() => setShowAffWithdraw(false)}
         onSuccess={() => { setShowAffWithdraw(false); fetchAffiliateStats(); }}
-        availableBalance={affiliateBalance}
+        availableBalanceUsd={affBalanceUsd}
+        rates={rates}
       />
     </>
   );

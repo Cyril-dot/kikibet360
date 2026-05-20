@@ -1178,7 +1178,7 @@ function SlipTab() {
         </button>
       </div>
 
-      {user && <BookingCodePanel />}
+      <BookingCodePanel />
     </div>
   );
 }
