@@ -693,11 +693,42 @@ function BetDetailSheet({ bet, onClose }: { bet: Bet; onClose: () => void }) {
 // Booking code panel
 // ---------------------------------------------------------------------------
 function BookingCodePanel() {
-  const { clearBetSlip, addToBetSlip, showToast } = useAppStore();
+  const { clearBetSlip, addToBetSlip, showToast, user } = useAppStore();
+  const navigate = useNavigate();
   const [code, setCode]       = useState('');
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<any>(null);
   const [error, setError]     = useState<string | null>(null);
+
+  // ── If the user is not logged in, show a prompt to log in instead ─────────
+  if (!user) {
+    return (
+      <div className="mt-3">
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+          <QrCodeIcon sx={{ fontSize: 14 }} /> Booking Code
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="e.g. ABC12345"
+            disabled
+            className="input-field flex-1 font-mono tracking-widest uppercase opacity-50 cursor-not-allowed"
+          />
+          <button
+            disabled
+            className="px-4 py-2.5 bg-primary/40 text-white rounded-xl text-sm font-bold opacity-50 cursor-not-allowed shrink-0"
+          >
+            Load
+          </button>
+        </div>
+        <p className="text-xs text-slate-400 mt-2 flex items-center gap-1.5">
+          <InfoOutlinedIcon sx={{ fontSize: 14 }} />
+          <Link to="/login" className="text-primary font-semibold hover:underline">Log in</Link>
+          {' '}to load a booking code
+        </p>
+      </div>
+    );
+  }
 
   const handleLoad = async () => {
     if (!code.trim()) return;
@@ -718,7 +749,6 @@ function BookingCodePanel() {
         console.group(`%c[Futball:BookingCode] ✅ Loaded ${selections.length} selection(s)`, 'color:#22c55e;font-weight:bold');
         selections.forEach((sel: Record<string, unknown>, i: number) => {
           console.log(`Selection ${i + 1}:`, JSON.stringify(sel, null, 2));
-          // Explicitly log odds-related fields
           const oddsFields = ['currentOdds','oddsLocked','odds','value','odd','price','oddsValue','rate'];
           const found = oddsFields.filter(k => sel[k] !== undefined && sel[k] !== null);
           console.log(`  Odds fields present: [${found.join(', ')}]`);
@@ -751,14 +781,12 @@ function BookingCodePanel() {
     const mapped = enriched.map((s) => {
       const odds = extractOdds(s);
 
-      // matchId: API uses fixture_id for admin/booking selections
       const matchId = String(
         s.matchId    ?? s.match_id   ??
         s.fixtureId  ?? s.fixture_id ??
         ''
       );
 
-      // selection: CORRECT_SCORE bets use `pick` (e.g. "3-1"), others use `selection`
       const selection = String(
         s.selection ?? s.pick ?? s.name ?? s.label ?? ''
       );
@@ -926,13 +954,9 @@ function SlipTab() {
     log('SlipTab', 'Placing bet. Slip:', betSlip);
 
     try {
-      // Re-fetch fresh odds for selections that have a real matchId.
-      // Booking-code selections (fixture_id based) may not have a matchId,
-      // so we skip the verification call for those and use the stored odds.
       const verifiedSelections = await Promise.all(
         betSlip.map(async (s) => {
           if (!s.matchId) {
-            // No matchId — booking code / admin selection; trust the stored odd.
             log('SlipTab', `Skipping odds verification for "${s.market}: ${s.selection}" (no matchId) — using stored odd: ${s.odd}`);
             return {
               matchId:       s.matchId,
@@ -978,7 +1002,7 @@ function SlipTab() {
         currency:   'GHS',
         selections: verifiedSelections.map(s => ({
           matchId:       s.matchId,
-          fixtureId:     s.matchId,   // alias — backend may accept either
+          fixtureId:     s.matchId,
           market:        s.market,
           selection:     s.selection,
           submittedOdds: s.submittedOdds,
@@ -1029,7 +1053,7 @@ function SlipTab() {
   // ── Empty slip ────────────────────────────────────────────────────────────
   if (betSlip.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+      <div className="flex flex-col items-center justify-center py-10 text-center px-6">
         <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
           <ReceiptLongIcon className="text-slate-400" sx={{ fontSize: 28 }} />
         </div>
@@ -1040,11 +1064,11 @@ function SlipTab() {
         <Link to="/" className="btn-primary px-5 py-2.5 text-sm rounded-xl flex items-center gap-2">
           <SportsSoccerIcon fontSize="small" /> Browse Matches
         </Link>
-        {user && (
-          <div className="w-full mt-6">
-            <BookingCodePanel />
-          </div>
-        )}
+
+        {/* ── Booking code always visible, regardless of login state ── */}
+        <div className="w-full mt-6">
+          <BookingCodePanel />
+        </div>
       </div>
     );
   }

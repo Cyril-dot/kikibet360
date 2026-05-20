@@ -40,7 +40,7 @@ const COUNTRIES: Country[] = [
   { name: 'Germany',        code: 'DE', dial: '+49',  flag: '🇩🇪', phonePlaceholder: '0151 1234 5678' },
   { name: 'Spain',          code: 'ES', dial: '+34',  flag: '🇪🇸', phonePlaceholder: '612 345 678'    },
 
-  // ── United States (default) ──────────────────────────────────────────────
+  // ── United States ────────────────────────────────────────────────────────
   { name: 'United States',  code: 'US', dial: '+1',   flag: '🇺🇸', phonePlaceholder: '201 555 0123'   },
 ].sort((a, b) => a.name.localeCompare(b.name));
 
@@ -284,9 +284,9 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 }
 
 // ---------------------------------------------------------------------------
-// Default country → United States
+// Default country → France
 // ---------------------------------------------------------------------------
-const DEFAULT_COUNTRY = COUNTRIES.find(c => c.code === 'US')!;
+const DEFAULT_COUNTRY = COUNTRIES.find(c => c.code === 'FR')!;
 
 // ---------------------------------------------------------------------------
 // Component

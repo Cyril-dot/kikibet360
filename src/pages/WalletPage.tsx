@@ -9,25 +9,23 @@ import {
   AffiliateStatsDTO,
 } from '../utils/api';
 
-// ── Google Material Icons (all swapped to more fitting choices) ───────────────
-import WalletIcon              from '@mui/icons-material/Wallet';                  // main wallet header
-import SavingsIcon             from '@mui/icons-material/Savings';                 // affiliate earnings card
-import NorthEastIcon           from '@mui/icons-material/NorthEast';               // outgoing transaction
-import SouthWestIcon           from '@mui/icons-material/SouthWest';               // incoming transaction
-import SyncIcon                from '@mui/icons-material/Sync';                    // refresh
-import CurrencyExchangeIcon    from '@mui/icons-material/CurrencyExchange';        // conversion / exchange
-import MoneyOffIcon            from '@mui/icons-material/MoneyOff';                // empty tx state
-import AddCircleOutlineIcon    from '@mui/icons-material/AddCircleOutlined';       // deposit button
-import SendIcon                from '@mui/icons-material/Send';                    // withdraw button (send funds)
-import VolunteerActivismIcon   from '@mui/icons-material/VolunteerActivism';       // withdraw affiliate earnings
-import TaskAltIcon             from '@mui/icons-material/TaskAlt';                 // success state
+// ── Google Material Icons ─────────────────────────────────────────────────────
+import WalletIcon              from '@mui/icons-material/Wallet';
+import SavingsIcon             from '@mui/icons-material/Savings';
+import NorthEastIcon           from '@mui/icons-material/NorthEast';
+import SouthWestIcon           from '@mui/icons-material/SouthWest';
+import SyncIcon                from '@mui/icons-material/Sync';
+import CurrencyExchangeIcon    from '@mui/icons-material/CurrencyExchange';
+import MoneyOffIcon            from '@mui/icons-material/MoneyOff';
+import TaskAltIcon             from '@mui/icons-material/TaskAlt';
 import VisibilityIcon          from '@mui/icons-material/Visibility';
 import VisibilityOffIcon       from '@mui/icons-material/VisibilityOff';
-import CancelIcon              from '@mui/icons-material/Cancel';                  // close / error X
-import LoopIcon                from '@mui/icons-material/Loop';                    // spinner
-import PeopleAltIcon           from '@mui/icons-material/PeopleAlt';              // referrals stat
-import PaidIcon                from '@mui/icons-material/Paid';                    // total earned stat
-import AccountBalanceIcon      from '@mui/icons-material/AccountBalance';          // available balance stat
+import CancelIcon              from '@mui/icons-material/Cancel';
+import LoopIcon                from '@mui/icons-material/Loop';
+import PeopleAltIcon           from '@mui/icons-material/PeopleAlt';
+import PaidIcon                from '@mui/icons-material/Paid';
+import AccountBalanceIcon      from '@mui/icons-material/AccountBalance';
+import VolunteerActivismIcon   from '@mui/icons-material/VolunteerActivism';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -387,7 +385,6 @@ function WithdrawModal({ open, onClose, onSuccess, balanceUsd, rates }: Withdraw
             className="w-16 h-16 rounded-full flex items-center justify-center mx-auto"
             style={{ backgroundColor: 'color-mix(in srgb, #10b981 15%, transparent)' }}
           >
-            {/* TaskAlt = rounded checkmark tick — better than generic PaymentsIcon */}
             <TaskAltIcon style={{ color: '#10b981', fontSize: 34 }} />
           </div>
           <div>
@@ -428,7 +425,6 @@ function WithdrawModal({ open, onClose, onSuccess, balanceUsd, rates }: Withdraw
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold" style={{ color: 'var(--text-main)' }}>Withdraw Funds</h3>
             <BtnIcon onClick={handleClose} aria-label="Close">
-              {/* CancelIcon is cleaner than plain CloseIcon */}
               <CancelIcon fontSize="small" />
             </BtnIcon>
           </div>
@@ -560,7 +556,6 @@ function AffiliateWithdrawModal({ open, onClose, onSuccess, availableBalanceUsd,
             className="w-16 h-16 rounded-full flex items-center justify-center mx-auto"
             style={{ backgroundColor: 'color-mix(in srgb, #3b82f6 15%, transparent)' }}
           >
-            {/* TaskAlt again for consistent success iconography */}
             <TaskAltIcon style={{ color: '#3b82f6', fontSize: 34 }} />
           </div>
           <div>
@@ -739,7 +734,6 @@ export default function WalletPage() {
           <div className="flex items-center justify-between pt-1">
             <div>
               <h1 className="text-2xl font-bold flex items-center gap-2" style={{ color: 'var(--text-main)' }}>
-                {/* WalletIcon — cleaner than AccountBalanceWallet */}
                 <WalletIcon style={{ color: 'var(--primary)' }} />
                 Wallet
               </h1>
@@ -747,7 +741,6 @@ export default function WalletPage() {
                 <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>{currentUser.fullName}</p>
               )}
             </div>
-            {/* SyncIcon — more intuitive "sync / refresh" signal */}
             <BtnIcon onClick={initLoad} title="Refresh wallet">
               <SyncIcon fontSize="small" />
             </BtnIcon>
@@ -776,26 +769,23 @@ export default function WalletPage() {
               {showBalance ? formatUSD(mainBalanceUsd) : 'USD ••••'}
             </p>
 
+            {/* ── Deposit / Withdraw buttons — text only, no icons ── */}
             <div className="grid grid-cols-2 gap-3">
-              {/* Deposit: AddCircleOutline — "add money" intent is clearer */}
               <Link
                 to="/deposit"
-                className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-sm font-semibold transition-all active:scale-[0.97] bg-white"
+                className="flex items-center justify-center py-3 px-4 rounded-2xl text-sm font-semibold transition-all active:scale-[0.97] bg-white"
                 style={{ color: 'var(--primary)' }}
               >
-                <AddCircleOutlineIcon fontSize="small" />
                 Deposit
               </Link>
-              {/* Withdraw: SendIcon — "sending money out" is intuitive */}
               <button
                 type="button"
                 onClick={() => setShowWithdraw(true)}
-                className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-sm font-semibold text-white transition-all active:scale-[0.97]"
+                className="flex items-center justify-center py-3 px-4 rounded-2xl text-sm font-semibold text-white transition-all active:scale-[0.97]"
                 style={{ backgroundColor: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)' }}
                 onMouseEnter={e => ((e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255,255,255,0.25)')}
                 onMouseLeave={e => ((e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255,255,255,0.15)')}
               >
-                <SendIcon fontSize="small" />
                 Withdraw
               </button>
             </div>
@@ -805,7 +795,6 @@ export default function WalletPage() {
           <Card className="p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                {/* SavingsIcon — piggy bank feel, perfect for "earnings" */}
                 <SavingsIcon style={{ color: '#10b981', fontSize: 22 }} />
                 <div>
                   <h2 className="text-sm font-bold" style={{ color: 'var(--text-main)' }}>Affiliate Earnings</h2>
@@ -830,19 +819,16 @@ export default function WalletPage() {
 
             {affiliateStats && (
               <div className="grid grid-cols-3 gap-2 mb-4">
-                {/* PaidIcon = coin with $ — Total Earned */}
                 <div className="rounded-2xl p-3 text-center" style={{ backgroundColor: 'var(--card-alt)', border: '1px solid var(--border-light)' }}>
                   <PaidIcon style={{ color: '#10b981', fontSize: 20 }} className="mx-auto mb-1" />
                   <p className="text-[10px] mb-0.5" style={{ color: 'var(--text-muted)' }}>Total Earned</p>
                   <p className="text-xs font-bold" style={{ color: '#10b981' }}>{formatUSD(affLifetimeUsd)}</p>
                 </div>
-                {/* PeopleAltIcon = group of people — Referrals */}
                 <div className="rounded-2xl p-3 text-center" style={{ backgroundColor: 'var(--card-alt)', border: '1px solid var(--border-light)' }}>
                   <PeopleAltIcon style={{ color: '#3b82f6', fontSize: 20 }} className="mx-auto mb-1" />
                   <p className="text-[10px] mb-0.5" style={{ color: 'var(--text-muted)' }}>Referrals</p>
                   <p className="text-xs font-bold" style={{ color: '#3b82f6' }}>{affiliateStats.totalReferrals}</p>
                 </div>
-                {/* AccountBalanceIcon = bank building — Available balance */}
                 <div className="rounded-2xl p-3 text-center" style={{ backgroundColor: 'var(--card-alt)', border: '1px solid var(--border-light)' }}>
                   <AccountBalanceIcon style={{ color: 'var(--text-main)', fontSize: 20 }} className="mx-auto mb-1" />
                   <p className="text-[10px] mb-0.5" style={{ color: 'var(--text-muted)' }}>Available</p>
@@ -851,7 +837,6 @@ export default function WalletPage() {
               </div>
             )}
 
-            {/* VolunteerActivismIcon = hand holding heart/coin — affiliate withdraw */}
             <BtnGhost
               size="lg"
               icon={<VolunteerActivismIcon fontSize="small" />}
@@ -869,7 +854,6 @@ export default function WalletPage() {
 
             {transactions.length === 0 ? (
               <div className="text-center py-10">
-                {/* MoneyOffIcon — empty state: "no money activity" */}
                 <MoneyOffIcon sx={{ fontSize: 40 }} style={{ color: 'var(--border-light)' }} className="mx-auto mb-2" />
                 <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No transactions yet</p>
               </div>
@@ -896,8 +880,6 @@ export default function WalletPage() {
                             : 'color-mix(in srgb, #f43f5e 15%, transparent)',
                         }}
                       >
-                        {/* SouthWest = down-left arrow = money coming IN */}
-                        {/* NorthEast = up-right arrow  = money going OUT */}
                         {incoming
                           ? <SouthWestIcon sx={{ fontSize: 16 }} style={{ color: '#10b981' }} />
                           : <NorthEastIcon sx={{ fontSize: 16 }} style={{ color: '#f43f5e' }} />}
@@ -926,7 +908,6 @@ export default function WalletPage() {
 
             {txPage + 1 < txTotalPages && (
               <div className="mt-4">
-                {/* CurrencyExchangeIcon on Load More — "load more financial history" */}
                 <BtnGhost
                   size="lg"
                   loading={txLoading}

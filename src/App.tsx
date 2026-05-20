@@ -19,6 +19,15 @@ import AdminModal from './pages/AdminModal';
 // GameRunner lives at src/games/GameRunner.tsx
 import GameRunner from './games/GameRunner';
 
+// ---------------------------------------------------------------------------
+// Stub pages for footer links – replace with real pages when ready
+// ---------------------------------------------------------------------------
+const StubPage = ({ title }: { title: string }) => (
+  <div className="flex items-center justify-center min-h-[60vh]">
+    <h1 className="text-2xl font-bold" style={{ color: 'var(--text-main)' }}>{title}</h1>
+  </div>
+);
+
 function App() {
   const theme = useAppStore((s) => s.theme);
 
@@ -33,20 +42,34 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route element={<Layout />}>
-          <Route path="/" element={<HomePage />} />
+          {/* ── Core pages ── */}
+          <Route path="/"          element={<HomePage />} />
           <Route path="/match/:id" element={<MatchDetailsPage />} />
-          <Route path="/live" element={<LiveMatchesPage />} />
-          <Route path="/betslip" element={<BetSlipPage />} />
-          <Route path="/wallet" element={<WalletPage />} />
-          <Route path="/deposit" element={<DepositPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/account" element={<AccountPage />} />
-          <Route path="/casino" element={<CasinoPage />} />
-          <Route path="/promos" element={<PromosPage />} />
+          <Route path="/live"      element={<LiveMatchesPage />} />
+          <Route path="/betslip"   element={<BetSlipPage />} />
+          <Route path="/wallet"    element={<WalletPage />} />
+          <Route path="/deposit"   element={<DepositPage />} />
+          <Route path="/register"  element={<RegisterPage />} />
+          <Route path="/login"     element={<LoginPage />} />
+          <Route path="/account"   element={<AccountPage />} />
+          <Route path="/casino"    element={<CasinoPage />} />
+          <Route path="/promos"    element={<PromosPage />} />
           <Route path="/affiliate" element={<AffiliatePage />} />
 
-          {/* All games resolved via slug → GameRunner */}
+          {/* ── Footer quick links ── */}
+          <Route path="/sports"      element={<StubPage title="Sports" />} />
+          <Route path="/live-tv"     element={<StubPage title="Live TV" />} />
+          <Route path="/jackpot"     element={<StubPage title="Jackpot" />} />
+
+          {/* ── Footer company links ── */}
+          <Route path="/about"       element={<StubPage title="About Us" />} />
+          <Route path="/terms"       element={<StubPage title="Terms & Conditions" />} />
+          <Route path="/privacy"     element={<StubPage title="Privacy Policy" />} />
+          <Route path="/cookies"     element={<StubPage title="Cookie Policy" />} />
+          <Route path="/responsible" element={<StubPage title="Responsible Gaming" />} />
+          <Route path="/faq"         element={<StubPage title="FAQ" />} />
+
+          {/* ── All games resolved via slug → GameRunner ── */}
           <Route path="/games/:slug" element={<GameRunner />} />
         </Route>
       </Routes>

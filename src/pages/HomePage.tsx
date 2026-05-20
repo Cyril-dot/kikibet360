@@ -6,13 +6,16 @@ import RightSidebar from '../components/home/RightSidebar';
 
 export default function HomePage() {
   return (
-    <div className="flex">
-      <div className="flex-1 min-w-0">
-        <HeroCarousel />
-        <LeagueCards />
-        <MatchList />
+    <>
+      <SportsCategoryBar />
+      <div className="flex">
+        <div className="flex-1 min-w-0">
+          <HeroCarousel />
+          <LeagueCards />
+          <MatchList />
+        </div>
+        <RightSidebar />
       </div>
-      <RightSidebar />
-    </div>
+    </>
   );
 }
