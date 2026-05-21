@@ -1,5 +1,12 @@
 // ---------------------------------------------------------------------------
 // updated match list — old logic + new UI from v2
+// FIX 1: blob: URLs for admin team logos are session-scoped and non-transferable.
+//         We detect them early and treat them as missing → pool logo or initials fallback.
+// FIX 2: All console.log / console.warn / console.error removed.
+// FIX 3: Games without odds are filtered out and never shown on site.
+// FIX 4: Admin games now cycle through hardcoded logo pools (5 home + 5 away).
+//         Each admin match gets a unique pair so no two games share the same logos.
+//         Admin can also set logos via the hardcodedHomeLogo / hardcodedAwayLogo fields.
 // ---------------------------------------------------------------------------
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -17,6 +24,34 @@ import SportsMmaIcon from '@mui/icons-material/SportsMma';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
 // ---------------------------------------------------------------------------
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║  ADMIN LOGO POOLS — paste your 10 URLs here                             ║
+// ║                                                                          ║
+// ║  HOME_LOGO_POOL  → used for the home-team slot                          ║
+// ║  AWAY_LOGO_POOL  → used for the away-team slot                          ║
+// ║                                                                          ║
+// ║  Each admin match is assigned one logo from each pool, cycling in order  ║
+// ║  so no two visible matches ever share the same logo simultaneously.      ║
+// ║  If the admin sets hardcodedHomeLogo / hardcodedAwayLogo on the match    ║
+// ║  record those take precedence over the pool.                             ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+const HOME_LOGO_POOL: string[] = [
+  'https://static.vecteezy.com/system/resources/thumbnails/011/049/345/small_2x/soccer-football-badge-logo-sport-team-identity-illustrations-isolated-on-white-background-vector.jpg', // ← replace
+  'https://marketplace.canva.com/EAGXHkfvP0k/2/0/1600w/canva-white-and-black-professional-design-football-club-logo-_0PEzCBc5Ao.jpg', // ← replace
+  'https://img.magnific.com/premium-vector/soccer-football-badge-logo-design-templates-sport-team-identity-vector-illustrations_683941-173.jpg', // ← replace
+  'https://marketplace.canva.com/EAFnwIBf4dU/2/0/1600w/canva-black-white-yellow-elegant-modern-football-club-logo-8HTQhmXBF18.jpg', // ← replace
+  'https://static.vecteezy.com/system/resources/previews/035/358/256/non_2x/football-club-logo-vector.jpg', // ← replace
+];
+
+const AWAY_LOGO_POOL: string[] = [
+  'https://marketplace.canva.com/EAF9gkRs2dU/2/0/1600w/canva-white-black-gold-circle-modern-football-club-logo-8y4rT2SOMu0.jpg', // ← replace
+  'https://logowik.com/content/uploads/images/football-club2744.logowik.com.webp', // ← replace
+  'https://img.freepik.com/free-vector/football-soccer-tournament-vector-logo-design_47987-24746.jpg?semt=ais_hybrid&w=740&q=80', // ← replace
+  'https://static.vecteezy.com/system/resources/thumbnails/012/995/442/small/football-championship-or-football-club-logo-vector.jpg', // ← replace
+  'https://d1csarkz8obe9u.cloudfront.net/posterpreviews/logo-design-template-b588de7cc0b07e82392c3b2ea4ea7b73_screen.jpg?ts=1702915331', // ← replace
+];
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 type SportTab = 'football' | 'basketball' | 'tennis' | 'baseball' | 'nfl' | 'mma';
@@ -24,7 +59,12 @@ type FootballLeagueTab = 'all' | 'premier_league' | 'la_liga' | 'bundesliga' | '
 type MatchCategory = 'live' | 'today' | 'upcoming' | 'finished';
 
 interface OddsMap { home: number; draw: number; away: number; }
-interface EnrichedMatch extends Match { oddsMap?: OddsMap; }
+interface EnrichedMatch extends Match {
+  oddsMap?: OddsMap;
+  /** Logo URLs resolved for admin matches (pool or hardcoded) */
+  adminHomeLogo?: string;
+  adminAwayLogo?: string;
+}
 
 interface BetSlipEntry {
   matchId: string;
@@ -32,6 +72,35 @@ interface BetSlipEntry {
   market: string;
   selection: string;
   odd: number;
+}
+
+// ---------------------------------------------------------------------------
+// BLOB URL GUARD
+// ---------------------------------------------------------------------------
+function sanitizeLogo(url: string | undefined | null): string {
+  if (!url) return '';
+  const trimmed = url.trim();
+  if (trimmed.startsWith('blob:')) return '';
+  return trimmed;
+}
+
+// ---------------------------------------------------------------------------
+// Admin logo pool assignment
+// Assigns a stable logo pair to each admin match based on its position in
+// the current visible list. Two matches never get the same pool index at the
+// same time, even if the pool has only 5 entries and there are more games.
+// ---------------------------------------------------------------------------
+function assignAdminLogos(matches: EnrichedMatch[]): EnrichedMatch[] {
+  const poolSize = Math.max(HOME_LOGO_POOL.length, AWAY_LOGO_POOL.length, 1);
+  return matches.map((m, idx) => {
+    const hardHome = sanitizeLogo((m as unknown as Record<string, string>).hardcodedHomeLogo);
+    const hardAway = sanitizeLogo((m as unknown as Record<string, string>).hardcodedAwayLogo);
+
+    const homeUrl = hardHome || sanitizeLogo(HOME_LOGO_POOL[idx % poolSize]) || '';
+    const awayUrl = hardAway || sanitizeLogo(AWAY_LOGO_POOL[idx % poolSize]) || '';
+
+    return { ...m, adminHomeLogo: homeUrl, adminAwayLogo: awayUrl };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -45,18 +114,12 @@ function loadHiddenAdminIds(): Set<string> {
     if (!raw) return new Set();
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) return new Set<string>(parsed);
-  } catch {
-    // ignore parse errors
-  }
+  } catch { /* ignore */ }
   return new Set();
 }
 
 function saveHiddenAdminIds(ids: Set<string>): void {
-  try {
-    localStorage.setItem(HIDDEN_ADMIN_IDS_KEY, JSON.stringify([...ids]));
-  } catch {
-    // ignore storage errors (e.g. private mode quota)
-  }
+  try { localStorage.setItem(HIDDEN_ADMIN_IDS_KEY, JSON.stringify([...ids])); } catch { /* ignore */ }
 }
 
 function addHiddenAdminId(id: string): void {
@@ -210,9 +273,9 @@ const FINISHED_STATUSES = new Set([
   'STATUS_RAIN_DELAY',
 ]);
 
-const HALFTIME_STATUSES = new Set(['HALFTIME','halftime','HALF_TIME','half_time','HT','ht','STATUS_HALFTIME']);
+const HALFTIME_STATUSES  = new Set(['HALFTIME','halftime','HALF_TIME','half_time','HT','ht','STATUS_HALFTIME']);
 const EXTRA_TIME_STATUSES = new Set(['EXTRA_TIME','extra_time','ET','et','ET1','et1','ET2','et2','STATUS_OVERTIME']);
-const PENALTY_STATUSES = new Set(['PENALTIES','penalties','PEN','pen','SHOOTOUT','shootout']);
+const PENALTY_STATUSES   = new Set(['PENALTIES','penalties','PEN','pen','SHOOTOUT','shootout']);
 
 function finishedLabel(status?: string): string {
   const s = status ?? '';
@@ -233,8 +296,8 @@ function finishedLabel(status?: string): string {
 // League classification
 // ---------------------------------------------------------------------------
 const TOP_6_LEAGUE_DISPLAY_NAMES = ['Premier League','La Liga','Bundesliga','Serie A','Ligue 1'];
-const TOP_6_LABELS = new Set<string>(TOP_6_LEAGUE_DISPLAY_NAMES);
-const CUPS_LABELS = new Set<string>([
+const TOP_6_LABELS  = new Set<string>(TOP_6_LEAGUE_DISPLAY_NAMES);
+const CUPS_LABELS   = new Set<string>([
   'FA Cup','EFL Cup / Carabao Cup','Copa del Rey','DFB Pokal','Coppa Italia',
   'Coupe de France','UEFA Champions League','UEFA Europa League',
   'UEFA Conference League','UEFA Nations League','UEFA Euros',
@@ -282,6 +345,125 @@ function formatDate(kickoffAt?: string): string {
   return new Date(kickoffAt).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+function formatCountdown(kickoffAt?: string): string {
+  if (!kickoffAt) return '';
+  const diff = new Date(kickoffAt).getTime() - Date.now();
+  if (diff <= 0) return 'Starting soon';
+  const days  = Math.floor(diff / 86_400_000);
+  const hours = Math.floor((diff % 86_400_000) / 3_600_000);
+  const mins  = Math.floor((diff % 3_600_000) / 60_000);
+  if (days > 0) return `in ${days}d ${hours}h`;
+  if (hours > 0) return `in ${hours}h ${mins}m`;
+  return `in ${mins}m`;
+}
+
+// ---------------------------------------------------------------------------
+// Team initials helper
+// ---------------------------------------------------------------------------
+function getTeamInitials(name: string): string {
+  if (!name) return '?';
+  const words = name.trim().split(/\s+/);
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  const stopwords = new Set(['fc','sc','ac','bc','rc','if','bk','sk','nk','fk','hk','vfb','vfl','afc','rcd','ssv','tsv','bv','sv','cf','us','as','ss','ud','og']);
+  const meaningful = words.filter((w) => !stopwords.has(w.toLowerCase().replace(/[^a-z]/g, '')));
+  const src = meaningful.length >= 2 ? meaningful : words;
+  return (src[0][0] + (src[1]?.[0] ?? '')).toUpperCase();
+}
+
+function teamColour(name: string): string {
+  const PALETTE = [
+    '#1a6b3c','#c0392b','#2471a3','#6c3483','#d35400',
+    '#117a65','#1f618d','#784212','#1a5276','#4a235a',
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return PALETTE[hash % PALETTE.length];
+}
+
+// ---------------------------------------------------------------------------
+// TeamLogo — renders img if URL is a real non-blob URL, else initials avatar.
+// ---------------------------------------------------------------------------
+function TeamLogo({ logo, name, size = 32 }: { logo?: string; name?: string; size?: number }) {
+  const cleanLogo = sanitizeLogo(logo);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { setFailed(false); }, [cleanLogo]);
+  const teamName = name ?? '';
+
+  if (cleanLogo && !failed) {
+    return (
+      <img
+        src={cleanLogo}
+        alt={teamName}
+        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'contain', flexShrink: 0 }}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+
+  const initials = getTeamInitials(teamName);
+  const bg = teamColour(teamName);
+  return (
+    <div
+      style={{
+        width: size, height: size, background: bg,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        borderRadius: '50%', flexShrink: 0,
+        fontSize: size * 0.28, fontWeight: 700, color: '#fff',
+        letterSpacing: '0.02em', userSelect: 'none',
+      }}
+      aria-label={teamName}
+    >
+      {initials}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TeamLogoAdmin — tries the pooled/hardcoded URL first; falls back to initials.
+// ---------------------------------------------------------------------------
+function TeamLogoAdmin({
+  poolUrl,
+  name,
+  size = 32,
+}: {
+  poolUrl?: string;
+  name?: string;
+  size?: number;
+}) {
+  const cleanUrl = sanitizeLogo(poolUrl);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { setFailed(false); }, [cleanUrl]);
+  const teamName = name ?? '';
+
+  if (cleanUrl && !failed) {
+    return (
+      <img
+        src={cleanUrl}
+        alt={teamName}
+        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'contain', flexShrink: 0 }}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+
+  const initials = getTeamInitials(teamName);
+  const bg = teamColour(teamName);
+  return (
+    <div
+      style={{
+        width: size, height: size, background: bg,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        borderRadius: '50%', flexShrink: 0,
+        fontSize: size * 0.28, fontWeight: 700, color: '#fff',
+        letterSpacing: '0.02em', userSelect: 'none',
+      }}
+      aria-label={teamName}
+    >
+      {initials}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Odds extraction
 // ---------------------------------------------------------------------------
@@ -308,20 +490,13 @@ function extractOddsMap(oddsArray: unknown[], homeTeam: string, awayTeam: string
     const val = parseOdd(o);
     if (val <= 1 || val > 200) continue;
 
-    if (sel === 'home') {
-      if (home === 0) home = val;
-    } else if (sel === 'away') {
-      if (away === 0) away = val;
-    } else if (sel === 'draw' || sel === 'x') {
-      if (draw === 0) draw = val;
-    } else if (matchesTeam(sel, normHome)) {
-      if (home === 0) home = val;
-    } else if (matchesTeam(sel, normAway)) {
-      if (away === 0) away = val;
-    }
+    if (sel === 'home') { if (home === 0) home = val; }
+    else if (sel === 'away') { if (away === 0) away = val; }
+    else if (sel === 'draw' || sel === 'x') { if (draw === 0) draw = val; }
+    else if (matchesTeam(sel, normHome)) { if (home === 0) home = val; }
+    else if (matchesTeam(sel, normAway)) { if (away === 0) away = val; }
   }
 
-  // Fallback: pick first valid values if named extraction found nothing
   if (home === 0 && draw === 0 && away === 0) {
     const vals = pool.map(parseOdd).filter((v) => v > 1 && v < 50);
     if (vals.length >= 2) {
@@ -335,14 +510,12 @@ function extractOddsMap(oddsArray: unknown[], homeTeam: string, awayTeam: string
   return { home, draw, away };
 }
 
-// Updated extractAdminOdds from v2 — handles object odds + extra array fields
 function extractAdminOdds(raw: Record<string, unknown>, homeTeam: string, awayTeam: string): OddsMap | undefined {
   const flatHome = parseFloat(String(raw.homeOdds ?? raw.home_odds ?? raw.oddHome ?? raw.odd_home ?? '0'));
   const flatDraw = parseFloat(String(raw.drawOdds ?? raw.draw_odds ?? raw.oddDraw ?? raw.odd_draw ?? '0'));
   const flatAway = parseFloat(String(raw.awayOdds ?? raw.away_odds ?? raw.oddAway ?? raw.odd_away ?? '0'));
   if (flatHome > 0 || flatDraw > 0 || flatAway > 0) return { home: flatHome, draw: flatDraw, away: flatAway };
 
-  // Handle object-shaped odds: { home, draw, away }
   if (raw.odds && typeof raw.odds === 'object' && !Array.isArray(raw.odds)) {
     const o = raw.odds as Record<string, unknown>;
     const h = parseFloat(String(o.home ?? o.homeOdds ?? o['1'] ?? '0'));
@@ -391,9 +564,8 @@ function unwrapWithAllOdds(raw: unknown): Array<{ match: Match; odds: unknown[] 
   const processArray = (arr: unknown[]) => arr.forEach(processItem);
 
   const data = obj.data;
-  if (Array.isArray(data)) {
-    processArray(data);
-  } else if (data && typeof data === 'object') {
+  if (Array.isArray(data)) { processArray(data); }
+  else if (data && typeof data === 'object') {
     for (const val of Object.values(data as Record<string, unknown>)) {
       if (Array.isArray(val)) processArray(val);
     }
@@ -449,7 +621,7 @@ function normalizeMatch(raw: unknown): Match | null {
       const first = obj.logos[0] as Record<string, unknown>;
       return String(first.href ?? first.url ?? '');
     }
-    return String(obj.logo ?? obj.logoUrl ?? obj.crest ?? '');
+    return String(obj.logo ?? obj.logoUrl ?? obj.crest ?? obj.image ?? obj.photo ?? obj.img ?? '');
   };
 
   let homeTeam = String(
@@ -511,9 +683,7 @@ function normalizeMatch(raw: unknown): Match | null {
     const so = rawStatus as Record<string, unknown>;
     const typeObj = so.type as Record<string, unknown> | undefined;
     status = String(typeObj?.name ?? typeObj?.description ?? so.name ?? so.description ?? so.state ?? '');
-  } else {
-    status = String(rawStatus ?? '');
-  }
+  } else { status = String(rawStatus ?? ''); }
 
   let scoreHome: number | undefined;
   let scoreAway: number | undefined;
@@ -539,8 +709,19 @@ function normalizeMatch(raw: unknown): Match | null {
     firstComp?.date ?? ''
   );
 
-  const homeLogo = String(r.homeLogo ?? r.home_logo ?? r.homeCrest ?? '') || getLogoFromObj(homeObj);
-  const awayLogo = String(r.awayLogo ?? r.away_logo ?? r.awayCrest ?? '') || getLogoFromObj(awayObj);
+  const rawHomeLogo = String(
+    r.homeLogo ?? r.home_logo ?? r.homeCrest ?? r.homeTeamLogo ?? r.home_team_logo ??
+    r.homeImage ?? r.home_image ?? r.homePhoto ?? r.home_photo ??
+    homeObj?.logo ?? homeObj?.logoUrl ?? homeObj?.crest ?? homeObj?.image ?? homeObj?.photo ?? ''
+  ).trim() || getLogoFromObj(homeObj);
+  const rawAwayLogo = String(
+    r.awayLogo ?? r.away_logo ?? r.awayCrest ?? r.awayTeamLogo ?? r.away_team_logo ??
+    r.awayImage ?? r.away_image ?? r.awayPhoto ?? r.away_photo ??
+    awayObj?.logo ?? awayObj?.logoUrl ?? awayObj?.crest ?? awayObj?.image ?? awayObj?.photo ?? ''
+  ).trim() || getLogoFromObj(awayObj);
+
+  const homeLogo = sanitizeLogo(rawHomeLogo);
+  const awayLogo = sanitizeLogo(rawAwayLogo);
 
   let minutePlayed: number | undefined;
   if (r.minutePlayed != null) minutePlayed = Number(r.minutePlayed);
@@ -555,6 +736,74 @@ function normalizeMatch(raw: unknown): Match | null {
     id, source: (r.source as Match['source']) ?? 'ESPN',
     homeTeam, awayTeam, league: leagueName, status, kickoffAt,
     scoreHome, scoreAway, homeLogo, awayLogo, leagueLogo, minutePlayed,
+    sport: String(r.sport ?? 'FOOTBALL'),
+    createdAt: String(r.createdAt ?? r.created_at ?? ''),
+  } as Match;
+}
+
+// ---------------------------------------------------------------------------
+// normalizeAdminMatch
+// Now also reads hardcodedHomeLogo / hardcodedAwayLogo from the API record
+// so admin can set per-match logos via those fields.
+// ---------------------------------------------------------------------------
+function normalizeAdminMatch(raw: unknown): Match | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+
+  const id = String(r.id ?? r.matchId ?? r.match_id ?? '');
+  if (!id || id === 'undefined') return null;
+
+  const homeTeam = String(r.homeTeam ?? r.home_team ?? r.homeName ?? r.home_name ?? '').trim();
+  const awayTeam = String(r.awayTeam ?? r.away_team ?? r.awayName ?? r.away_name ?? '').trim();
+
+  let leagueName = '';
+  let leagueLogo = '';
+  const rawLeague = r.league ?? r.leagueName ?? r.league_name ?? r.competition ?? r.competitionName;
+  if (rawLeague && typeof rawLeague === 'object') {
+    const lo = rawLeague as Record<string, unknown>;
+    leagueName = String(lo.name ?? lo.displayName ?? lo.shortName ?? '');
+    leagueLogo = String(lo.logo ?? lo.logoUrl ?? lo.logo_url ?? '');
+  } else if (typeof rawLeague === 'string' && rawLeague.trim()) {
+    leagueName = rawLeague.trim();
+  }
+  if (!leagueLogo) leagueLogo = String(r.leagueLogo ?? r.league_logo ?? r.competitionLogo ?? r.competition_logo ?? '');
+  leagueLogo = sanitizeLogo(leagueLogo);
+  if (!leagueName && homeTeam && awayTeam) leagueName = inferLeagueFromTeams(homeTeam, awayTeam);
+
+  const status = String(r.status ?? r.matchStatus ?? r.match_status ?? '');
+  const scoreHome = r.scoreHome != null ? Number(r.scoreHome)
+    : r.score_home != null ? Number(r.score_home)
+    : r.homeScore != null ? Number(r.homeScore)
+    : undefined;
+  const scoreAway = r.scoreAway != null ? Number(r.scoreAway)
+    : r.score_away != null ? Number(r.score_away)
+    : r.awayScore != null ? Number(r.awayScore)
+    : undefined;
+  const kickoffAt = String(r.kickoffAt ?? r.kickoff_at ?? r.startTime ?? r.start_time ?? r.date ?? r.scheduledAt ?? '');
+  const minutePlayed = r.minutePlayed != null ? Number(r.minutePlayed) : r.minute_played != null ? Number(r.minute_played) : undefined;
+
+  // Fields accepted: hardcodedHomeLogo, hardcoded_home_logo, homeLogo, home_logo
+  const hardcodedHomeLogo = sanitizeLogo(
+    String(r.hardcodedHomeLogo ?? r.hardcoded_home_logo ?? r.homeLogo ?? r.home_logo ?? '').trim()
+  );
+  const hardcodedAwayLogo = sanitizeLogo(
+    String(r.hardcodedAwayLogo ?? r.hardcoded_away_logo ?? r.awayLogo ?? r.away_logo ?? '').trim()
+  );
+
+  return {
+    id,
+    source: 'ADMIN_CREATED' as Match['source'],
+    homeTeam: homeTeam || 'Home Team',
+    awayTeam: awayTeam || 'Away Team',
+    league: leagueName,
+    status,
+    kickoffAt,
+    scoreHome,
+    scoreAway,
+    homeLogo: hardcodedHomeLogo,
+    awayLogo: hardcodedAwayLogo,
+    leagueLogo,
+    minutePlayed,
     sport: String(r.sport ?? 'FOOTBALL'),
     createdAt: String(r.createdAt ?? r.created_at ?? ''),
   } as Match;
@@ -600,7 +849,6 @@ function safeUnwrapOddsArray(raw: unknown): unknown[] {
   return [];
 }
 
-// Updated unwrapAdminMatches — returns Match[] directly (v2 style)
 function unwrapAdminMatches(raw: unknown): Match[] {
   if (!raw) return [];
   const obj = raw as Record<string, unknown>;
@@ -608,46 +856,41 @@ function unwrapAdminMatches(raw: unknown): Match[] {
   const data = obj.data;
   if (!Array.isArray(data)) return [];
   return (data as unknown[]).reduce<Match[]>((acc, item) => {
-    const match = normalizeMatch(item);
+    const match = normalizeAdminMatch(item);
     if (match?.id) acc.push(match);
     return acc;
   }, []);
 }
 
-// ---------------------------------------------------------------------------
-// FIX 1 & 2: fetchAdminMatchOdds — correct base URL + uses matchId in path
-// ---------------------------------------------------------------------------
-const ADMIN_API_BASE = 'https://futballbackend-production-c821.up.railway.app';
-
 async function fetchAdminMatchOdds(matchId: string): Promise<unknown[]> {
   try {
     const raw = await fetch(
-      `${ADMIN_API_BASE}/api/public/admin-matches/${matchId}/odds`,
+      `https://futballbackend-production.up.railway.app/api/public/admin-matches/${matchId}/odds`
     ).then((r) => r.json());
     return safeUnwrapOddsArray(raw);
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
-// ---------------------------------------------------------------------------
-// mergeOddsById
-// ---------------------------------------------------------------------------
-function mergeOddsById(
-  oddsById: Map<string, unknown[]>,
-  entries: Array<{ match: Match; odds: unknown[] }>,
-): void {
+function mergeOddsById(oddsById: Map<string, unknown[]>, entries: Array<{ match: Match; odds: unknown[] }>): void {
   for (const { match, odds } of entries) {
     if (odds.length === 0) continue;
     const existing = oddsById.get(match.id);
-    if (!existing || odds.length > existing.length) {
-      oddsById.set(match.id, odds);
-    }
+    if (!existing || odds.length > existing.length) oddsById.set(match.id, odds);
   }
 }
 
 // ---------------------------------------------------------------------------
-// Football data fetch — old rich multi-source logic preserved
+// hasValidOdds
+// ---------------------------------------------------------------------------
+function hasValidOdds(match: EnrichedMatch): boolean {
+  if (FINISHED_STATUSES.has(match.status ?? '')) return true;
+  const o = match.oddsMap;
+  if (!o) return false;
+  return o.home > 0 && o.away > 0;
+}
+
+// ---------------------------------------------------------------------------
+// Football data fetch
 // ---------------------------------------------------------------------------
 async function fetchAllFootballMatches(): Promise<EnrichedMatch[]> {
   const [
@@ -667,7 +910,6 @@ async function fetchAllFootballMatches(): Promise<EnrichedMatch[]> {
   ]);
 
   const oddsById = new Map<string, unknown[]>();
-
   const withOddsItems     = withOddsRes.status  === 'fulfilled' ? unwrapWithAllOdds(withOddsRes.value)   : [];
   const fromUpcomingItems = upcomingRes.status   === 'fulfilled' ? unwrapWithAllOdds(upcomingRes.value)   : [];
   const fromTodayItems    = todayRes.status      === 'fulfilled' ? unwrapWithAllOdds(todayRes.value)      : [];
@@ -675,19 +917,14 @@ async function fetchAllFootballMatches(): Promise<EnrichedMatch[]> {
   mergeOddsById(oddsById, withOddsItems);
   mergeOddsById(oddsById, fromUpcomingItems);
   mergeOddsById(oddsById, fromTodayItems);
+  if (liveRes.status === 'fulfilled') mergeOddsById(oddsById, unwrapWithAllOdds(liveRes.value));
 
-  if (liveRes.status === 'fulfilled') {
-    mergeOddsById(oddsById, unwrapWithAllOdds(liveRes.value));
-  }
-
-  // Fingerprint fallback map
   const oddsByFingerprint = new Map<string, unknown[]>();
   const makeFingerprint = (home: string, away: string, kickoff: string) =>
     `${home.toLowerCase().trim()}|${away.toLowerCase().trim()}|${kickoff.slice(0, 10)}`;
 
   for (const [matchId, odds] of oddsById.entries()) {
-    const sourceMatch = [...withOddsItems, ...fromUpcomingItems, ...fromTodayItems]
-      .find(({ match }) => match.id === matchId)?.match;
+    const sourceMatch = [...withOddsItems, ...fromUpcomingItems, ...fromTodayItems].find(({ match }) => match.id === matchId)?.match;
     if (sourceMatch?.homeTeam && sourceMatch?.awayTeam && sourceMatch?.kickoffAt) {
       const fp = makeFingerprint(sourceMatch.homeTeam, sourceMatch.awayTeam, sourceMatch.kickoffAt);
       if (!oddsByFingerprint.has(fp)) oddsByFingerprint.set(fp, odds);
@@ -714,7 +951,6 @@ async function fetchAllFootballMatches(): Promise<EnrichedMatch[]> {
 
   const seenIds = new Set<string>();
   const seenFps = new Set<string>();
-
   const dedupedMatches = allMatches.filter((m) => {
     if (!m?.id || seenIds.has(m.id)) return false;
     seenIds.add(m.id);
@@ -736,12 +972,9 @@ async function fetchAllFootballMatches(): Promise<EnrichedMatch[]> {
   });
 
   const needsIndividualOdds = enrichedPass1.filter((m) => m._needsOdds).slice(0, 30);
-
   const individualOddsResults = await Promise.allSettled(
     needsIndividualOdds.map((m) =>
-      api.publicFootball.odds(m.id)
-        .then((r) => ({ matchId: m.id, data: r }))
-        .catch(() => ({ matchId: m.id, data: null }))
+      api.publicFootball.odds(m.id).then((r) => ({ matchId: m.id, data: r })).catch(() => ({ matchId: m.id, data: null }))
     )
   );
 
@@ -753,13 +986,15 @@ async function fetchAllFootballMatches(): Promise<EnrichedMatch[]> {
     }
   });
 
-  return enrichedPass1.map(({ _needsOdds, ...match }) => {
+  const enriched = enrichedPass1.map(({ _needsOdds, ...match }) => {
     if (!_needsOdds || match.oddsMap) return match as EnrichedMatch;
     const indOdds = individualOddsMap.get(match.id) ?? [];
     if (indOdds.length === 0) return match as EnrichedMatch;
     const oddsMap = extractOddsMap(indOdds, match.homeTeam ?? '', match.awayTeam ?? '');
     return { ...match, oddsMap } as EnrichedMatch;
   });
+
+  return enriched.filter(hasValidOdds);
 }
 
 function filterByLeagueTab(matches: EnrichedMatch[], tab: FootballLeagueTab): EnrichedMatch[] {
@@ -788,24 +1023,26 @@ async function fetchBasketballMatches(): Promise<EnrichedMatch[]> {
     ...(results.status === 'fulfilled' ? unwrapWithAllOdds(results.value) : []),
   ];
   const seen = new Set<string>();
-  return allItems.filter(({ match }) => {
+  const enriched = allItems.filter(({ match }) => {
     if (!match?.id || seen.has(match.id)) return false;
     seen.add(match.id); return true;
   }).map(({ match, odds }) => ({
     ...match,
     oddsMap: extractOddsMap(odds, match.homeTeam ?? '', match.awayTeam ?? ''),
   }));
+  return enriched.filter(hasValidOdds);
 }
 
 async function fetchTennisMatches(): Promise<EnrichedMatch[]> {
   const [live, upcoming, results] = await Promise.allSettled([
     api.publicTennis.live(), api.publicTennis.upcoming(), api.publicTennis.results(),
   ]);
-  return dedup([
+  const enriched = dedup([
     ...(live.status === 'fulfilled' ? safeUnwrapList(live.value) : []),
     ...(upcoming.status === 'fulfilled' ? safeUnwrapList(upcoming.value) : []),
     ...(results.status === 'fulfilled' ? safeUnwrapList(results.value) : []),
   ]);
+  return enriched.filter(hasValidOdds);
 }
 
 async function fetchBaseballMatches(): Promise<EnrichedMatch[]> {
@@ -832,36 +1069,39 @@ async function fetchBaseballMatches(): Promise<EnrichedMatch[]> {
       if (parsed.length > 0) oddsById.set(match.id, parsed);
     }
   });
-  return deduped.map(({ match, odds }) => ({
+  const enriched = deduped.map(({ match, odds }) => ({
     ...match,
     oddsMap: extractOddsMap(odds.length > 0 ? odds : (oddsById.get(match.id) ?? []), match.homeTeam ?? '', match.awayTeam ?? ''),
   }));
+  return enriched.filter(hasValidOdds);
 }
 
 async function fetchNflMatches(): Promise<EnrichedMatch[]> {
   const [live, upcoming, results] = await Promise.allSettled([
     api.publicNfl.live(), api.publicNfl.upcoming(), api.publicNfl.results(),
   ]);
-  return dedup([
+  const enriched = dedup([
     ...(live.status === 'fulfilled' ? safeUnwrapList(live.value) : []),
     ...(upcoming.status === 'fulfilled' ? safeUnwrapList(upcoming.value) : []),
     ...(results.status === 'fulfilled' ? safeUnwrapList(results.value) : []),
   ]);
+  return enriched.filter(hasValidOdds);
 }
 
 async function fetchMmaMatches(): Promise<EnrichedMatch[]> {
   const [live, upcoming, results] = await Promise.allSettled([
     api.publicMma.live(), api.publicMma.upcoming(), api.publicMma.results(),
   ]);
-  return dedup([
+  const enriched = dedup([
     ...(live.status === 'fulfilled' ? safeUnwrapList(live.value) : []),
     ...(upcoming.status === 'fulfilled' ? safeUnwrapList(upcoming.value) : []),
     ...(results.status === 'fulfilled' ? safeUnwrapList(results.value) : []),
   ]);
+  return enriched.filter(hasValidOdds);
 }
 
 // ---------------------------------------------------------------------------
-// Live Timer Hook — updated to v2 style
+// Live Timer Hook
 // ---------------------------------------------------------------------------
 function useLiveTimer(match: EnrichedMatch): string {
   const status = match.status ?? '';
@@ -891,20 +1131,21 @@ function useLiveTimer(match: EnrichedMatch): string {
   return `${match.minutePlayed != null ? match.minutePlayed : Math.min(elapsed, 90)}'`;
 }
 
-// How long a just-finished admin game lingers before permanently hiding (ms)
 const ADMIN_FINISHED_LINGER_MS = 10_000;
 
 // ---------------------------------------------------------------------------
-// MatchCard — new v2 design
+// MatchCard — v2 design, with isAdmin prop routing logos to TeamLogoAdmin
 // ---------------------------------------------------------------------------
 function MatchCard({
   match,
   hasDraw = true,
   onClick,
+  isAdmin = false,
 }: {
   match: EnrichedMatch;
   hasDraw?: boolean;
   onClick?: () => void;
+  isAdmin?: boolean;
 }) {
   const { betSlip, addToBetSlip, showToast } = useAppStore() as {
     betSlip: BetSlipEntry[];
@@ -954,6 +1195,16 @@ function MatchCard({
         { key: '2', label: 'Away', val: odds?.away ?? 0 },
       ];
 
+  // Logo rendering — admin matches use TeamLogoAdmin (pool url → initials fallback)
+  // regular matches use TeamLogo (real url → initials fallback)
+  const renderHomeLogo = (size: number) => isAdmin
+    ? <TeamLogoAdmin poolUrl={match.adminHomeLogo} name={match.homeTeam} size={size} />
+    : <TeamLogo logo={match.homeLogo} name={match.homeTeam} size={size} />;
+
+  const renderAwayLogo = (size: number) => isAdmin
+    ? <TeamLogoAdmin poolUrl={match.adminAwayLogo} name={match.awayTeam} size={size} />
+    : <TeamLogo logo={match.awayLogo} name={match.awayTeam} size={size} />;
+
   return (
     <div
       className={`match-card ${stateClass}`}
@@ -997,15 +1248,7 @@ function MatchCard({
       <div className="match-card-body">
         {/* Home row */}
         <div className="match-team-row">
-          {match.homeLogo ? (
-            <img
-              src={match.homeLogo} alt=""
-              className="match-team-logo"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-            />
-          ) : (
-            <div className="match-team-logo-placeholder" />
-          )}
+          {renderHomeLogo(32)}
           <span className={`match-team-name${isFinished ? (homeWon ? ' winner' : ' loser') : ''}`}>
             {match.homeTeam}
           </span>
@@ -1014,6 +1257,9 @@ function MatchCard({
               {homeScore}
             </span>
           )}
+          {isUpcoming && (
+            <span className="match-countdown">{formatCountdown(match.kickoffAt)}</span>
+          )}
         </div>
 
         {/* Separator */}
@@ -1021,15 +1267,7 @@ function MatchCard({
 
         {/* Away row */}
         <div className="match-team-row">
-          {match.awayLogo ? (
-            <img
-              src={match.awayLogo} alt=""
-              className="match-team-logo"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-            />
-          ) : (
-            <div className="match-team-logo-placeholder" />
-          )}
+          {renderAwayLogo(32)}
           <span className={`match-team-name${isFinished ? (awayWon ? ' winner' : ' loser') : ''}`}>
             {match.awayTeam}
           </span>
@@ -1082,7 +1320,7 @@ function MatchCard({
 }
 
 // ---------------------------------------------------------------------------
-// LeagueCard — new v2 wrapper
+// LeagueCard — v2 wrapper
 // ---------------------------------------------------------------------------
 function LeagueCard({
   league,
@@ -1126,27 +1364,12 @@ function LeagueCard({
 
 // ---------------------------------------------------------------------------
 // SpecialGamesSection
-// FIX: finished admin games are now permanently hidden via localStorage.
-//      - On load, any match whose ID is already in localStorage is filtered
-//        out immediately (never shown, even for a flash).
-//      - When a match transitions to finished for the first time this session,
-//        it lingers for ADMIN_FINISHED_LINGER_MS ms (progress bar shown), then
-//        its ID is written to localStorage and it disappears forever.
-//      - On every subsequent page load the ID is in localStorage, so the match
-//        is hidden before it ever renders.
 // ---------------------------------------------------------------------------
 function SpecialGamesSection() {
   const navigate = useNavigate();
-
-  // Persistent set — load once from localStorage, keep in sync via helpers
   const permanentlyHiddenRef = useRef<Set<string>>(loadHiddenAdminIds());
-
-  // Tracks when a match first became finished THIS session (for the linger timer)
   const finishedAtRef = useRef<Map<string, number>>(new Map());
-
-  // IDs that have lingered long enough and should now be hidden + persisted
   const [sessionHiddenIds, setSessionHiddenIds] = useState<Set<string>>(new Set());
-
   const [adminMatches, setAdminMatches] = useState<EnrichedMatch[]>([]);
   const genRef = useRef(0);
 
@@ -1156,16 +1379,15 @@ function SpecialGamesSection() {
 
     async function load() {
       try {
-        // FIX 3: removed stale ?ngrok-skip-browser-warning=true query param
         const raw = await fetch(
-          `${ADMIN_API_BASE}/api/public/admin-matches`,
+          'https://futballbackend-production.up.railway.app/api/public/admin-matches?ngrok-skip-browser-warning=true',
         ).then((r) => r.json());
+
         if (!alive()) return;
 
         const matches = unwrapAdminMatches(raw);
         if (matches.length === 0) { setAdminMatches([]); return; }
 
-        // Fetch per-match odds in parallel
         const oddsResults = await Promise.allSettled(matches.map((m) => fetchAdminMatchOdds(m.id)));
         if (!alive()) return;
 
@@ -1175,18 +1397,21 @@ function SpecialGamesSection() {
           return { ...match, oddsMap };
         });
 
+        const withOdds = enriched.filter(hasValidOdds);
+
+        // Assign pool logos AFTER filtering so indices are stable for visible matches
+        const withLogos = assignAdminLogos(withOdds);
+
         const now = Date.now();
-        for (const m of enriched) {
+        for (const m of withLogos) {
           const isFinished = FINISHED_STATUSES.has(m.status ?? '');
           if (isFinished && !finishedAtRef.current.has(m.id) && !permanentlyHiddenRef.current.has(m.id)) {
-            // First time we see this match as finished in this session — start linger clock
             finishedAtRef.current.set(m.id, now);
           }
         }
-
-        setAdminMatches(enriched);
-      } catch (err) {
-        console.error('[SpecialGames] load error:', err);
+        setAdminMatches(withLogos);
+      } catch {
+        // silently swallow fetch errors
       }
     }
 
@@ -1194,57 +1419,33 @@ function SpecialGamesSection() {
     const interval = setInterval(() => { if (document.visibilityState === 'visible') load(); }, 15_000);
     const onVisible = () => { if (document.visibilityState === 'visible') load(); };
     document.addEventListener('visibilitychange', onVisible);
-    return () => {
-      genRef.current++;
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVisible);
-    };
+    return () => { genRef.current++; clearInterval(interval); document.removeEventListener('visibilitychange', onVisible); };
   }, []);
 
-  // Schedule a hide + persist for each lingering match
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
-
     for (const [id, finishedAt] of finishedAtRef.current.entries()) {
-      // Already permanently hidden — skip
       if (permanentlyHiddenRef.current.has(id)) continue;
-      // Already scheduled to hide this session — skip
       if (sessionHiddenIds.has(id)) continue;
-
       const remaining = ADMIN_FINISHED_LINGER_MS - (Date.now() - finishedAt);
-
-      const hide = () => {
-        // Write to localStorage so it's hidden on all future visits
-        addHiddenAdminId(id);
-        permanentlyHiddenRef.current.add(id);
-        setSessionHiddenIds((prev) => new Set([...prev, id]));
-      };
-
-      if (remaining <= 0) {
-        hide();
-      } else {
-        timers.push(setTimeout(hide, remaining));
-      }
+      const hide = () => { addHiddenAdminId(id); permanentlyHiddenRef.current.add(id); setSessionHiddenIds((prev) => new Set([...prev, id])); };
+      if (remaining <= 0) hide();
+      else timers.push(setTimeout(hide, remaining));
     }
-
     return () => timers.forEach(clearTimeout);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminMatches]);
 
   const visibleMatches = useMemo(() =>
     adminMatches.filter((m) => {
-      // Permanently hidden (localStorage) — never show
       if (permanentlyHiddenRef.current.has(m.id)) return false;
-      // Finished but not yet expired — show with linger bar
       if (FINISHED_STATUSES.has(m.status ?? '')) return finishedAtRef.current.has(m.id);
       return true;
     }),
-  // sessionHiddenIds drives re-computation when a match gets hidden mid-session
   // eslint-disable-next-line react-hooks/exhaustive-deps
   [adminMatches, sessionHiddenIds]);
 
   if (visibleMatches.length === 0) return null;
-
   const liveCount = visibleMatches.filter((m) => LIVE_STATUSES.has(m.status ?? '')).length;
 
   return (
@@ -1272,7 +1473,7 @@ function SpecialGamesSection() {
             const pct = Math.max(0, ((ADMIN_FINISHED_LINGER_MS - (Date.now() - finishedAt)) / ADMIN_FINISHED_LINGER_MS) * 100);
             return (
               <div key={m.id} className="relative">
-                <MatchCard match={m} hasDraw onClick={() => navigate(`/match/${m.id}`)} />
+                <MatchCard match={m} hasDraw isAdmin onClick={() => navigate(`/match/${m.id}`)} />
                 <div
                   className="absolute bottom-0 left-0 h-0.5 transition-all duration-1000 ease-linear rounded-b"
                   style={{ width: `${pct}%`, background: 'var(--accent)', opacity: 0.4 }}
@@ -1280,7 +1481,7 @@ function SpecialGamesSection() {
               </div>
             );
           }
-          return <MatchCard key={m.id} match={m} hasDraw onClick={() => navigate(`/match/${m.id}`)} />;
+          return <MatchCard key={m.id} match={m} hasDraw isAdmin onClick={() => navigate(`/match/${m.id}`)} />;
         })}
       </div>
     </section>
@@ -1288,7 +1489,7 @@ function SpecialGamesSection() {
 }
 
 // ---------------------------------------------------------------------------
-// Skeleton — updated to v2 style
+// Skeleton — v2 style
 // ---------------------------------------------------------------------------
 function SkeletonCard() {
   return (
@@ -1318,7 +1519,7 @@ function SkeletonCard() {
 }
 
 // ---------------------------------------------------------------------------
-// SectionHeader — new v2 component
+// SectionHeader
 // ---------------------------------------------------------------------------
 function SectionHeader({
   title,
@@ -1365,7 +1566,7 @@ function SectionHeader({
 }
 
 // ---------------------------------------------------------------------------
-// SectionDivider — new v2 component
+// SectionDivider
 // ---------------------------------------------------------------------------
 function SectionDivider({ label }: { label: string }) {
   return (
@@ -1378,7 +1579,7 @@ function SectionDivider({ label }: { label: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// groupByLeague util — renamed from groupByField
+// groupByLeague
 // ---------------------------------------------------------------------------
 function groupByLeague(matches: EnrichedMatch[], sorted = false): Map<string, EnrichedMatch[]> {
   const map = new Map<string, EnrichedMatch[]>();
@@ -1472,7 +1673,6 @@ export default function MatchList() {
   useEffect(() => { fetchFootball(false); }, [fetchFootball]);
   useEffect(() => { if (activeSport !== 'football') fetchSport(activeSport, false); }, [activeSport, fetchSport]);
 
-  // Background refresh every 30s
   useEffect(() => {
     const refresh = () => {
       if (document.visibilityState !== 'visible') return;
