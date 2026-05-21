@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import EmailIcon from '@mui/icons-material/Email';
 import PhoneIcon from '@mui/icons-material/Phone';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
 import TelegramIcon from '@mui/icons-material/Telegram';
 import TwitterIcon from '@mui/icons-material/Twitter';
 import FacebookIcon from '@mui/icons-material/Facebook';
@@ -26,7 +27,7 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 
 // ---------------------------------------------------------------------------
-// SuperBetLogo (same as Header)
+// SuperBetLogo
 // ---------------------------------------------------------------------------
 function SuperBetLogo() {
   return (
@@ -86,33 +87,33 @@ function SuperBetLogo() {
 // Data
 // ---------------------------------------------------------------------------
 const quickLinks = [
-  { to: '/',          label: 'Home',      icon: <HomeIcon sx={{ fontSize: 14 }} /> },
+  { to: '/',          label: 'Home',         icon: <HomeIcon sx={{ fontSize: 14 }} /> },
   { to: '/live',      label: 'Live Betting', icon: <FiberManualRecordIcon className="text-green-500 animate-pulse-green" sx={{ fontSize: 14 }} /> },
-  { to: '/casino',    label: 'Casino',    icon: <CasinoIcon sx={{ fontSize: 14 }} /> },
-  { to: '/sports',    label: 'Sports',    icon: <SportsSoccerIcon sx={{ fontSize: 14 }} /> },
-  { to: '/live-tv',   label: 'Live TV',   icon: <LiveTvIcon sx={{ fontSize: 14 }} /> },
-  { to: '/jackpot',   label: 'Jackpot',   icon: <EmojiEventsIcon sx={{ fontSize: 14 }} /> },
-  { to: '/affiliate', label: 'Affiliate', icon: <GroupAddIcon sx={{ fontSize: 14 }} /> },
-  { to: '/wallet',    label: 'Wallet',    icon: <AccountBalanceWalletIcon sx={{ fontSize: 14 }} /> },
+  { to: '/casino',    label: 'Casino',       icon: <CasinoIcon sx={{ fontSize: 14 }} /> },
+  { to: '/sports',    label: 'Sports',       icon: <SportsSoccerIcon sx={{ fontSize: 14 }} /> },
+  { to: '/live-tv',   label: 'Live TV',      icon: <LiveTvIcon sx={{ fontSize: 14 }} /> },
+  { to: '/jackpot',   label: 'Jackpot',      icon: <EmojiEventsIcon sx={{ fontSize: 14 }} /> },
+  { to: '/affiliate', label: 'Affiliate',    icon: <GroupAddIcon sx={{ fontSize: 14 }} /> },
+  { to: '/wallet',    label: 'Wallet',       icon: <AccountBalanceWalletIcon sx={{ fontSize: 14 }} /> },
 ];
 
 const companyLinks = [
-  { to: '/about',           label: 'About Us',          icon: <InfoIcon sx={{ fontSize: 14 }} /> },
-  { to: '/terms',           label: 'Terms & Conditions', icon: <GavelIcon sx={{ fontSize: 14 }} /> },
-  { to: '/privacy',         label: 'Privacy Policy',    icon: <SecurityIcon sx={{ fontSize: 14 }} /> },
-  { to: '/responsible',     label: 'Responsible Gaming', icon: <ShieldIcon sx={{ fontSize: 14 }} /> },
-  { to: '/faq',             label: 'FAQ',               icon: <HelpIcon sx={{ fontSize: 14 }} /> },
+  { to: '/about',       label: 'About Us',           icon: <InfoIcon sx={{ fontSize: 14 }} /> },
+  { to: '/terms',       label: 'Terms & Conditions', icon: <GavelIcon sx={{ fontSize: 14 }} /> },
+  { to: '/privacy',     label: 'Privacy Policy',     icon: <SecurityIcon sx={{ fontSize: 14 }} /> },
+  { to: '/responsible', label: 'Responsible Gaming', icon: <ShieldIcon sx={{ fontSize: 14 }} /> },
+  { to: '/faq',         label: 'FAQ',                icon: <HelpIcon sx={{ fontSize: 14 }} /> },
 ];
 
 const socials = [
-  { icon: <FacebookIcon sx={{ fontSize: 18 }} />, href: 'https://facebook.com',  label: 'Facebook',  color: '#1877F2' },
-  { icon: <TwitterIcon  sx={{ fontSize: 18 }} />, href: 'https://twitter.com',   label: 'Twitter/X', color: '#000000' },
+  { icon: <FacebookIcon  sx={{ fontSize: 18 }} />, href: 'https://facebook.com',  label: 'Facebook',  color: '#1877F2' },
+  { icon: <TwitterIcon   sx={{ fontSize: 18 }} />, href: 'https://twitter.com',   label: 'Twitter/X', color: '#000000' },
   { icon: <InstagramIcon sx={{ fontSize: 18 }} />, href: 'https://instagram.com', label: 'Instagram', color: '#E1306C' },
   { icon: <TelegramIcon  sx={{ fontSize: 18 }} />, href: 'https://t.me',          label: 'Telegram',  color: '#229ED9' },
   { icon: <YouTubeIcon   sx={{ fontSize: 18 }} />, href: 'https://youtube.com',   label: 'YouTube',   color: '#FF0000' },
 ];
 
-const paymentMethods = ['MTN', 'Telecel', 'VISA', 'Mastercard', 'GTBank', 'AirtelTigo'];
+const paymentMethods = ['Visa', 'Mastercard', 'PayPal', 'Apple Pay', 'Google Pay', 'ACH'];
 
 // ---------------------------------------------------------------------------
 // Footer
@@ -125,29 +126,34 @@ export default function Footer() {
       className="border-t mt-auto"
       style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-light)' }}
     >
-      {/* ── QUICK DIAL BANNER ─────────────────────────────────────────────── */}
+      {/* ── QUICK DIAL BANNER — hidden on mobile ──────────────────────────── */}
       <div
-        className="w-full py-3 flex items-center justify-center gap-3 flex-wrap text-sm font-bold tracking-wide"
+        className="hidden sm:flex w-full py-3 items-center justify-center gap-3 flex-wrap text-sm font-bold tracking-wide"
         style={{
           background: 'linear-gradient(90deg, #E24B4A 0%, #EF9F27 100%)',
           color: '#fff',
           letterSpacing: '0.04em',
         }}
       >
-        <span style={{ opacity: 0.85, fontWeight: 400 }}>Quick Deposit via Paybill:</span>
-        <span style={{ fontSize: '1.1rem', fontWeight: 900, letterSpacing: '0.06em' }}>*711*222#</span>
+        <span style={{ opacity: 0.85, fontWeight: 400 }}>24/7 Customer Support:</span>
+        <span style={{ fontSize: '1.1rem', fontWeight: 900, letterSpacing: '0.06em' }}>+1 (800) 555-0192</span>
       </div>
 
       {/* ── MAIN GRID ─────────────────────────────────────────────────────── */}
-      <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+      {/*
+          Mobile  (< sm):  1 col — only Brand col renders, Quick Links & Company are hidden
+          Tablet  (sm):    2 cols — all 4 cols visible
+          Desktop (lg):    4 cols — all 4 cols visible
+      */}
+      <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-8 sm:py-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
 
-        {/* ── COL 1: Brand ─── */}
+        {/* ── COL 1: Brand — always visible ─── */}
         <div className="flex flex-col gap-4">
           <Link to="/">
             <SuperBetLogo />
           </Link>
 
-          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)', maxWidth: 240 }}>
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)', maxWidth: 260 }}>
             The world's most visited betting platform. Bet on sports, play casino games and win big — responsibly.
           </p>
 
@@ -182,16 +188,96 @@ export default function Footer() {
             ))}
           </div>
 
-          {/* Partner logos placeholder */}
-          <div className="flex items-center gap-3 mt-1 flex-wrap">
-            <span className="text-xs font-semibold px-2 py-1 rounded" style={{ backgroundColor: 'var(--card-alt)', color: 'var(--text-muted)' }}>
+          {/* Contact info — always visible */}
+          <div className="flex flex-col gap-2 mt-1">
+
+            {/* Location */}
+            <div className="flex items-start gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <LocationOnIcon sx={{ fontSize: 14 }} style={{ opacity: 0.6, marginTop: 1, flexShrink: 0 }} />
+              <span>
+                350 Fifth Avenue, Suite 4100<br />
+                New York, NY 10118<br />
+                United States
+              </span>
+            </div>
+
+            {/* Phone */}
+            <a
+              href="tel:+18005550192"
+              className="flex items-center gap-2 text-xs transition-colors"
+              style={{ color: 'var(--text-muted)' }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--primary)'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'}
+            >
+              <PhoneIcon sx={{ fontSize: 14 }} style={{ opacity: 0.6 }} />
+              +1 (800) 555-0192
+            </a>
+
+            {/* Email */}
+            <a
+              href="mailto:support@superbet.com"
+              className="flex items-center gap-2 text-xs transition-colors"
+              style={{ color: 'var(--text-muted)' }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--primary)'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'}
+            >
+              <EmailIcon sx={{ fontSize: 14 }} style={{ opacity: 0.6 }} />
+              support@superbet.com
+            </a>
+
+            {/* Telegram */}
+            <a
+              href="https://t.me/superbet"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-xs transition-colors"
+              style={{ color: 'var(--text-muted)' }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#229ED9'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'}
+            >
+              <TelegramIcon sx={{ fontSize: 14 }} style={{ opacity: 0.6 }} />
+              @superbet on Telegram
+            </a>
+          </div>
+
+          {/* Payment methods — always visible */}
+          <div>
+            <p
+              className="text-xs font-semibold mb-2 uppercase tracking-wider"
+              style={{ color: 'var(--text-muted)', opacity: 0.6 }}
+            >
+              Payment Methods
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {paymentMethods.map(m => (
+                <span
+                  key={m}
+                  className="text-xs px-2 py-0.5 rounded font-semibold"
+                  style={{
+                    backgroundColor: 'var(--card-alt)',
+                    border: '1px solid var(--border-light)',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  {m}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Official partner badge */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <span
+              className="text-xs font-semibold px-2 py-1 rounded"
+              style={{ backgroundColor: 'var(--card-alt)', color: 'var(--text-muted)' }}
+            >
               Official Betting Partner
             </span>
           </div>
         </div>
 
-        {/* ── COL 2: Quick Links ─── */}
-        <div>
+        {/* ── COL 2: Quick Links — hidden on mobile ─── */}
+        <div className="hidden sm:block">
           <h3
             className="text-xs font-bold uppercase tracking-widest mb-4"
             style={{
@@ -221,8 +307,8 @@ export default function Footer() {
           </ul>
         </div>
 
-        {/* ── COL 3: Company ─── */}
-        <div>
+        {/* ── COL 3: Company — hidden on mobile ─── */}
+        <div className="hidden sm:block">
           <h3
             className="text-xs font-bold uppercase tracking-widest mb-4"
             style={{
@@ -252,8 +338,8 @@ export default function Footer() {
           </ul>
         </div>
 
-        {/* ── COL 4: Contact ─── */}
-        <div>
+        {/* ── COL 4: Connect — hidden on mobile (contact moved into col 1) ─── */}
+        <div className="hidden sm:block">
           <h3
             className="text-xs font-bold uppercase tracking-widest mb-4"
             style={{
@@ -267,16 +353,27 @@ export default function Footer() {
           </h3>
 
           <div className="flex flex-col gap-3">
+
+            {/* Location */}
+            <div className="flex items-start gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <LocationOnIcon sx={{ fontSize: 14 }} style={{ opacity: 0.6, marginTop: 1, flexShrink: 0 }} />
+              <span>
+                350 Fifth Avenue, Suite 4100<br />
+                New York, NY 10118<br />
+                United States
+              </span>
+            </div>
+
             {/* Phone */}
             <a
-              href="tel:0596921899"
+              href="tel:+18005550192"
               className="flex items-center gap-2 text-xs transition-colors"
               style={{ color: 'var(--text-muted)' }}
               onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--primary)'}
               onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'}
             >
               <PhoneIcon sx={{ fontSize: 14 }} style={{ opacity: 0.6 }} />
-              0596 921 899
+              +1 (800) 555-0192
             </a>
 
             {/* Email */}
@@ -307,7 +404,10 @@ export default function Footer() {
 
             {/* Payment methods */}
             <div className="mt-2">
-              <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--text-muted)', opacity: 0.6 }}>
+              <p
+                className="text-xs font-semibold mb-2 uppercase tracking-wider"
+                style={{ color: 'var(--text-muted)', opacity: 0.6 }}
+              >
                 Payment Methods
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -331,22 +431,21 @@ export default function Footer() {
       </div>
 
       {/* ── RESPONSIBLE GAMING BANNER ─────────────────────────────────────── */}
-      <div
-        className="border-t"
-        style={{ borderColor: 'var(--border-light)' }}
-      >
+      <div className="border-t" style={{ borderColor: 'var(--border-light)' }}>
         <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 justify-between">
 
-          {/* 18+ + disclaimer */}
+          {/* 21+ disclaimer */}
           <div className="flex items-start gap-3">
             <div
               className="shrink-0 w-9 h-9 rounded-full border-2 flex items-center justify-center font-black text-xs"
               style={{ borderColor: 'var(--text-muted)', color: 'var(--text-muted)' }}
             >
-              18+
+              21+
             </div>
             <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)', maxWidth: 420 }}>
-              Age 18 and above only. Play Responsibly. Betting is addictive and can be psychologically harmful.
+              Must be 21 years or older to participate. Please gamble responsibly.
+              If you or someone you know has a gambling problem, call the
+              National Problem Gambling Helpline: <strong>1-800-522-4700</strong>.
             </p>
           </div>
 
@@ -359,7 +458,8 @@ export default function Footer() {
               <ShieldIcon sx={{ fontSize: 18 }} style={{ color: 'var(--text-muted)' }} />
             </div>
             <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)', maxWidth: 380 }}>
-              SuperBet is licensed by the Gaming Commission under the Gaming Act, 2006 (Act, 721) under License No 0000237.
+              SuperBet is licensed and regulated under the laws of the State of New Jersey,
+              Division of Gaming Enforcement. License No. NJDGE-2024-00237.
             </p>
           </div>
         </div>
@@ -368,7 +468,10 @@ export default function Footer() {
       {/* ── BOTTOM BAR ────────────────────────────────────────────────────── */}
       <div
         className="border-t"
-        style={{ borderColor: 'var(--border-light)', backgroundColor: 'color-mix(in srgb, var(--card-bg) 80%, #000 20%)' }}
+        style={{
+          borderColor: 'var(--border-light)',
+          backgroundColor: 'color-mix(in srgb, var(--card-bg) 80%, #000 20%)',
+        }}
       >
         <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p className="text-xs" style={{ color: 'var(--text-muted)', opacity: 0.6 }}>
@@ -381,8 +484,14 @@ export default function Footer() {
                 to={`/${t.toLowerCase()}`}
                 className="text-xs transition-colors"
                 style={{ color: 'var(--text-muted)', opacity: 0.6 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = 'var(--primary)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.6'; (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.opacity = '1';
+                  (e.currentTarget as HTMLElement).style.color = 'var(--primary)';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.opacity = '0.6';
+                  (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)';
+                }}
               >
                 {t}
               </Link>
