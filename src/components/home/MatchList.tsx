@@ -1186,9 +1186,9 @@ function MatchCard({
 
   const oddsSlots = hasDraw
     ? [
-        { key: '1', label: '1',    val: odds?.home ?? 0 },
+        { key: '1', label: 'Home', val: odds?.home ?? 0 },
         { key: 'X', label: 'Draw', val: odds?.draw ?? 0 },
-        { key: '2', label: '2',    val: odds?.away ?? 0 },
+        { key: '2', label: 'Away', val: odds?.away ?? 0 },
       ]
     : [
         { key: '1', label: 'Home', val: odds?.home ?? 0 },
@@ -1305,8 +1305,29 @@ function MatchCard({
                 onClick={(e) => val > 0 && pick(key, val, e)}
                 disabled={val <= 0}
               >
-                <span className="match-odds-label">{label}</span>
-                <span className="match-odds-value">{val > 0 ? val.toFixed(2) : '—'}</span>
+                <span
+                  className="match-odds-label"
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                    opacity: 1,
+                    color: 'var(--text-main, #ffffff)',
+                  }}
+                >
+                  {label}
+                </span>
+                <span
+                  className="match-odds-value"
+                  style={{
+                    fontSize: '15px',
+                    fontWeight: 700,
+                    color: 'var(--primary, #f5a623)',
+                  }}
+                >
+                  {val > 0 ? val.toFixed(2) : '—'}
+                </span>
               </button>
             ))}
           </div>
