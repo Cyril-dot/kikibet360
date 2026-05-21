@@ -614,12 +614,16 @@ function unwrapAdminMatches(raw: unknown): Match[] {
   }, []);
 }
 
-// New: fetch per-match admin odds (v2)
+// ---------------------------------------------------------------------------
+// FIX 1 & 2: fetchAdminMatchOdds — correct base URL + uses matchId in path
+// ---------------------------------------------------------------------------
+const ADMIN_API_BASE = 'https://futballbackend-production-c821.up.railway.app';
+
 async function fetchAdminMatchOdds(matchId: string): Promise<unknown[]> {
   try {
     const raw = await fetch(
-  'https://futballbackend-production-7d3b.up.railway.app/api/public/admin-matches',
-).then((r) => r.json());
+      `${ADMIN_API_BASE}/api/public/admin-matches/${matchId}/odds`,
+    ).then((r) => r.json());
     return safeUnwrapOddsArray(raw);
   } catch {
     return [];
@@ -1145,7 +1149,6 @@ function SpecialGamesSection() {
 
   const [adminMatches, setAdminMatches] = useState<EnrichedMatch[]>([]);
   const genRef = useRef(0);
-  const [, forceUpdate] = useState(0);
 
   useEffect(() => {
     const myGen = ++genRef.current;
@@ -1153,10 +1156,11 @@ function SpecialGamesSection() {
 
     async function load() {
       try {
-const raw = await fetch(
-  'https://futballbackend-production-c821.up.railway.app/api/public/admin-matches?ngrok-skip-browser-warning=true',
-).then((r) => r.json());
-if (!alive()) return;
+        // FIX 3: removed stale ?ngrok-skip-browser-warning=true query param
+        const raw = await fetch(
+          `${ADMIN_API_BASE}/api/public/admin-matches`,
+        ).then((r) => r.json());
+        if (!alive()) return;
 
         const matches = unwrapAdminMatches(raw);
         if (matches.length === 0) { setAdminMatches([]); return; }
