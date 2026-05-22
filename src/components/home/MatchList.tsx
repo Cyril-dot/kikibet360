@@ -56,140 +56,255 @@ const AWAY_LOGO_POOL: string[] = [
 interface Winner {
   name: string;
   amount: string;
+  currency: 'GHS' | 'NGN' | 'USD';
   timeAgo: string;
 }
 
 const RECENT_WINNERS: Winner[] = [
   // ── GHS ──
-  { name: 'Kwame O.',   amount: 'GHS 23,500',    timeAgo: '2m ago'  },
-  { name: 'Abena M.',   amount: 'GHS 47,200',    timeAgo: '5m ago'  },
-  { name: 'Kofi A.',    amount: 'GHS 88,000',    timeAgo: '9m ago'  },
-  { name: 'Ama S.',     amount: 'GHS 31,750',    timeAgo: '14m ago' },
-  { name: 'Yaw B.',     amount: 'GHS 65,400',    timeAgo: '18m ago' },
-  { name: 'Akosua P.',  amount: 'GHS 99,000',    timeAgo: '22m ago' },
-  { name: 'Kojo D.',    amount: 'GHS 54,800',    timeAgo: '27m ago' },
-  { name: 'Efua T.',    amount: 'GHS 20,500',    timeAgo: '31m ago' },
-  { name: 'Nana F.',    amount: 'GHS 76,300',    timeAgo: '35m ago' },
-  { name: 'Kweku R.',   amount: 'GHS 43,100',    timeAgo: '40m ago' },
+  { name: 'Kwame O.',   amount: '23,500',    currency: 'GHS', timeAgo: '2m'  },
+  { name: 'Abena M.',   amount: '47,200',    currency: 'GHS', timeAgo: '5m'  },
+  { name: 'Kofi A.',    amount: '88,000',    currency: 'GHS', timeAgo: '9m'  },
+  { name: 'Ama S.',     amount: '31,750',    currency: 'GHS', timeAgo: '14m' },
+  { name: 'Yaw B.',     amount: '65,400',    currency: 'GHS', timeAgo: '18m' },
+  { name: 'Akosua P.',  amount: '99,000',    currency: 'GHS', timeAgo: '22m' },
+  { name: 'Kojo D.',    amount: '54,800',    currency: 'GHS', timeAgo: '27m' },
+  { name: 'Efua T.',    amount: '20,500',    currency: 'GHS', timeAgo: '31m' },
+  { name: 'Nana F.',    amount: '76,300',    currency: 'GHS', timeAgo: '35m' },
+  { name: 'Kweku R.',   amount: '43,100',    currency: 'GHS', timeAgo: '40m' },
   // ── NGN ──
-  { name: 'Chidi E.',   amount: '₦ 4,200,000',   timeAgo: '3m ago'  },
-  { name: 'Amaka I.',   amount: '₦ 850,000',     timeAgo: '7m ago'  },
-  { name: 'Tunde A.',   amount: '₦ 22,500,000',  timeAgo: '11m ago' },
-  { name: 'Ngozi O.',   amount: '₦ 1,700,000',   timeAgo: '16m ago' },
-  { name: 'Emeka N.',   amount: '₦ 49,800,000',  timeAgo: '20m ago' },
-  { name: 'Chioma U.',  amount: '₦ 380,000',     timeAgo: '24m ago' },
-  { name: 'Olu B.',     amount: '₦ 7,600,000',   timeAgo: '29m ago' },
-  { name: 'Kemi F.',    amount: '₦ 14,300,000',  timeAgo: '33m ago' },
-  { name: 'Seun W.',    amount: '₦ 600,000',     timeAgo: '37m ago' },
-  { name: 'Bayo L.',    amount: '₦ 33,000,000',  timeAgo: '42m ago' },
+  { name: 'Chidi E.',   amount: '4,200,000',  currency: 'NGN', timeAgo: '3m'  },
+  { name: 'Amaka I.',   amount: '850,000',    currency: 'NGN', timeAgo: '7m'  },
+  { name: 'Tunde A.',   amount: '22,500,000', currency: 'NGN', timeAgo: '11m' },
+  { name: 'Ngozi O.',   amount: '1,700,000',  currency: 'NGN', timeAgo: '16m' },
+  { name: 'Emeka N.',   amount: '49,800,000', currency: 'NGN', timeAgo: '20m' },
+  { name: 'Chioma U.',  amount: '380,000',    currency: 'NGN', timeAgo: '24m' },
+  { name: 'Olu B.',     amount: '7,600,000',  currency: 'NGN', timeAgo: '29m' },
+  { name: 'Kemi F.',    amount: '14,300,000', currency: 'NGN', timeAgo: '33m' },
+  { name: 'Seun W.',    amount: '600,000',    currency: 'NGN', timeAgo: '37m' },
+  { name: 'Bayo L.',    amount: '33,000,000', currency: 'NGN', timeAgo: '42m' },
   // ── USD ──
-  { name: 'James K.',   amount: '$ 3,800',       timeAgo: '1m ago'  },
-  { name: 'Sarah M.',   amount: '$ 47,500',      timeAgo: '6m ago'  },
-  { name: 'David C.',   amount: '$ 12,200',      timeAgo: '10m ago' },
-  { name: 'Fatima A.',  amount: '$ 28,750',      timeAgo: '15m ago' },
-  { name: 'Carlos R.',  amount: '$ 5,400',       timeAgo: '19m ago' },
-  { name: 'Lena V.',    amount: '$ 49,000',      timeAgo: '23m ago' },
-  { name: 'Omar H.',    amount: '$ 8,600',       timeAgo: '28m ago' },
-  { name: 'Priya S.',   amount: '$ 2,300',       timeAgo: '32m ago' },
-  { name: 'Mike T.',    amount: '$ 19,900',      timeAgo: '36m ago' },
-  { name: 'Yuki N.',    amount: '$ 36,500',      timeAgo: '41m ago' },
+  { name: 'James K.',   amount: '3,800',  currency: 'USD', timeAgo: '1m'  },
+  { name: 'Sarah M.',   amount: '47,500', currency: 'USD', timeAgo: '6m'  },
+  { name: 'David C.',   amount: '12,200', currency: 'USD', timeAgo: '10m' },
+  { name: 'Fatima A.',  amount: '28,750', currency: 'USD', timeAgo: '15m' },
+  { name: 'Carlos R.',  amount: '5,400',  currency: 'USD', timeAgo: '19m' },
+  { name: 'Lena V.',    amount: '49,000', currency: 'USD', timeAgo: '23m' },
+  { name: 'Omar H.',    amount: '8,600',  currency: 'USD', timeAgo: '28m' },
+  { name: 'Priya S.',   amount: '2,300',  currency: 'USD', timeAgo: '32m' },
+  { name: 'Mike T.',    amount: '19,900', currency: 'USD', timeAgo: '36m' },
+  { name: 'Yuki N.',    amount: '36,500', currency: 'USD', timeAgo: '41m' },
 ];
 
+// Currency display config — grey + blue palette only
+const CURRENCY_CONFIG: Record<Winner['currency'], { symbol: string; accent: string; bg: string; badge: string }> = {
+  GHS: { symbol: 'GHS', accent: '#60a5fa', bg: 'rgba(96,165,250,0.08)',  badge: 'rgba(96,165,250,0.15)'  },
+  NGN: { symbol: '₦',   accent: '#93c5fd', bg: 'rgba(147,197,253,0.07)', badge: 'rgba(147,197,253,0.13)' },
+  USD: { symbol: '$',   accent: '#3b82f6', bg: 'rgba(59,130,246,0.09)',  badge: 'rgba(59,130,246,0.16)'  },
+};
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(' ');
+  return parts.length >= 2
+    ? (parts[0][0] + parts[1][0]).toUpperCase()
+    : parts[0].slice(0, 2).toUpperCase();
+}
+
 // ---------------------------------------------------------------------------
-// RecentWinnersBar — horizontal auto-scrolling ticker
+// RecentWinnersBar — redesigned horizontal auto-scrolling ticker
 // ---------------------------------------------------------------------------
 function RecentWinnersBar() {
-  const trackRef = useRef<HTMLDivElement>(null);
-
-  // Duplicate the list so the loop appears seamless
-  const doubled = [...RECENT_WINNERS, ...RECENT_WINNERS];
+  const doubled = useMemo(() => [...RECENT_WINNERS, ...RECENT_WINNERS], []);
 
   return (
-    <div
-      style={{
-        overflow: 'hidden',
-        background: 'linear-gradient(90deg, rgba(20,20,30,0.95) 0%, rgba(25,25,40,0.95) 100%)',
-        borderRadius: 10,
-        padding: '0 0',
-        marginBottom: 12,
-        position: 'relative',
-        border: '1px solid rgba(245,166,35,0.18)',
-      }}
-    >
-      {/* Label */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '7px 12px 4px',
-        }}
-      >
-        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--primary, #f5a623)', textTransform: 'uppercase' }}>
-          🏆 Grand Prize Winners
+    <div style={{
+      overflow: 'hidden',
+      background: 'linear-gradient(135deg, #0d1117 0%, #0f1520 50%, #0b1019 100%)',
+      borderRadius: 14,
+      marginBottom: 14,
+      position: 'relative',
+      border: '1px solid rgba(59,130,246,0.18)',
+      boxShadow: '0 4px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(59,130,246,0.08)',
+    }}>
+
+      {/* Header row */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '10px 14px 6px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          {/* Pulsing dot */}
+          <span style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: '#3b82f6',
+            boxShadow: '0 0 8px rgba(59,130,246,0.7)',
+            display: 'inline-block',
+            animation: 'winnerPulse 1.6s ease-in-out infinite',
+            flexShrink: 0,
+          }} />
+          <span style={{
+            fontSize: 10,
+            fontWeight: 800,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: '#94a3b8',
+            fontFamily: 'system-ui, sans-serif',
+          }}>
+            Recent Winners
+          </span>
+        </div>
+        <span style={{
+          fontSize: 9,
+          fontWeight: 700,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          color: '#475569',
+          fontFamily: 'system-ui, sans-serif',
+        }}>
+          LIVE PAYOUTS
         </span>
       </div>
 
       {/* Scrolling track */}
-      <div style={{ overflow: 'hidden', paddingBottom: 8 }}>
-        <div
-          ref={trackRef}
-          style={{
-            display: 'flex',
-            gap: 8,
-            paddingLeft: 12,
-            animation: 'winnersScroll 60s linear infinite',
-            width: 'max-content',
-          }}
-        >
-          {doubled.map((w, i) => (
-            <div
-              key={i}
-              style={{
-                flexShrink: 0,
-                background: 'rgba(255,255,255,0.05)',
-                borderRadius: 8,
-                padding: '5px 10px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                border: '1px solid rgba(245,166,35,0.12)',
-                minWidth: 160,
-              }}
-            >
-              <span style={{ fontSize: 14 }}>🎉</span>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-main, #fff)', whiteSpace: 'nowrap' }}>
-                  {w.name}
+      <div style={{ overflow: 'hidden', paddingBottom: 11, paddingTop: 2 }}>
+        <div style={{
+          display: 'flex',
+          gap: 7,
+          paddingLeft: 14,
+          animation: 'winnersScroll 55s linear infinite',
+          width: 'max-content',
+        }}>
+          {doubled.map((w, i) => {
+            const cfg = CURRENCY_CONFIG[w.currency];
+            const initials = getInitials(w.name);
+            return (
+              <div
+                key={i}
+                style={{
+                  flexShrink: 0,
+                  background: cfg.bg,
+                  borderRadius: 10,
+                  padding: '7px 11px 7px 8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 9,
+                  border: `1px solid ${cfg.accent}28`,
+                  minWidth: 0,
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Subtle shimmer line at top */}
+                <div style={{
+                  position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+                  background: `linear-gradient(90deg, transparent 0%, ${cfg.accent}50 50%, transparent 100%)`,
+                }} />
+
+                {/* Avatar */}
+                <div style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: '50%',
+                  background: `linear-gradient(135deg, ${cfg.accent}30, ${cfg.accent}15)`,
+                  border: `1.5px solid ${cfg.accent}55`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 10,
+                  fontWeight: 800,
+                  color: cfg.accent,
+                  letterSpacing: '0.02em',
+                  flexShrink: 0,
+                  fontFamily: 'system-ui, sans-serif',
+                }}>
+                  {initials}
                 </div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--primary, #f5a623)', whiteSpace: 'nowrap' }}>
-                  {w.amount}
+
+                {/* Name + amount */}
+                <div style={{ lineHeight: 1 }}>
+                  <div style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: '#64748b',
+                    whiteSpace: 'nowrap',
+                    marginBottom: 4,
+                    fontFamily: 'system-ui, sans-serif',
+                  }}>
+                    {w.name}
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    gap: 4,
+                    whiteSpace: 'nowrap',
+                  }}>
+                    <span style={{
+                      fontSize: 9,
+                      fontWeight: 700,
+                      color: cfg.accent,
+                      background: cfg.badge,
+                      borderRadius: 4,
+                      padding: '1px 5px',
+                      letterSpacing: '0.06em',
+                      fontFamily: 'system-ui, sans-serif',
+                    }}>
+                      {cfg.symbol}
+                    </span>
+                    <span style={{
+                      fontSize: 13,
+                      fontWeight: 800,
+                      color: cfg.accent,
+                      letterSpacing: '-0.01em',
+                      fontFamily: 'system-ui, sans-serif',
+                    }}>
+                      {w.amount}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Time ago pill */}
+                <div style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  color: '#334155',
+                  whiteSpace: 'nowrap',
+                  alignSelf: 'flex-start',
+                  marginTop: 1,
+                  fontFamily: 'system-ui, sans-serif',
+                  letterSpacing: '0.04em',
+                }}>
+                  {w.timeAgo}
                 </div>
               </div>
-              <div style={{ fontSize: 9, color: 'var(--text-muted, #888)', whiteSpace: 'nowrap', marginLeft: 2 }}>
-                {w.timeAgo}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
-      {/* Fade masks */}
+      {/* Fade edge masks */}
       <div style={{
-        position: 'absolute', top: 0, left: 0, bottom: 0, width: 24,
-        background: 'linear-gradient(90deg, rgba(20,20,30,0.95), transparent)',
+        position: 'absolute', top: 0, left: 0, bottom: 0, width: 32,
+        background: 'linear-gradient(90deg, #0d1117 0%, transparent 100%)',
         pointerEvents: 'none',
+        zIndex: 2,
       }} />
       <div style={{
-        position: 'absolute', top: 0, right: 0, bottom: 0, width: 24,
-        background: 'linear-gradient(270deg, rgba(20,20,30,0.95), transparent)',
+        position: 'absolute', top: 0, right: 0, bottom: 0, width: 32,
+        background: 'linear-gradient(270deg, #0d1117 0%, transparent 100%)',
         pointerEvents: 'none',
+        zIndex: 2,
       }} />
 
       <style>{`
         @keyframes winnersScroll {
           0%   { transform: translateX(0); }
           100% { transform: translateX(-50%); }
+        }
+        @keyframes winnerPulse {
+          0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(59,130,246,0.7); }
+          50%       { opacity: 0.5; box-shadow: 0 0 4px rgba(59,130,246,0.3); }
         }
       `}</style>
     </div>
@@ -216,33 +331,33 @@ function FloatingBetSlipButton() {
         width: 52,
         height: 52,
         borderRadius: '50%',
-        background: 'var(--primary, #f5a623)',
-        border: 'none',
+        background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
+        border: '1px solid rgba(96,165,250,0.3)',
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        boxShadow: '0 4px 16px rgba(245,166,35,0.45)',
+        boxShadow: '0 4px 18px rgba(37,99,235,0.5)',
         transition: 'transform 0.15s ease, box-shadow 0.15s ease',
       }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.08)';
-        (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 22px rgba(245,166,35,0.6)';
+        (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 24px rgba(37,99,235,0.7)';
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
-        (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 16px rgba(245,166,35,0.45)';
+        (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 18px rgba(37,99,235,0.5)';
       }}
     >
-      <ReceiptLongIcon sx={{ fontSize: 24, color: '#1a1a1a' }} />
+      <ReceiptLongIcon sx={{ fontSize: 24, color: '#e2e8f0' }} />
       {count > 0 && (
         <span
           style={{
             position: 'absolute',
             top: -2,
             right: -2,
-            background: '#e53935',
-            color: '#fff',
+            background: '#1e3a5f',
+            color: '#93c5fd',
             borderRadius: '50%',
             width: 18,
             height: 18,
@@ -251,7 +366,7 @@ function FloatingBetSlipButton() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            border: '2px solid var(--bg-main, #0f0f1a)',
+            border: '2px solid #0d1117',
             lineHeight: 1,
           }}
         >
