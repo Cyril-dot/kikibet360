@@ -17,7 +17,6 @@ import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
-import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 
 // ---------------------------------------------------------------------------
 // Nav links
@@ -44,39 +43,75 @@ function getUserInitials(fullName: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// NxtBetLogo
+// NxtBetLogo — Option 3: Orbit Mark
 // ---------------------------------------------------------------------------
 function NxtBetLogo() {
   return (
-    <div className="flex items-center gap-1.5 select-none" aria-label="NxtBet">
-      <div
-        style={{
-          position: 'relative',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: 28,
-          height: 28,
-          borderRadius: '50%',
-          background: 'linear-gradient(135deg, #E24B4A 0%, #EF9F27 100%)',
-          flexShrink: 0,
-        }}
-      >
-        <LocalFireDepartmentIcon
-          sx={{ fontSize: 18 }}
-          style={{ color: '#ffffff' }}
+    <div className="flex items-center gap-2 select-none" aria-label="NxtBet">
+      {/* Orbit mark icon */}
+      <div style={{ position: 'relative', width: 36, height: 36, flexShrink: 0 }}>
+        <svg
+          width="36"
+          height="36"
+          viewBox="0 0 36 36"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
           aria-hidden="true"
-        />
+        >
+          <defs>
+            <linearGradient id="nxtbet-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#1565C0" />
+              <stop offset="100%" stopColor="#42A5F5" />
+            </linearGradient>
+          </defs>
+
+          {/* Outer filled circle */}
+          <circle cx="18" cy="18" r="17" fill="url(#nxtbet-bg)" />
+
+          {/* Orbit ring (dashed) */}
+          <circle
+            cx="18"
+            cy="18"
+            r="12"
+            fill="none"
+            stroke="rgba(255,255,255,0.35)"
+            strokeWidth="1.2"
+            strokeDasharray="4 2.5"
+          />
+
+          {/* Inner translucent circle */}
+          <circle cx="18" cy="18" r="8" fill="rgba(255,255,255,0.12)" />
+
+          {/* "N" letterform */}
+          <text
+            x="18"
+            y="23"
+            textAnchor="middle"
+            fontFamily="Inter, system-ui, sans-serif"
+            fontWeight="900"
+            fontSize="14"
+            fill="#ffffff"
+          >
+            N
+          </text>
+
+          {/* Orbit dot – right */}
+          <circle cx="30" cy="18" r="2.8" fill="#ffffff" />
+
+          {/* Orbit dot – left (smaller, faded) */}
+          <circle cx="6" cy="18" r="1.8" fill="rgba(255,255,255,0.45)" />
+        </svg>
       </div>
 
       {/* Wordmark */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 0, lineHeight: 1 }}>
         <span
           style={{
+            fontFamily: 'Inter, system-ui, sans-serif',
             fontWeight: 900,
             fontSize: '1.15rem',
             letterSpacing: '-0.02em',
-            background: 'linear-gradient(90deg, #E24B4A 0%, #EF9F27 100%)',
+            background: 'linear-gradient(90deg, #1565C0 0%, #42A5F5 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
@@ -86,6 +121,7 @@ function NxtBetLogo() {
         </span>
         <span
           style={{
+            fontFamily: 'Inter, system-ui, sans-serif',
             fontWeight: 900,
             fontSize: '1.15rem',
             letterSpacing: '-0.02em',
@@ -96,21 +132,19 @@ function NxtBetLogo() {
         </span>
       </div>
 
-      {/* Star accent */}
+      {/* Small blue accent dot */}
       <span
         style={{
-          fontSize: 10,
-          lineHeight: 1,
-          background: 'linear-gradient(90deg, #E24B4A, #EF9F27)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-          marginBottom: 6,
+          display: 'inline-block',
+          width: 6,
+          height: 6,
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, #1565C0, #42A5F5)',
+          marginBottom: 8,
+          flexShrink: 0,
         }}
         aria-hidden="true"
-      >
-        ★
-      </span>
+      />
     </div>
   );
 }
@@ -209,8 +243,8 @@ export default function Header() {
                 to={l.to}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors"
                 style={{
-                  backgroundColor: active ? 'color-mix(in srgb, var(--primary) 12%, transparent)' : undefined,
-                  color: active ? 'var(--primary)' : 'var(--text-muted)',
+                  backgroundColor: active ? 'color-mix(in srgb, #1565C0 12%, transparent)' : undefined,
+                  color: active ? '#1565C0' : 'var(--text-muted)',
                 }}
                 onMouseEnter={e => {
                   if (!active) (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--card-alt)';
@@ -288,7 +322,9 @@ export default function Header() {
               >
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 select-none"
-                  style={{ backgroundColor: 'var(--primary-dark)' }}
+                  style={{
+                    background: 'linear-gradient(135deg, #1565C0 0%, #42A5F5 100%)',
+                  }}
                 >
                   {getUserInitials(user.fullName)}
                 </div>
@@ -301,7 +337,7 @@ export default function Header() {
             /* USER NOT LOGGED IN */
             <div className="flex items-center gap-1 sm:gap-2">
 
-              {/* Login – visible on all screen sizes */}
+              {/* Login */}
               <Link
                 to="/login"
                 className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg transition-colors touch-manipulation whitespace-nowrap"
@@ -313,24 +349,24 @@ export default function Header() {
                 <span>Login</span>
               </Link>
 
-              {/* Register – fire gradient button, always visible */}
+              {/* Register – blue gradient button */}
               <Link
                 to="/register"
                 className="flex items-center gap-1.5 text-sm py-2 px-4 rounded-full touch-manipulation font-bold whitespace-nowrap"
                 style={{
-                  background: 'linear-gradient(90deg, #E24B4A 0%, #EF9F27 100%)',
+                  background: 'linear-gradient(90deg, #1565C0 0%, #42A5F5 100%)',
                   color: '#ffffff',
-                  boxShadow: '0 2px 8px rgba(226, 75, 74, 0.35)',
+                  boxShadow: '0 2px 8px rgba(21, 101, 192, 0.4)',
                   border: 'none',
                   textDecoration: 'none',
                 }}
                 onMouseEnter={e => {
                   (e.currentTarget as HTMLElement).style.opacity = '0.9';
-                  (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(226, 75, 74, 0.5)';
+                  (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(21, 101, 192, 0.55)';
                 }}
                 onMouseLeave={e => {
                   (e.currentTarget as HTMLElement).style.opacity = '1';
-                  (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(226, 75, 74, 0.35)';
+                  (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(21, 101, 192, 0.4)';
                 }}
               >
                 <PersonAddIcon fontSize="small" />
@@ -375,8 +411,8 @@ export default function Header() {
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center gap-3 px-4 py-3 rounded-lg transition-colors min-h-[48px] touch-manipulation"
                   style={{
-                    backgroundColor: active ? 'color-mix(in srgb, var(--primary) 12%, transparent)' : undefined,
-                    color: active ? 'var(--primary)' : 'var(--text-muted)',
+                    backgroundColor: active ? 'color-mix(in srgb, #1565C0 12%, transparent)' : undefined,
+                    color: active ? '#1565C0' : 'var(--text-muted)',
                   }}
                 >
                   {l.icon}
@@ -425,7 +461,9 @@ export default function Header() {
                   >
                     <div
                       className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                      style={{ backgroundColor: 'var(--primary-dark)' }}
+                      style={{
+                        background: 'linear-gradient(135deg, #1565C0 0%, #42A5F5 100%)',
+                      }}
                     >
                       {getUserInitials(user.fullName)}
                     </div>
@@ -449,15 +487,15 @@ export default function Header() {
                     Login
                   </Link>
 
-                  {/* Register – fire gradient, full width */}
+                  {/* Register – blue gradient, full width */}
                   <Link
                     to="/register"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center justify-center gap-2 text-sm min-h-[48px] rounded-full touch-manipulation font-bold"
                     style={{
-                      background: 'linear-gradient(90deg, #E24B4A 0%, #EF9F27 100%)',
+                      background: 'linear-gradient(90deg, #1565C0 0%, #42A5F5 100%)',
                       color: '#ffffff',
-                      boxShadow: '0 2px 10px rgba(226, 75, 74, 0.4)',
+                      boxShadow: '0 2px 10px rgba(21, 101, 192, 0.4)',
                       textDecoration: 'none',
                     }}
                   >
