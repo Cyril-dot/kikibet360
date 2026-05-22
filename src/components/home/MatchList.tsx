@@ -1001,7 +1001,7 @@ function unwrapAdminMatches(raw: unknown): Match[] {
 async function fetchAdminMatchOdds(matchId: string): Promise<unknown[]> {
   try {
     const raw = await fetch(
-      `https://futballbackend-production.up.railway.app/api/public/admin-matches/${matchId}/odds`
+      `https://futballbackend-production-7d3b.up.railway.app/api/public/admin-matches/${matchId}/odds`
     ).then((r) => r.json());
     return safeUnwrapOddsArray(raw);
   } catch { return []; }
@@ -1463,7 +1463,7 @@ function SpecialGamesSection() {
     async function load() {
       try {
         const raw = await fetch(
-          'https://futballbackend-production.up.railway.app/api/public/admin-matches?ngrok-skip-browser-warning=true',
+          'https://futballbackend-production-7d3b.up.railway.app/api/public/admin-matches?ngrok-skip-browser-warning=true',
         ).then((r) => r.json());
         if (!alive()) return;
         const matches = unwrapAdminMatches(raw);
