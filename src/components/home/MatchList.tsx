@@ -5,6 +5,8 @@
 //   • Countdown timer: smaller, muted, subtle (not bold/visible)
 //   • RecentWinnersBar: no avatar icon, shows masked phone number + amount won
 //   • Carousel speed slowed from 55s → 90s
+//   • League tab fallback: if a specific league tab has no matches, falls back
+//     to showing all available matches (with a subtle notice)
 // ---------------------------------------------------------------------------
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -757,6 +759,9 @@ function extractAdminOdds(raw: Record<string, unknown>, homeTeam: string, awayTe
   return undefined;
 }
 
+// keep extractAdminOdds importable even if unused in this file
+void extractAdminOdds;
+
 function unwrapWithAllOdds(raw: unknown): Array<{ match: Match; odds: unknown[] }> {
   if (!raw) return [];
   const obj = raw as Record<string, unknown>;
@@ -1166,17 +1171,35 @@ async function fetchAllFootballMatches(): Promise<EnrichedMatch[]> {
   return enriched.filter(hasValidOdds);
 }
 
-function filterByLeagueTab(matches: EnrichedMatch[], tab: FootballLeagueTab): EnrichedMatch[] {
-  if (tab === 'all') return matches;
+// ---------------------------------------------------------------------------
+// filterByLeagueTab — with fallback to all matches when a specific tab is empty
+// Returns { matches, isFallback } so the UI can show a notice
+// ---------------------------------------------------------------------------
+function filterByLeagueTab(
+  matches: EnrichedMatch[],
+  tab: FootballLeagueTab,
+): { matches: EnrichedMatch[]; isFallback: boolean } {
+  if (tab === 'all') return { matches, isFallback: false };
+
   if (tab === 'other') {
-    return matches.filter((m) => {
+    const filtered = matches.filter((m) => {
       for (const leagueTab of Object.keys(LEAGUE_TEAMS) as Exclude<FootballLeagueTab, 'all' | 'other'>[]) {
         if (matchBelongsToLeagueTab(m, leagueTab)) return false;
       }
       return true;
     });
+    // "Other" fallback: if nothing found, show all
+    if (filtered.length === 0) return { matches, isFallback: true };
+    return { matches: filtered, isFallback: false };
   }
-  return matches.filter((m) => matchBelongsToLeagueTab(m, tab));
+
+  // Specific league tab (premier_league, la_liga, etc.)
+  const filtered = matches.filter((m) => matchBelongsToLeagueTab(m, tab));
+  if (filtered.length === 0) {
+    // Fallback: return all matches
+    return { matches, isFallback: true };
+  }
+  return { matches: filtered, isFallback: false };
 }
 
 async function fetchBasketballMatches(): Promise<EnrichedMatch[]> {
@@ -1641,6 +1664,34 @@ function SectionDivider({ label }: { label: string }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// FallbackNotice — subtle banner shown when a league tab has no matches
+// and we're showing all games instead
+// ---------------------------------------------------------------------------
+function FallbackNotice({ tabLabel }: { tabLabel: string }) {
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 7,
+      padding: '8px 12px',
+      marginBottom: 12,
+      borderRadius: 8,
+      background: 'rgba(59,130,246,0.07)',
+      border: '1px solid rgba(59,130,246,0.15)',
+    }}>
+      <span style={{ fontSize: 13 }}>ℹ️</span>
+      <span style={{
+        fontSize: 11,
+        color: 'var(--text-muted, #64748b)',
+        fontFamily: 'system-ui, sans-serif',
+      }}>
+        No <strong style={{ color: 'var(--text-main, #cbd5e1)', fontWeight: 700 }}>{tabLabel}</strong> matches right now — showing all available games.
+      </span>
+    </div>
+  );
+}
+
 function groupByLeague(matches: EnrichedMatch[], sorted = false): Map<string, EnrichedMatch[]> {
   const map = new Map<string, EnrichedMatch[]>();
   for (const m of matches) {
@@ -1744,9 +1795,15 @@ export default function MatchList() {
     return () => { clearInterval(interval); document.removeEventListener('visibilitychange', refresh); };
   }, [activeSport, fetchFootball, fetchSport]);
 
-  const allMatches = useMemo((): EnrichedMatch[] => {
-    if (activeSport === 'football') return filterByLeagueTab(allFootballMatches, activeLeagueTab);
-    return sportMatches[activeSport];
+  // ---------------------------------------------------------------------------
+  // allMatches + isFallback — computed with fallback logic
+  // ---------------------------------------------------------------------------
+  const { allMatches, isFallback } = useMemo((): { allMatches: EnrichedMatch[]; isFallback: boolean } => {
+    if (activeSport === 'football') {
+      const result = filterByLeagueTab(allFootballMatches, activeLeagueTab);
+      return { allMatches: result.matches, isFallback: result.isFallback };
+    }
+    return { allMatches: sportMatches[activeSport], isFallback: false };
   }, [activeSport, activeLeagueTab, allFootballMatches, sportMatches]);
 
   const grouped = useMemo(() => {
@@ -1765,9 +1822,19 @@ export default function MatchList() {
     return sportLoading[activeSport];
   }, [activeSport, footballLoading, sportLoading]);
 
-  const isSpecificLeagueTab = activeSport === 'football' && activeLeagueTab !== 'all' && activeLeagueTab !== 'other';
+  // When fallback is active we treat it as "all" for rendering purposes
+  const isSpecificLeagueTab = activeSport === 'football'
+    && activeLeagueTab !== 'all'
+    && activeLeagueTab !== 'other'
+    && !isFallback;  // ← key: if fallback, render like "all"
 
   const navigate = useNavigate();
+
+  // The human-readable label for the active league tab (used in FallbackNotice)
+  const activeLeagueTabLabel = useMemo(
+    () => FOOTBALL_LEAGUE_TABS.find((t) => t.key === activeLeagueTab)?.label ?? activeLeagueTab,
+    [activeLeagueTab],
+  );
 
   function renderLeagueGroups(matches: EnrichedMatch[], isFinishedSection: boolean) {
     if (isSpecificLeagueTab) {
@@ -1780,7 +1847,7 @@ export default function MatchList() {
         <MatchCard key={m.id} match={m} hasDraw={showDraw} onClick={() => navigate(`/match/${m.id}`)} />
       ));
     }
-    if (activeSport === 'football' && (activeLeagueTab === 'all' || activeLeagueTab === 'other')) {
+    if (activeSport === 'football' && (activeLeagueTab === 'all' || activeLeagueTab === 'other' || isFallback)) {
       const top6   = matches.filter((m) => TOP_6_LABELS.has(m.league ?? ''));
       const cups   = matches.filter((m) => !TOP_6_LABELS.has(m.league ?? '') && CUPS_LABELS.has(m.league ?? ''));
       const others = matches.filter((m) => !TOP_6_LABELS.has(m.league ?? '') && !CUPS_LABELS.has(m.league ?? ''));
@@ -1859,6 +1926,11 @@ export default function MatchList() {
 
       {/* ── Special Games ── */}
       {activeSport === 'football' && <SpecialGamesSection />}
+
+      {/* ── Fallback notice — shown when a specific league tab had no matches ── */}
+      {isFallback && !isLoading && (
+        <FallbackNotice tabLabel={activeLeagueTabLabel} />
+      )}
 
       {/* ── Match list ── */}
       {error ? (
