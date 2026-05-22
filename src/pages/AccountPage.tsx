@@ -999,7 +999,7 @@ export default function AccountPage() {
             </Card>
 
             {/* Admin panel CTA — only shown to admins */}
-            {(user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') && (
+            {user.role === 'admin' && (
               <BtnPrimary
                 size="lg"
                 icon={<AdminPanelSettingsIcon fontSize="small" />}
@@ -1010,7 +1010,7 @@ export default function AccountPage() {
             )}
 
             {/* Admin upgrade CTA — only shown to regular users */}
-            {user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN' && (
+            {user.role !== 'admin' && (
               <button
                 onClick={() => setShowAdminUpgrade(true)}
                 className="w-full rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold text-sm transition-all active:scale-[0.98]"

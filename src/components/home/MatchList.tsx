@@ -1,5 +1,9 @@
 // ---------------------------------------------------------------------------
 // updated match list — old logic + new UI from v2
+// ADDITIONS:
+//   • RecentWinnersBar — scrolling ticker with 30 hardcoded winners (GHS/NGN/USD)
+//     placed ABOVE the sport-tab row on mobile.
+//   • FloatingBetSlipButton — fixed bottom-right icon that navigates to /betslip.
 // FIX 1: blob: URLs for admin team logos are session-scoped and non-transferable.
 //         We detect them early and treat them as missing → pool logo or initials fallback.
 // FIX 2: All console.log / console.warn / console.error removed.
@@ -22,34 +26,241 @@ import SportsBaseballIcon from '@mui/icons-material/SportsBaseball';
 import SportsFootballIcon from '@mui/icons-material/SportsFootball';
 import SportsMmaIcon from '@mui/icons-material/SportsMma';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 
 // ---------------------------------------------------------------------------
 // ╔══════════════════════════════════════════════════════════════════════════╗
 // ║  ADMIN LOGO POOLS — paste your 10 URLs here                             ║
-// ║                                                                          ║
-// ║  HOME_LOGO_POOL  → used for the home-team slot                          ║
-// ║  AWAY_LOGO_POOL  → used for the away-team slot                          ║
-// ║                                                                          ║
-// ║  Each admin match is assigned one logo from each pool, cycling in order  ║
-// ║  so no two visible matches ever share the same logo simultaneously.      ║
-// ║  If the admin sets hardcodedHomeLogo / hardcodedAwayLogo on the match    ║
-// ║  record those take precedence over the pool.                             ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
 const HOME_LOGO_POOL: string[] = [
-  'https://static.vecteezy.com/system/resources/thumbnails/011/049/345/small_2x/soccer-football-badge-logo-sport-team-identity-illustrations-isolated-on-white-background-vector.jpg', // ← replace
-  'https://marketplace.canva.com/EAGXHkfvP0k/2/0/1600w/canva-white-and-black-professional-design-football-club-logo-_0PEzCBc5Ao.jpg', // ← replace
-  'https://img.magnific.com/premium-vector/soccer-football-badge-logo-design-templates-sport-team-identity-vector-illustrations_683941-173.jpg', // ← replace
-  'https://marketplace.canva.com/EAFnwIBf4dU/2/0/1600w/canva-black-white-yellow-elegant-modern-football-club-logo-8HTQhmXBF18.jpg', // ← replace
-  'https://static.vecteezy.com/system/resources/previews/035/358/256/non_2x/football-club-logo-vector.jpg', // ← replace
+  'https://static.vecteezy.com/system/resources/thumbnails/011/049/345/small_2x/soccer-football-badge-logo-sport-team-identity-illustrations-isolated-on-white-background-vector.jpg',
+  'https://marketplace.canva.com/EAGXHkfvP0k/2/0/1600w/canva-white-and-black-professional-design-football-club-logo-_0PEzCBc5Ao.jpg',
+  'https://img.magnific.com/premium-vector/soccer-football-badge-logo-design-templates-sport-team-identity-vector-illustrations_683941-173.jpg',
+  'https://marketplace.canva.com/EAFnwIBf4dU/2/0/1600w/canva-black-white-yellow-elegant-modern-football-club-logo-8HTQhmXBF18.jpg',
+  'https://static.vecteezy.com/system/resources/previews/035/358/256/non_2x/football-club-logo-vector.jpg',
 ];
 
 const AWAY_LOGO_POOL: string[] = [
-  'https://marketplace.canva.com/EAF9gkRs2dU/2/0/1600w/canva-white-black-gold-circle-modern-football-club-logo-8y4rT2SOMu0.jpg', // ← replace
-  'https://logowik.com/content/uploads/images/football-club2744.logowik.com.webp', // ← replace
-  'https://img.freepik.com/free-vector/football-soccer-tournament-vector-logo-design_47987-24746.jpg?semt=ais_hybrid&w=740&q=80', // ← replace
-  'https://static.vecteezy.com/system/resources/thumbnails/012/995/442/small/football-championship-or-football-club-logo-vector.jpg', // ← replace
-  'https://d1csarkz8obe9u.cloudfront.net/posterpreviews/logo-design-template-b588de7cc0b07e82392c3b2ea4ea7b73_screen.jpg?ts=1702915331', // ← replace
+  'https://marketplace.canva.com/EAF9gkRs2dU/2/0/1600w/canva-white-black-gold-circle-modern-football-club-logo-8y4rT2SOMu0.jpg',
+  'https://logowik.com/content/uploads/images/football-club2744.logowik.com.webp',
+  'https://img.freepik.com/free-vector/football-soccer-tournament-vector-logo-design_47987-24746.jpg?semt=ais_hybrid&w=740&q=80',
+  'https://static.vecteezy.com/system/resources/thumbnails/012/995/442/small/football-championship-or-football-club-logo-vector.jpg',
+  'https://d1csarkz8obe9u.cloudfront.net/posterpreviews/logo-design-template-b588de7cc0b07e82392c3b2ea4ea7b73_screen.jpg?ts=1702915331',
 ];
+
+// ---------------------------------------------------------------------------
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║  RECENT WINNERS — 30 hardcoded entries                                  ║
+// ║  10 × GHS (20k–100k), 10 × NGN (100k–50m), 10 × USD (2k–50k)          ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+interface Winner {
+  name: string;
+  amount: string;
+  timeAgo: string;
+}
+
+const RECENT_WINNERS: Winner[] = [
+  // ── GHS ──
+  { name: 'Kwame O.',   amount: 'GHS 23,500',    timeAgo: '2m ago'  },
+  { name: 'Abena M.',   amount: 'GHS 47,200',    timeAgo: '5m ago'  },
+  { name: 'Kofi A.',    amount: 'GHS 88,000',    timeAgo: '9m ago'  },
+  { name: 'Ama S.',     amount: 'GHS 31,750',    timeAgo: '14m ago' },
+  { name: 'Yaw B.',     amount: 'GHS 65,400',    timeAgo: '18m ago' },
+  { name: 'Akosua P.',  amount: 'GHS 99,000',    timeAgo: '22m ago' },
+  { name: 'Kojo D.',    amount: 'GHS 54,800',    timeAgo: '27m ago' },
+  { name: 'Efua T.',    amount: 'GHS 20,500',    timeAgo: '31m ago' },
+  { name: 'Nana F.',    amount: 'GHS 76,300',    timeAgo: '35m ago' },
+  { name: 'Kweku R.',   amount: 'GHS 43,100',    timeAgo: '40m ago' },
+  // ── NGN ──
+  { name: 'Chidi E.',   amount: '₦ 4,200,000',   timeAgo: '3m ago'  },
+  { name: 'Amaka I.',   amount: '₦ 850,000',     timeAgo: '7m ago'  },
+  { name: 'Tunde A.',   amount: '₦ 22,500,000',  timeAgo: '11m ago' },
+  { name: 'Ngozi O.',   amount: '₦ 1,700,000',   timeAgo: '16m ago' },
+  { name: 'Emeka N.',   amount: '₦ 49,800,000',  timeAgo: '20m ago' },
+  { name: 'Chioma U.',  amount: '₦ 380,000',     timeAgo: '24m ago' },
+  { name: 'Olu B.',     amount: '₦ 7,600,000',   timeAgo: '29m ago' },
+  { name: 'Kemi F.',    amount: '₦ 14,300,000',  timeAgo: '33m ago' },
+  { name: 'Seun W.',    amount: '₦ 600,000',     timeAgo: '37m ago' },
+  { name: 'Bayo L.',    amount: '₦ 33,000,000',  timeAgo: '42m ago' },
+  // ── USD ──
+  { name: 'James K.',   amount: '$ 3,800',       timeAgo: '1m ago'  },
+  { name: 'Sarah M.',   amount: '$ 47,500',      timeAgo: '6m ago'  },
+  { name: 'David C.',   amount: '$ 12,200',      timeAgo: '10m ago' },
+  { name: 'Fatima A.',  amount: '$ 28,750',      timeAgo: '15m ago' },
+  { name: 'Carlos R.',  amount: '$ 5,400',       timeAgo: '19m ago' },
+  { name: 'Lena V.',    amount: '$ 49,000',      timeAgo: '23m ago' },
+  { name: 'Omar H.',    amount: '$ 8,600',       timeAgo: '28m ago' },
+  { name: 'Priya S.',   amount: '$ 2,300',       timeAgo: '32m ago' },
+  { name: 'Mike T.',    amount: '$ 19,900',      timeAgo: '36m ago' },
+  { name: 'Yuki N.',    amount: '$ 36,500',      timeAgo: '41m ago' },
+];
+
+// ---------------------------------------------------------------------------
+// RecentWinnersBar — horizontal auto-scrolling ticker
+// ---------------------------------------------------------------------------
+function RecentWinnersBar() {
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  // Duplicate the list so the loop appears seamless
+  const doubled = [...RECENT_WINNERS, ...RECENT_WINNERS];
+
+  return (
+    <div
+      style={{
+        overflow: 'hidden',
+        background: 'linear-gradient(90deg, rgba(20,20,30,0.95) 0%, rgba(25,25,40,0.95) 100%)',
+        borderRadius: 10,
+        padding: '0 0',
+        marginBottom: 12,
+        position: 'relative',
+        border: '1px solid rgba(245,166,35,0.18)',
+      }}
+    >
+      {/* Label */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '7px 12px 4px',
+        }}
+      >
+        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--primary, #f5a623)', textTransform: 'uppercase' }}>
+          🏆 Grand Prize Winners
+        </span>
+      </div>
+
+      {/* Scrolling track */}
+      <div style={{ overflow: 'hidden', paddingBottom: 8 }}>
+        <div
+          ref={trackRef}
+          style={{
+            display: 'flex',
+            gap: 8,
+            paddingLeft: 12,
+            animation: 'winnersScroll 60s linear infinite',
+            width: 'max-content',
+          }}
+        >
+          {doubled.map((w, i) => (
+            <div
+              key={i}
+              style={{
+                flexShrink: 0,
+                background: 'rgba(255,255,255,0.05)',
+                borderRadius: 8,
+                padding: '5px 10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                border: '1px solid rgba(245,166,35,0.12)',
+                minWidth: 160,
+              }}
+            >
+              <span style={{ fontSize: 14 }}>🎉</span>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-main, #fff)', whiteSpace: 'nowrap' }}>
+                  {w.name}
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--primary, #f5a623)', whiteSpace: 'nowrap' }}>
+                  {w.amount}
+                </div>
+              </div>
+              <div style={{ fontSize: 9, color: 'var(--text-muted, #888)', whiteSpace: 'nowrap', marginLeft: 2 }}>
+                {w.timeAgo}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Fade masks */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, bottom: 0, width: 24,
+        background: 'linear-gradient(90deg, rgba(20,20,30,0.95), transparent)',
+        pointerEvents: 'none',
+      }} />
+      <div style={{
+        position: 'absolute', top: 0, right: 0, bottom: 0, width: 24,
+        background: 'linear-gradient(270deg, rgba(20,20,30,0.95), transparent)',
+        pointerEvents: 'none',
+      }} />
+
+      <style>{`
+        @keyframes winnersScroll {
+          0%   { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FloatingBetSlipButton
+// ---------------------------------------------------------------------------
+function FloatingBetSlipButton() {
+  const navigate = useNavigate();
+  const { betSlip } = useAppStore() as { betSlip: { matchId: string }[] };
+  const count = betSlip?.length ?? 0;
+
+  return (
+    <button
+      onClick={() => navigate('/betslip')}
+      aria-label="Open bet slip"
+      style={{
+        position: 'fixed',
+        bottom: 80,
+        right: 16,
+        zIndex: 1000,
+        width: 52,
+        height: 52,
+        borderRadius: '50%',
+        background: 'var(--primary, #f5a623)',
+        border: 'none',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: '0 4px 16px rgba(245,166,35,0.45)',
+        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.08)';
+        (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 22px rgba(245,166,35,0.6)';
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
+        (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 16px rgba(245,166,35,0.45)';
+      }}
+    >
+      <ReceiptLongIcon sx={{ fontSize: 24, color: '#1a1a1a' }} />
+      {count > 0 && (
+        <span
+          style={{
+            position: 'absolute',
+            top: -2,
+            right: -2,
+            background: '#e53935',
+            color: '#fff',
+            borderRadius: '50%',
+            width: 18,
+            height: 18,
+            fontSize: 10,
+            fontWeight: 800,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '2px solid var(--bg-main, #0f0f1a)',
+            lineHeight: 1,
+          }}
+        >
+          {count > 9 ? '9+' : count}
+        </span>
+      )}
+    </button>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -61,7 +272,6 @@ type MatchCategory = 'live' | 'today' | 'upcoming' | 'finished';
 interface OddsMap { home: number; draw: number; away: number; }
 interface EnrichedMatch extends Match {
   oddsMap?: OddsMap;
-  /** Logo URLs resolved for admin matches (pool or hardcoded) */
   adminHomeLogo?: string;
   adminAwayLogo?: string;
 }
@@ -84,30 +294,18 @@ function sanitizeLogo(url: string | undefined | null): string {
   return trimmed;
 }
 
-// ---------------------------------------------------------------------------
-// Admin logo pool assignment
-// Assigns a stable logo pair to each admin match based on its position in
-// the current visible list. Two matches never get the same pool index at the
-// same time, even if the pool has only 5 entries and there are more games.
-// ---------------------------------------------------------------------------
 function assignAdminLogos(matches: EnrichedMatch[]): EnrichedMatch[] {
   const poolSize = Math.max(HOME_LOGO_POOL.length, AWAY_LOGO_POOL.length, 1);
   return matches.map((m, idx) => {
     const hardHome = sanitizeLogo((m as unknown as Record<string, string>).hardcodedHomeLogo);
     const hardAway = sanitizeLogo((m as unknown as Record<string, string>).hardcodedAwayLogo);
-
     const homeUrl = hardHome || sanitizeLogo(HOME_LOGO_POOL[idx % poolSize]) || '';
     const awayUrl = hardAway || sanitizeLogo(AWAY_LOGO_POOL[idx % poolSize]) || '';
-
     return { ...m, adminHomeLogo: homeUrl, adminAwayLogo: awayUrl };
   });
 }
 
-// ---------------------------------------------------------------------------
-// localStorage key for permanently hidden admin match IDs
-// ---------------------------------------------------------------------------
 const HIDDEN_ADMIN_IDS_KEY = 'hidden_finished_admin_match_ids';
-
 function loadHiddenAdminIds(): Set<string> {
   try {
     const raw = localStorage.getItem(HIDDEN_ADMIN_IDS_KEY);
@@ -117,11 +315,9 @@ function loadHiddenAdminIds(): Set<string> {
   } catch { /* ignore */ }
   return new Set();
 }
-
 function saveHiddenAdminIds(ids: Set<string>): void {
   try { localStorage.setItem(HIDDEN_ADMIN_IDS_KEY, JSON.stringify([...ids])); } catch { /* ignore */ }
 }
-
 function addHiddenAdminId(id: string): void {
   const ids = loadHiddenAdminIds();
   ids.add(id);
@@ -129,7 +325,7 @@ function addHiddenAdminId(id: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Hardcoded league → teams mappings
+// Hardcoded league → teams mappings (unchanged from original)
 // ---------------------------------------------------------------------------
 const LEAGUE_TEAMS: Record<Exclude<FootballLeagueTab, 'all' | 'other'>, { leagueNames: string[]; teams: string[] }> = {
   premier_league: {
@@ -220,9 +416,6 @@ function inferLeagueFromTeams(homeTeam: string, awayTeam: string): string {
   return '';
 }
 
-// ---------------------------------------------------------------------------
-// Sport tab config
-// ---------------------------------------------------------------------------
 const SPORT_TABS: { key: SportTab; label: string; icon: React.ReactNode }[] = [
   { key: 'football',   label: 'Football',   icon: <SportsSoccerIcon sx={{ fontSize: 15 }} /> },
   { key: 'basketball', label: 'Basketball', icon: <SportsBasketballIcon sx={{ fontSize: 15 }} /> },
@@ -244,9 +437,6 @@ const FOOTBALL_LEAGUE_TABS: { key: FootballLeagueTab; label: string }[] = [
 
 const TWO_WAY_ODDS_SPORTS = new Set<SportTab>(['baseball','basketball','nfl','mma']);
 
-// ---------------------------------------------------------------------------
-// Status sets
-// ---------------------------------------------------------------------------
 const LIVE_STATUSES = new Set([
   'LIVE','live','IN_PLAY','in_play','inplay',
   'FIRST_HALF','first_half','1H','1h',
@@ -292,9 +482,6 @@ function finishedLabel(status?: string): string {
   return 'FT';
 }
 
-// ---------------------------------------------------------------------------
-// League classification
-// ---------------------------------------------------------------------------
 const TOP_6_LEAGUE_DISPLAY_NAMES = ['Premier League','La Liga','Bundesliga','Serie A','Ligue 1'];
 const TOP_6_LABELS  = new Set<string>(TOP_6_LEAGUE_DISPLAY_NAMES);
 const CUPS_LABELS   = new Set<string>([
@@ -315,9 +502,6 @@ function leagueSortKey(league: string): string {
   return `02_${league.toLowerCase()}`;
 }
 
-// ---------------------------------------------------------------------------
-// Categorise
-// ---------------------------------------------------------------------------
 function categorise(match: Match): MatchCategory {
   const status = match.status ?? '';
   if (FINISHED_STATUSES.has(status)) return 'finished';
@@ -332,9 +516,6 @@ function categorise(match: Match): MatchCategory {
   return 'upcoming';
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 function formatKickoff(kickoffAt?: string): string {
   if (!kickoffAt) return '--:--';
   return new Date(kickoffAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -357,9 +538,6 @@ function formatCountdown(kickoffAt?: string): string {
   return `in ${mins}m`;
 }
 
-// ---------------------------------------------------------------------------
-// Team initials helper
-// ---------------------------------------------------------------------------
 function getTeamInitials(name: string): string {
   if (!name) return '?';
   const words = name.trim().split(/\s+/);
@@ -380,123 +558,75 @@ function teamColour(name: string): string {
   return PALETTE[hash % PALETTE.length];
 }
 
-// ---------------------------------------------------------------------------
-// TeamLogo — renders img if URL is a real non-blob URL, else initials avatar.
-// ---------------------------------------------------------------------------
 function TeamLogo({ logo, name, size = 32 }: { logo?: string; name?: string; size?: number }) {
   const cleanLogo = sanitizeLogo(logo);
   const [failed, setFailed] = useState(false);
   useEffect(() => { setFailed(false); }, [cleanLogo]);
   const teamName = name ?? '';
-
   if (cleanLogo && !failed) {
     return (
-      <img
-        src={cleanLogo}
-        alt={teamName}
+      <img src={cleanLogo} alt={teamName}
         style={{ width: size, height: size, borderRadius: '50%', objectFit: 'contain', flexShrink: 0 }}
-        onError={() => setFailed(true)}
-      />
+        onError={() => setFailed(true)} />
     );
   }
-
   const initials = getTeamInitials(teamName);
   const bg = teamColour(teamName);
   return (
-    <div
-      style={{
-        width: size, height: size, background: bg,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        borderRadius: '50%', flexShrink: 0,
-        fontSize: size * 0.28, fontWeight: 700, color: '#fff',
-        letterSpacing: '0.02em', userSelect: 'none',
-      }}
-      aria-label={teamName}
-    >
+    <div style={{ width: size, height: size, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      borderRadius: '50%', flexShrink: 0, fontSize: size * 0.28, fontWeight: 700, color: '#fff',
+      letterSpacing: '0.02em', userSelect: 'none' }} aria-label={teamName}>
       {initials}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// TeamLogoAdmin — tries the pooled/hardcoded URL first; falls back to initials.
-// ---------------------------------------------------------------------------
-function TeamLogoAdmin({
-  poolUrl,
-  name,
-  size = 32,
-}: {
-  poolUrl?: string;
-  name?: string;
-  size?: number;
-}) {
+function TeamLogoAdmin({ poolUrl, name, size = 32 }: { poolUrl?: string; name?: string; size?: number }) {
   const cleanUrl = sanitizeLogo(poolUrl);
   const [failed, setFailed] = useState(false);
   useEffect(() => { setFailed(false); }, [cleanUrl]);
   const teamName = name ?? '';
-
   if (cleanUrl && !failed) {
     return (
-      <img
-        src={cleanUrl}
-        alt={teamName}
+      <img src={cleanUrl} alt={teamName}
         style={{ width: size, height: size, borderRadius: '50%', objectFit: 'contain', flexShrink: 0 }}
-        onError={() => setFailed(true)}
-      />
+        onError={() => setFailed(true)} />
     );
   }
-
   const initials = getTeamInitials(teamName);
   const bg = teamColour(teamName);
   return (
-    <div
-      style={{
-        width: size, height: size, background: bg,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        borderRadius: '50%', flexShrink: 0,
-        fontSize: size * 0.28, fontWeight: 700, color: '#fff',
-        letterSpacing: '0.02em', userSelect: 'none',
-      }}
-      aria-label={teamName}
-    >
+    <div style={{ width: size, height: size, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      borderRadius: '50%', flexShrink: 0, fontSize: size * 0.28, fontWeight: 700, color: '#fff',
+      letterSpacing: '0.02em', userSelect: 'none' }} aria-label={teamName}>
       {initials}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Odds extraction
-// ---------------------------------------------------------------------------
 function extractOddsMap(oddsArray: unknown[], homeTeam: string, awayTeam: string): OddsMap | undefined {
   if (!Array.isArray(oddsArray) || oddsArray.length === 0) return undefined;
-
   const pool = oddsArray as Array<Record<string, unknown>>;
   const parseOdd = (o: Record<string, unknown>): number =>
     parseFloat(String(o.odd ?? o.value ?? o.odds ?? o.price ?? o.decimal ?? o.americanOdds ?? '0'));
-
   const norm = (s: string) => s.toLowerCase().trim();
   const normHome = norm(homeTeam);
   const normAway = norm(awayTeam);
-
   const matchesTeam = (sel: string, teamNorm: string) => {
     const s = norm(sel);
     return s === teamNorm || s.includes(teamNorm) || teamNorm.includes(s);
   };
-
   let home = 0, draw = 0, away = 0;
-
   for (const o of pool) {
     const sel = norm(String(o.selection ?? o.outcome ?? o.name ?? o.label ?? o.type ?? ''));
     const val = parseOdd(o);
     if (val <= 1 || val > 200) continue;
-
     if (sel === 'home') { if (home === 0) home = val; }
     else if (sel === 'away') { if (away === 0) away = val; }
     else if (sel === 'draw' || sel === 'x') { if (draw === 0) draw = val; }
     else if (matchesTeam(sel, normHome)) { if (home === 0) home = val; }
     else if (matchesTeam(sel, normAway)) { if (away === 0) away = val; }
   }
-
   if (home === 0 && draw === 0 && away === 0) {
     const vals = pool.map(parseOdd).filter((v) => v > 1 && v < 50);
     if (vals.length >= 2) {
@@ -506,7 +636,6 @@ function extractOddsMap(oddsArray: unknown[], homeTeam: string, awayTeam: string
     }
     return undefined;
   }
-
   return { home, draw, away };
 }
 
@@ -515,7 +644,6 @@ function extractAdminOdds(raw: Record<string, unknown>, homeTeam: string, awayTe
   const flatDraw = parseFloat(String(raw.drawOdds ?? raw.draw_odds ?? raw.oddDraw ?? raw.odd_draw ?? '0'));
   const flatAway = parseFloat(String(raw.awayOdds ?? raw.away_odds ?? raw.oddAway ?? raw.odd_away ?? '0'));
   if (flatHome > 0 || flatDraw > 0 || flatAway > 0) return { home: flatHome, draw: flatDraw, away: flatAway };
-
   if (raw.odds && typeof raw.odds === 'object' && !Array.isArray(raw.odds)) {
     const o = raw.odds as Record<string, unknown>;
     const h = parseFloat(String(o.home ?? o.homeOdds ?? o['1'] ?? '0'));
@@ -523,7 +651,6 @@ function extractAdminOdds(raw: Record<string, unknown>, homeTeam: string, awayTe
     const a = parseFloat(String(o.away ?? o.awayOdds ?? o['2'] ?? '0'));
     if (h > 0 || d > 0 || a > 0) return { home: h, draw: d, away: a };
   }
-
   const ARRAY_FIELDS = ['odds', 'match_result', 'markets', 'selections', 'outcomes', 'bookmakers'] as const;
   let oddsArr: unknown[] = [];
   for (const field of ARRAY_FIELDS) {
@@ -539,17 +666,12 @@ function extractAdminOdds(raw: Record<string, unknown>, homeTeam: string, awayTe
   return undefined;
 }
 
-// ---------------------------------------------------------------------------
-// unwrapWithAllOdds
-// ---------------------------------------------------------------------------
 function unwrapWithAllOdds(raw: unknown): Array<{ match: Match; odds: unknown[] }> {
   if (!raw) return [];
   const obj = raw as Record<string, unknown>;
   if (!obj.success) return [];
   if (!obj.data) return [];
-
   const items: Array<{ match: Match; odds: unknown[] }> = [];
-
   const processItem = (item: unknown) => {
     const i = item as Record<string, unknown>;
     const match = normalizeMatch(i.match ?? i);
@@ -560,9 +682,7 @@ function unwrapWithAllOdds(raw: unknown): Array<{ match: Match; odds: unknown[] 
       Array.isArray(i.markets) ? i.markets : [];
     items.push({ match, odds });
   };
-
   const processArray = (arr: unknown[]) => arr.forEach(processItem);
-
   const data = obj.data;
   if (Array.isArray(data)) { processArray(data); }
   else if (data && typeof data === 'object') {
@@ -570,13 +690,9 @@ function unwrapWithAllOdds(raw: unknown): Array<{ match: Match; odds: unknown[] 
       if (Array.isArray(val)) processArray(val);
     }
   }
-
   return items;
 }
 
-// ---------------------------------------------------------------------------
-// normalizeMatch
-// ---------------------------------------------------------------------------
 function looksLikeFixtureName(s: string): boolean {
   return / at /i.test(s) || / vs\.? /i.test(s) || / @ /i.test(s);
 }
@@ -640,12 +756,10 @@ function normalizeMatch(raw: unknown): Match | null {
     if (atMatch) { if (!awayTeam) awayTeam = atMatch[1].trim(); if (!homeTeam) homeTeam = atMatch[2].trim(); }
     else if (vsMatch) { if (!homeTeam) homeTeam = vsMatch[1].trim(); if (!awayTeam) awayTeam = vsMatch[2].trim(); }
   }
-
   if (!homeTeam && !awayTeam) return null;
 
   let leagueName = '';
   let leagueLogo = '';
-
   if (firstComp) {
     const compLeague = firstComp.league ?? firstComp.season;
     if (compLeague && typeof compLeague === 'object') {
@@ -653,7 +767,6 @@ function normalizeMatch(raw: unknown): Match | null {
       leagueName = String(lo.name ?? lo.displayName ?? lo.slug ?? '');
     }
   }
-
   if (!leagueName) {
     const rawLeague = r.league ?? r.leagueName ?? r.competition ?? r.league_name ?? r.competitionName;
     if (rawLeague && typeof rawLeague === 'object') {
@@ -669,7 +782,6 @@ function normalizeMatch(raw: unknown): Match | null {
       leagueName = looksLikeFixtureName(candidate) ? '' : candidate;
     }
   }
-
   if (!leagueName && firstComp) {
     const season = firstComp.season as Record<string, unknown> | undefined;
     if (season?.slug) leagueName = String(season.slug);
@@ -741,21 +853,13 @@ function normalizeMatch(raw: unknown): Match | null {
   } as Match;
 }
 
-// ---------------------------------------------------------------------------
-// normalizeAdminMatch
-// Now also reads hardcodedHomeLogo / hardcodedAwayLogo from the API record
-// so admin can set per-match logos via those fields.
-// ---------------------------------------------------------------------------
 function normalizeAdminMatch(raw: unknown): Match | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
-
   const id = String(r.id ?? r.matchId ?? r.match_id ?? '');
   if (!id || id === 'undefined') return null;
-
   const homeTeam = String(r.homeTeam ?? r.home_team ?? r.homeName ?? r.home_name ?? '').trim();
   const awayTeam = String(r.awayTeam ?? r.away_team ?? r.awayName ?? r.away_name ?? '').trim();
-
   let leagueName = '';
   let leagueLogo = '';
   const rawLeague = r.league ?? r.leagueName ?? r.league_name ?? r.competition ?? r.competitionName;
@@ -769,7 +873,6 @@ function normalizeAdminMatch(raw: unknown): Match | null {
   if (!leagueLogo) leagueLogo = String(r.leagueLogo ?? r.league_logo ?? r.competitionLogo ?? r.competition_logo ?? '');
   leagueLogo = sanitizeLogo(leagueLogo);
   if (!leagueName && homeTeam && awayTeam) leagueName = inferLeagueFromTeams(homeTeam, awayTeam);
-
   const status = String(r.status ?? r.matchStatus ?? r.match_status ?? '');
   const scoreHome = r.scoreHome != null ? Number(r.scoreHome)
     : r.score_home != null ? Number(r.score_home)
@@ -781,37 +884,19 @@ function normalizeAdminMatch(raw: unknown): Match | null {
     : undefined;
   const kickoffAt = String(r.kickoffAt ?? r.kickoff_at ?? r.startTime ?? r.start_time ?? r.date ?? r.scheduledAt ?? '');
   const minutePlayed = r.minutePlayed != null ? Number(r.minutePlayed) : r.minute_played != null ? Number(r.minute_played) : undefined;
-
-  // Fields accepted: hardcodedHomeLogo, hardcoded_home_logo, homeLogo, home_logo
-  const hardcodedHomeLogo = sanitizeLogo(
-    String(r.hardcodedHomeLogo ?? r.hardcoded_home_logo ?? r.homeLogo ?? r.home_logo ?? '').trim()
-  );
-  const hardcodedAwayLogo = sanitizeLogo(
-    String(r.hardcodedAwayLogo ?? r.hardcoded_away_logo ?? r.awayLogo ?? r.away_logo ?? '').trim()
-  );
-
+  const hardcodedHomeLogo = sanitizeLogo(String(r.hardcodedHomeLogo ?? r.hardcoded_home_logo ?? r.homeLogo ?? r.home_logo ?? '').trim());
+  const hardcodedAwayLogo = sanitizeLogo(String(r.hardcodedAwayLogo ?? r.hardcoded_away_logo ?? r.awayLogo ?? r.away_logo ?? '').trim());
   return {
-    id,
-    source: 'ADMIN_CREATED' as Match['source'],
+    id, source: 'ADMIN_CREATED' as Match['source'],
     homeTeam: homeTeam || 'Home Team',
     awayTeam: awayTeam || 'Away Team',
-    league: leagueName,
-    status,
-    kickoffAt,
-    scoreHome,
-    scoreAway,
-    homeLogo: hardcodedHomeLogo,
-    awayLogo: hardcodedAwayLogo,
-    leagueLogo,
-    minutePlayed,
+    league: leagueName, status, kickoffAt, scoreHome, scoreAway,
+    homeLogo: hardcodedHomeLogo, awayLogo: hardcodedAwayLogo, leagueLogo, minutePlayed,
     sport: String(r.sport ?? 'FOOTBALL'),
     createdAt: String(r.createdAt ?? r.created_at ?? ''),
   } as Match;
 }
 
-// ---------------------------------------------------------------------------
-// safeUnwrapList
-// ---------------------------------------------------------------------------
 function safeUnwrapList(raw: unknown): Match[] {
   if (!raw) return [];
   const normalize = (arr: unknown[]): Match[] =>
@@ -879,9 +964,6 @@ function mergeOddsById(oddsById: Map<string, unknown[]>, entries: Array<{ match:
   }
 }
 
-// ---------------------------------------------------------------------------
-// hasValidOdds
-// ---------------------------------------------------------------------------
 function hasValidOdds(match: EnrichedMatch): boolean {
   if (FINISHED_STATUSES.has(match.status ?? '')) return true;
   const o = match.oddsMap;
@@ -889,9 +971,6 @@ function hasValidOdds(match: EnrichedMatch): boolean {
   return o.home > 0 && o.away > 0;
 }
 
-// ---------------------------------------------------------------------------
-// Football data fetch
-// ---------------------------------------------------------------------------
 async function fetchAllFootballMatches(): Promise<EnrichedMatch[]> {
   const [
     withOddsRes, liveRes, upcomingRes, todayRes, resultsRes,
@@ -936,7 +1015,6 @@ async function fetchAllFootballMatches(): Promise<EnrichedMatch[]> {
   const fromUpcoming = fromUpcomingItems.map(({ match }) => match);
   const fromToday    = fromTodayItems.map(({ match }) => match);
   const fromResults  = resultsRes.status === 'fulfilled' ? safeUnwrapList(resultsRes.value) : [];
-
   const fromLsLive          = livescoreLiveRes.status   === 'fulfilled' ? safeUnwrapList(livescoreLiveRes.value)   : [];
   const fromLsToday         = livescoreTodayRes.status  === 'fulfilled' ? safeUnwrapList(livescoreTodayRes.value)  : [];
   const fromAllCupsUpcoming = allCupsUpcomingRes.status === 'fulfilled' ? safeUnwrapList(allCupsUpcomingRes.value) : [];
@@ -1010,9 +1088,6 @@ function filterByLeagueTab(matches: EnrichedMatch[], tab: FootballLeagueTab): En
   return matches.filter((m) => matchBelongsToLeagueTab(m, tab));
 }
 
-// ---------------------------------------------------------------------------
-// Other sport fetchers
-// ---------------------------------------------------------------------------
 async function fetchBasketballMatches(): Promise<EnrichedMatch[]> {
   const [live, upcoming, results] = await Promise.allSettled([
     api.publicBasketball.live(), api.publicBasketball.upcoming(), api.publicBasketball.results(),
@@ -1100,13 +1175,9 @@ async function fetchMmaMatches(): Promise<EnrichedMatch[]> {
   return enriched.filter(hasValidOdds);
 }
 
-// ---------------------------------------------------------------------------
-// Live Timer Hook
-// ---------------------------------------------------------------------------
 function useLiveTimer(match: EnrichedMatch): string {
   const status = match.status ?? '';
   const isLive = LIVE_STATUSES.has(status);
-
   const getElapsedMins = useCallback((): number => {
     if (match.kickoffAt) {
       const elapsed = Date.now() - new Date(match.kickoffAt).getTime();
@@ -1114,16 +1185,13 @@ function useLiveTimer(match: EnrichedMatch): string {
     }
     return match.minutePlayed ?? 0;
   }, [match.kickoffAt, match.minutePlayed]);
-
   const [elapsed, setElapsed] = useState<number>(getElapsedMins);
-
   useEffect(() => {
     if (!isLive) return;
     setElapsed(getElapsedMins());
     const id = setInterval(() => setElapsed(getElapsedMins()), 30_000);
     return () => clearInterval(id);
   }, [isLive, getElapsedMins]);
-
   if (!isLive) return '';
   if (HALFTIME_STATUSES.has(status)) return 'HT';
   if (PENALTY_STATUSES.has(status)) return 'PEN';
@@ -1133,9 +1201,6 @@ function useLiveTimer(match: EnrichedMatch): string {
 
 const ADMIN_FINISHED_LINGER_MS = 10_000;
 
-// ---------------------------------------------------------------------------
-// MatchCard — v2 design, with isAdmin prop routing logos to TeamLogoAdmin
-// ---------------------------------------------------------------------------
 function MatchCard({
   match,
   hasDraw = true,
@@ -1152,38 +1217,25 @@ function MatchCard({
     addToBetSlip: (entry: BetSlipEntry) => void;
     showToast: (message: string, type: string) => void;
   };
-
   const status     = match.status ?? '';
   const isLive     = LIVE_STATUSES.has(status);
   const isFinished = FINISHED_STATUSES.has(status);
   const isUpcoming = !isLive && !isFinished;
-
   const timerStr  = useLiveTimer(match);
   const homeScore = match.scoreHome ?? 0;
   const awayScore = match.scoreAway ?? 0;
   const homeWon   = isFinished && homeScore > awayScore;
   const awayWon   = isFinished && awayScore > homeScore;
-
   const odds = match.oddsMap;
-
   const isSel = (sel: string) =>
     (betSlip as BetSlipEntry[]).some((s) => s.matchId === match.id && s.market === '1X2' && s.selection === sel);
-
   const pick = (sel: string, odd: number, e: React.MouseEvent) => {
     e.stopPropagation();
     if (isFinished || !odd || odd <= 0) return;
-    addToBetSlip({
-      matchId:   match.id,
-      matchName: `${match.homeTeam} vs ${match.awayTeam}`,
-      market:    '1X2',
-      selection: sel,
-      odd,
-    });
+    addToBetSlip({ matchId: match.id, matchName: `${match.homeTeam} vs ${match.awayTeam}`, market: '1X2', selection: sel, odd });
     showToast('Added to bet slip', 'success');
   };
-
   const stateClass = isLive ? 'live' : isFinished ? 'finished' : 'upcoming';
-
   const oddsSlots = hasDraw
     ? [
         { key: '1', label: 'Home', val: odds?.home ?? 0 },
@@ -1194,39 +1246,24 @@ function MatchCard({
         { key: '1', label: 'Home', val: odds?.home ?? 0 },
         { key: '2', label: 'Away', val: odds?.away ?? 0 },
       ];
-
-  // Logo rendering — admin matches use TeamLogoAdmin (pool url → initials fallback)
-  // regular matches use TeamLogo (real url → initials fallback)
   const renderHomeLogo = (size: number) => isAdmin
     ? <TeamLogoAdmin poolUrl={match.adminHomeLogo} name={match.homeTeam} size={size} />
     : <TeamLogo logo={match.homeLogo} name={match.homeTeam} size={size} />;
-
   const renderAwayLogo = (size: number) => isAdmin
     ? <TeamLogoAdmin poolUrl={match.adminAwayLogo} name={match.awayTeam} size={size} />
     : <TeamLogo logo={match.awayLogo} name={match.awayTeam} size={size} />;
 
   return (
-    <div
-      className={`match-card ${stateClass}`}
-      onClick={onClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.(); }}
-    >
-      {/* ── Top bar: league logo + name + status badge ── */}
+    <div className={`match-card ${stateClass}`} onClick={onClick} role="button" tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.(); }}>
       <div className="match-card-topbar">
         {match.leagueLogo && (
-          <img
-            src={match.leagueLogo}
-            alt=""
-            className="match-card-league-logo"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-          />
+          <img src={match.leagueLogo} alt="" className="match-card-league-logo"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
         )}
         <span className="match-card-league">
           {match.league || (match.source === 'ADMIN_CREATED' ? 'Special Game' : '')}
         </span>
-
         {isLive && (
           <span className="match-status-badge live">
             <FiberManualRecordIcon sx={{ fontSize: 7 }} className="live-dot" />
@@ -1243,43 +1280,24 @@ function MatchCard({
           </span>
         )}
       </div>
-
-      {/* ── Teams body ── */}
       <div className="match-card-body">
-        {/* Home row */}
         <div className="match-team-row">
           {renderHomeLogo(32)}
-          <span className={`match-team-name${isFinished ? (homeWon ? ' winner' : ' loser') : ''}`}>
-            {match.homeTeam}
-          </span>
+          <span className={`match-team-name${isFinished ? (homeWon ? ' winner' : ' loser') : ''}`}>{match.homeTeam}</span>
           {(isLive || isFinished) && (
-            <span className={`match-score${isFinished ? (homeWon ? ' winner' : ' loser') : ''}`}>
-              {homeScore}
-            </span>
+            <span className={`match-score${isFinished ? (homeWon ? ' winner' : ' loser') : ''}`}>{homeScore}</span>
           )}
-          {isUpcoming && (
-            <span className="match-countdown">{formatCountdown(match.kickoffAt)}</span>
-          )}
+          {isUpcoming && <span className="match-countdown">{formatCountdown(match.kickoffAt)}</span>}
         </div>
-
-        {/* Separator */}
         <div className="match-vs-separator" />
-
-        {/* Away row */}
         <div className="match-team-row">
           {renderAwayLogo(32)}
-          <span className={`match-team-name${isFinished ? (awayWon ? ' winner' : ' loser') : ''}`}>
-            {match.awayTeam}
-          </span>
+          <span className={`match-team-name${isFinished ? (awayWon ? ' winner' : ' loser') : ''}`}>{match.awayTeam}</span>
           {(isLive || isFinished) && (
-            <span className={`match-score${isFinished ? (awayWon ? ' winner' : ' loser') : ''}`}>
-              {awayScore}
-            </span>
+            <span className={`match-score${isFinished ? (awayWon ? ' winner' : ' loser') : ''}`}>{awayScore}</span>
           )}
         </div>
       </div>
-
-      {/* ── Finished: result strip, no odds ── */}
       {isFinished && (
         <div className="match-result-strip">
           <span className="match-result-label">Full time</span>
@@ -1293,39 +1311,18 @@ function MatchCard({
           </span>
         </div>
       )}
-
-      {/* ── Live / Upcoming: odds row + more markets ── */}
       {(isLive || isUpcoming) && (
         <>
           <div className="match-odds-row">
             {oddsSlots.map(({ key, label, val }) => (
-              <button
-                key={key}
+              <button key={key}
                 className={`match-odds-btn${val <= 0 ? ' empty' : isSel(key) ? ' selected' : ''}`}
                 onClick={(e) => val > 0 && pick(key, val, e)}
-                disabled={val <= 0}
-              >
-                <span
-                  className="match-odds-label"
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    letterSpacing: '0.04em',
-                    textTransform: 'uppercase',
-                    opacity: 1,
-                    color: 'var(--text-main, #ffffff)',
-                  }}
-                >
+                disabled={val <= 0}>
+                <span className="match-odds-label" style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', opacity: 1, color: 'var(--text-main, #ffffff)' }}>
                   {label}
                 </span>
-                <span
-                  className="match-odds-value"
-                  style={{
-                    fontSize: '15px',
-                    fontWeight: 700,
-                    color: 'var(--primary, #f5a623)',
-                  }}
-                >
+                <span className="match-odds-value" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--primary, #f5a623)' }}>
                   {val > 0 ? val.toFixed(2) : '—'}
                 </span>
               </button>
@@ -1340,52 +1337,27 @@ function MatchCard({
   );
 }
 
-// ---------------------------------------------------------------------------
-// LeagueCard — v2 wrapper
-// ---------------------------------------------------------------------------
-function LeagueCard({
-  league,
-  matches,
-  leagueLogo,
-  showDraw,
-}: {
-  league: string;
-  matches: EnrichedMatch[];
-  leagueLogo?: string;
-  showDraw: boolean;
-}) {
+function LeagueCard({ league, matches, leagueLogo, showDraw }: { league: string; matches: EnrichedMatch[]; leagueLogo?: string; showDraw: boolean }) {
   const navigate = useNavigate();
   const isTop6   = TOP_6_LABELS.has(league);
   const isCup    = CUPS_LABELS.has(league);
-
   return (
     <div className="league-group">
       <div className="league-group-header">
         {(isTop6 || isCup) && leagueLogo && (
-          <img
-            src={leagueLogo} alt=""
-            className="league-group-header-logo"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-          />
+          <img src={leagueLogo} alt="" className="league-group-header-logo"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
         )}
         <span className="league-group-name">{league || '—'}</span>
         <span className="league-group-count">{matches.length}</span>
       </div>
       {matches.map((m) => (
-        <MatchCard
-          key={m.id}
-          match={m}
-          hasDraw={showDraw}
-          onClick={() => navigate(`/match/${m.id}`)}
-        />
+        <MatchCard key={m.id} match={m} hasDraw={showDraw} onClick={() => navigate(`/match/${m.id}`)} />
       ))}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// SpecialGamesSection
-// ---------------------------------------------------------------------------
 function SpecialGamesSection() {
   const navigate = useNavigate();
   const permanentlyHiddenRef = useRef<Set<string>>(loadHiddenAdminIds());
@@ -1397,32 +1369,23 @@ function SpecialGamesSection() {
   useEffect(() => {
     const myGen = ++genRef.current;
     const alive = () => myGen === genRef.current;
-
     async function load() {
       try {
         const raw = await fetch(
           'https://futballbackend-production.up.railway.app/api/public/admin-matches?ngrok-skip-browser-warning=true',
         ).then((r) => r.json());
-
         if (!alive()) return;
-
         const matches = unwrapAdminMatches(raw);
         if (matches.length === 0) { setAdminMatches([]); return; }
-
         const oddsResults = await Promise.allSettled(matches.map((m) => fetchAdminMatchOdds(m.id)));
         if (!alive()) return;
-
         const enriched: EnrichedMatch[] = matches.map((match, idx) => {
           const oddsArr = oddsResults[idx].status === 'fulfilled' ? oddsResults[idx].value : [];
           const oddsMap = extractOddsMap(oddsArr, match.homeTeam ?? '', match.awayTeam ?? '');
           return { ...match, oddsMap };
         });
-
         const withOdds = enriched.filter(hasValidOdds);
-
-        // Assign pool logos AFTER filtering so indices are stable for visible matches
         const withLogos = assignAdminLogos(withOdds);
-
         const now = Date.now();
         for (const m of withLogos) {
           const isFinished = FINISHED_STATUSES.has(m.status ?? '');
@@ -1431,11 +1394,8 @@ function SpecialGamesSection() {
           }
         }
         setAdminMatches(withLogos);
-      } catch {
-        // silently swallow fetch errors
-      }
+      } catch { /* silent */ }
     }
-
     load();
     const interval = setInterval(() => { if (document.visibilityState === 'visible') load(); }, 15_000);
     const onVisible = () => { if (document.visibilityState === 'visible') load(); };
@@ -1495,10 +1455,8 @@ function SpecialGamesSection() {
             return (
               <div key={m.id} className="relative">
                 <MatchCard match={m} hasDraw isAdmin onClick={() => navigate(`/match/${m.id}`)} />
-                <div
-                  className="absolute bottom-0 left-0 h-0.5 transition-all duration-1000 ease-linear rounded-b"
-                  style={{ width: `${pct}%`, background: 'var(--accent)', opacity: 0.4 }}
-                />
+                <div className="absolute bottom-0 left-0 h-0.5 transition-all duration-1000 ease-linear rounded-b"
+                  style={{ width: `${pct}%`, background: 'var(--accent)', opacity: 0.4 }} />
               </div>
             );
           }
@@ -1509,9 +1467,6 @@ function SpecialGamesSection() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Skeleton — v2 style
-// ---------------------------------------------------------------------------
 function SkeletonCard() {
   return (
     <div className="match-card upcoming" style={{ cursor: 'default', pointerEvents: 'none' }}>
@@ -1531,42 +1486,23 @@ function SkeletonCard() {
         </div>
       </div>
       <div className="match-odds-row">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="match-odds-btn empty skeleton-block" />
-        ))}
+        {[0, 1, 2].map((i) => <div key={i} className="match-odds-btn empty skeleton-block" />)}
       </div>
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// SectionHeader
-// ---------------------------------------------------------------------------
-function SectionHeader({
-  title,
-  count,
-  isLive,
-  isFinished,
-  showToggle,
-  expanded,
-  onToggle,
-}: {
-  title: string;
-  count: number;
-  isLive?: boolean;
-  isFinished?: boolean;
-  showToggle?: boolean;
-  expanded?: boolean;
-  onToggle?: () => void;
+function SectionHeader({ title, count, isLive, isFinished, showToggle, expanded, onToggle }: {
+  title: string; count: number; isLive?: boolean; isFinished?: boolean;
+  showToggle?: boolean; expanded?: boolean; onToggle?: () => void;
 }) {
   return (
     <div className="section-header mb-3">
       <h2 className="section-title-text">
         {isLive && <FiberManualRecordIcon sx={{ fontSize: 8 }} className="text-green-500 live-dot" />}
         {isFinished && (
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-               stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-               style={{ color: 'var(--text-muted)' }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+               strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-muted)' }}>
             <circle cx="12" cy="12" r="10" /><polyline points="9 12 11 14 15 10" />
           </svg>
         )}
@@ -1574,11 +1510,7 @@ function SectionHeader({
         <span className="section-count">({count})</span>
       </h2>
       {showToggle && (
-        <button
-          onClick={onToggle}
-          className="ml-auto text-xs font-semibold hover:underline"
-          style={{ color: 'var(--primary)' }}
-        >
+        <button onClick={onToggle} className="ml-auto text-xs font-semibold hover:underline" style={{ color: 'var(--primary)' }}>
           {expanded ? 'Hide' : 'Show'}
         </button>
       )}
@@ -1586,9 +1518,6 @@ function SectionHeader({
   );
 }
 
-// ---------------------------------------------------------------------------
-// SectionDivider
-// ---------------------------------------------------------------------------
 function SectionDivider({ label }: { label: string }) {
   return (
     <div className="league-divider">
@@ -1599,9 +1528,6 @@ function SectionDivider({ label }: { label: string }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// groupByLeague
-// ---------------------------------------------------------------------------
 function groupByLeague(matches: EnrichedMatch[], sorted = false): Map<string, EnrichedMatch[]> {
   const map = new Map<string, EnrichedMatch[]>();
   for (const m of matches) {
@@ -1738,20 +1664,13 @@ export default function MatchList() {
         return isFinishedSection ? tb - ta : ta - tb;
       });
       return sorted.map((m) => (
-        <MatchCard
-          key={m.id}
-          match={m}
-          hasDraw={showDraw}
-          onClick={() => navigate(`/match/${m.id}`)}
-        />
+        <MatchCard key={m.id} match={m} hasDraw={showDraw} onClick={() => navigate(`/match/${m.id}`)} />
       ));
     }
-
     if (activeSport === 'football' && (activeLeagueTab === 'all' || activeLeagueTab === 'other')) {
       const top6   = matches.filter((m) => TOP_6_LABELS.has(m.league ?? ''));
       const cups   = matches.filter((m) => !TOP_6_LABELS.has(m.league ?? '') && CUPS_LABELS.has(m.league ?? ''));
       const others = matches.filter((m) => !TOP_6_LABELS.has(m.league ?? '') && !CUPS_LABELS.has(m.league ?? ''));
-
       return (
         <>
           {[...groupByLeague(top6, true).entries()].map(([league, lm]) => (
@@ -1776,29 +1695,17 @@ export default function MatchList() {
         </>
       );
     }
-
     return [...groupByLeague(matches, true).entries()].map(([league, lm]) => (
       <LeagueCard key={league} league={league} matches={lm} leagueLogo={lm[0]?.leagueLogo} showDraw={showDraw} />
     ));
   }
 
-  function renderSection(
-    title: string,
-    matches: EnrichedMatch[],
-    opts: { isLive?: boolean; isFinished?: boolean } = {},
-  ) {
+  function renderSection(title: string, matches: EnrichedMatch[], opts: { isLive?: boolean; isFinished?: boolean } = {}) {
     if (matches.length === 0) return null;
     return (
       <section className="mb-6">
-        <SectionHeader
-          title={title}
-          count={matches.length}
-          isLive={opts.isLive}
-          isFinished={opts.isFinished}
-          showToggle={opts.isFinished}
-          expanded={showFinished}
-          onToggle={() => setShowFinished((v) => !v)}
-        />
+        <SectionHeader title={title} count={matches.length} isLive={opts.isLive} isFinished={opts.isFinished}
+          showToggle={opts.isFinished} expanded={showFinished} onToggle={() => setShowFinished((v) => !v)} />
         {(!opts.isFinished || showFinished) && renderLeagueGroups(matches, !!opts.isFinished)}
       </section>
     );
@@ -1812,14 +1719,14 @@ export default function MatchList() {
   return (
     <div className="px-4 mt-4">
 
+      {/* ── Recent Winners Bar ── */}
+      <RecentWinnersBar />
+
       {/* ── Sport tabs ── */}
       <div className="flex gap-1.5 overflow-x-auto pb-2 mb-3 no-scrollbar">
         {SPORT_TABS.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveSport(tab.key)}
-            className={`sport-tab${activeSport === tab.key ? ' active' : ''}`}
-          >
+          <button key={tab.key} onClick={() => setActiveSport(tab.key)}
+            className={`sport-tab${activeSport === tab.key ? ' active' : ''}`}>
             {tab.icon}{tab.label}
           </button>
         ))}
@@ -1829,11 +1736,8 @@ export default function MatchList() {
       {activeSport === 'football' && (
         <div className="flex gap-1.5 overflow-x-auto pb-2 mb-4 no-scrollbar">
           {FOOTBALL_LEAGUE_TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveLeagueTab(tab.key)}
-              className={`league-tab${activeLeagueTab === tab.key ? ' active' : ''}`}
-            >
+            <button key={tab.key} onClick={() => setActiveLeagueTab(tab.key)}
+              className={`league-tab${activeLeagueTab === tab.key ? ' active' : ''}`}>
               {tab.label}
             </button>
           ))}
@@ -1877,6 +1781,9 @@ export default function MatchList() {
           )}
         </>
       )}
+
+      {/* ── Floating Bet Slip Button ── */}
+      <FloatingBetSlipButton />
     </div>
   );
 }
