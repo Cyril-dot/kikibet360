@@ -100,7 +100,7 @@ const CURRENCY_CONFIG: Record<Winner['currency'], { symbol: string; accent: stri
 };
 
 // ---------------------------------------------------------------------------
-// RecentWinnersBar — horizontal auto-scrolling ticker (no avatar, phone + amount)
+// RecentWinnersBar — bare scrolling cards, no outer container, blue + white
 // ---------------------------------------------------------------------------
 function RecentWinnersBar() {
   const doubled = useMemo(() => [...RECENT_WINNERS, ...RECENT_WINNERS], []);
@@ -108,160 +108,116 @@ function RecentWinnersBar() {
   return (
     <div style={{
       overflow: 'hidden',
-      background: 'linear-gradient(135deg, #0d1117 0%, #0f1520 50%, #0b1019 100%)',
-      borderRadius: 14,
       marginBottom: 14,
       position: 'relative',
-      border: '1px solid rgba(59,130,246,0.18)',
-      boxShadow: '0 4px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(59,130,246,0.08)',
     }}>
-
-      {/* Header row */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '10px 14px 6px',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          {/* Pulsing dot */}
-          <span style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: '#3b82f6',
-            boxShadow: '0 0 8px rgba(59,130,246,0.7)',
-            display: 'inline-block',
-            animation: 'winnerPulse 1.6s ease-in-out infinite',
-            flexShrink: 0,
-          }} />
-          <span style={{
-            fontSize: 10,
-            fontWeight: 800,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: '#94a3b8',
-            fontFamily: 'system-ui, sans-serif',
-          }}>
-            Recent Winners
-          </span>
-        </div>
-        <span style={{
-          fontSize: 9,
-          fontWeight: 700,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          color: '#475569',
-          fontFamily: 'system-ui, sans-serif',
-        }}>
-          LIVE PAYOUTS
-        </span>
-      </div>
-
-      {/* Scrolling track — slowed to 90s */}
-      <div style={{ overflow: 'hidden', paddingBottom: 11, paddingTop: 2 }}>
+      {/* Scrolling track */}
+      <div style={{ overflow: 'hidden', padding: '2px 0 6px' }}>
         <div style={{
           display: 'flex',
-          gap: 7,
-          paddingLeft: 14,
+          gap: 8,
           animation: 'winnersScroll 90s linear infinite',
           width: 'max-content',
         }}>
-          {doubled.map((w, i) => {
-            const cfg = CURRENCY_CONFIG[w.currency];
-            return (
-              <div
-                key={i}
-                style={{
-                  flexShrink: 0,
-                  background: cfg.bg,
-                  borderRadius: 10,
-                  padding: '7px 11px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  border: `1px solid ${cfg.accent}28`,
-                  minWidth: 0,
-                  position: 'relative',
-                  overflow: 'hidden',
-                }}
-              >
-                {/* Subtle shimmer line at top */}
-                <div style={{
-                  position: 'absolute', top: 0, left: 0, right: 0, height: 1,
-                  background: `linear-gradient(90deg, transparent 0%, ${cfg.accent}50 50%, transparent 100%)`,
-                }} />
+          {doubled.map((w, i) => (
+            <div
+              key={i}
+              style={{
+                flexShrink: 0,
+                background: 'rgba(37,99,235,0.12)',
+                borderRadius: 10,
+                padding: '7px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                border: '1px solid rgba(96,165,250,0.22)',
+                minWidth: 0,
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Top shimmer line */}
+              <div style={{
+                position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+                background: 'linear-gradient(90deg, transparent 0%, rgba(147,197,253,0.5) 50%, transparent 100%)',
+              }} />
 
-                {/* Phone number + amount — no avatar */}
-                <div style={{ lineHeight: 1 }}>
-                  <div style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: '#64748b',
-                    whiteSpace: 'nowrap',
-                    marginBottom: 4,
-                    fontFamily: 'system-ui, sans-serif',
-                    letterSpacing: '0.03em',
-                  }}>
-                    {w.phone}
-                  </div>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'baseline',
-                    gap: 4,
-                    whiteSpace: 'nowrap',
-                  }}>
-                    <span style={{
-                      fontSize: 9,
-                      fontWeight: 700,
-                      color: cfg.accent,
-                      background: cfg.badge,
-                      borderRadius: 4,
-                      padding: '1px 5px',
-                      letterSpacing: '0.06em',
-                      fontFamily: 'system-ui, sans-serif',
-                    }}>
-                      {cfg.symbol}
-                    </span>
-                    <span style={{
-                      fontSize: 13,
-                      fontWeight: 800,
-                      color: cfg.accent,
-                      letterSpacing: '-0.01em',
-                      fontFamily: 'system-ui, sans-serif',
-                    }}>
-                      {w.amount}
-                    </span>
-                  </div>
-                </div>
+              {/* Pulsing dot */}
+              <span style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: '#60a5fa',
+                boxShadow: '0 0 6px rgba(96,165,250,0.8)',
+                display: 'inline-block',
+                flexShrink: 0,
+                animation: 'winnerPulse 1.6s ease-in-out infinite',
+              }} />
 
-                {/* Time ago pill */}
+              {/* Phone + amount */}
+              <div style={{ lineHeight: 1 }}>
                 <div style={{
-                  fontSize: 9,
+                  fontSize: 10,
                   fontWeight: 600,
-                  color: '#334155',
+                  color: '#93c5fd',
                   whiteSpace: 'nowrap',
-                  alignSelf: 'flex-start',
-                  marginTop: 1,
+                  marginBottom: 4,
                   fontFamily: 'system-ui, sans-serif',
-                  letterSpacing: '0.04em',
+                  letterSpacing: '0.03em',
                 }}>
-                  {w.timeAgo}
+                  {w.phone}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, whiteSpace: 'nowrap' }}>
+                  <span style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    color: '#fff',
+                    background: 'rgba(59,130,246,0.35)',
+                    borderRadius: 4,
+                    padding: '1px 5px',
+                    letterSpacing: '0.06em',
+                    fontFamily: 'system-ui, sans-serif',
+                  }}>
+                    {CURRENCY_CONFIG[w.currency].symbol}
+                  </span>
+                  <span style={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: '#ffffff',
+                    letterSpacing: '-0.01em',
+                    fontFamily: 'system-ui, sans-serif',
+                  }}>
+                    {w.amount}
+                  </span>
                 </div>
               </div>
-            );
-          })}
+
+              {/* Time ago */}
+              <div style={{
+                fontSize: 9,
+                fontWeight: 600,
+                color: '#60a5fa',
+                whiteSpace: 'nowrap',
+                alignSelf: 'flex-start',
+                marginTop: 1,
+                fontFamily: 'system-ui, sans-serif',
+                letterSpacing: '0.04em',
+              }}>
+                {w.timeAgo}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Fade edge masks */}
+      {/* Fade edge masks — transparent so they blend with any page bg */}
       <div style={{
-        position: 'absolute', top: 0, left: 0, bottom: 0, width: 32,
-        background: 'linear-gradient(90deg, #0d1117 0%, transparent 100%)',
+        position: 'absolute', top: 0, left: 0, bottom: 0, width: 28,
+        background: 'linear-gradient(90deg, var(--bg-page, #0d1117) 0%, transparent 100%)',
         pointerEvents: 'none',
         zIndex: 2,
       }} />
       <div style={{
-        position: 'absolute', top: 0, right: 0, bottom: 0, width: 32,
-        background: 'linear-gradient(270deg, #0d1117 0%, transparent 100%)',
+        position: 'absolute', top: 0, right: 0, bottom: 0, width: 28,
+        background: 'linear-gradient(270deg, var(--bg-page, #0d1117) 0%, transparent 100%)',
         pointerEvents: 'none',
         zIndex: 2,
       }} />
@@ -272,8 +228,8 @@ function RecentWinnersBar() {
           100% { transform: translateX(-50%); }
         }
         @keyframes winnerPulse {
-          0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(59,130,246,0.7); }
-          50%       { opacity: 0.5; box-shadow: 0 0 4px rgba(59,130,246,0.3); }
+          0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(96,165,250,0.8); }
+          50%       { opacity: 0.4; box-shadow: 0 0 3px rgba(96,165,250,0.3); }
         }
       `}</style>
     </div>
