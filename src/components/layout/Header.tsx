@@ -17,7 +17,7 @@ import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
-
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutlined';
 // ---------------------------------------------------------------------------
 // Nav links
 // ---------------------------------------------------------------------------
@@ -428,7 +428,7 @@ export default function Header() {
 
               {user ? (
                 <>
-                  {/* Wallet */}
+                  {/* Wallet balance row */}
                   <Link
                     to="/wallet"
                     onClick={() => setMobileMenuOpen(false)}
@@ -448,6 +448,22 @@ export default function Header() {
                         {walletBalance !== null ? `$${formatBalance(walletBalance)}` : '—'}
                       </span>
                     </div>
+                  </Link>
+
+                  {/* Deposit button */}
+                  <Link
+                    to="/deposit"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center justify-center gap-2 text-sm min-h-[48px] rounded-full touch-manipulation font-bold"
+                    style={{
+                      background: 'linear-gradient(90deg, #16a34a 0%, #22c55e 100%)',
+                      color: '#ffffff',
+                      boxShadow: '0 2px 10px rgba(22, 163, 74, 0.35)',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <AddCircleOutlineIcon fontSize="small" />
+                    Deposit
                   </Link>
 
                   {/* Account */}

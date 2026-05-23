@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '../store';
-import { user as userApi, wallet, affiliate, auth, adminUpgrade } from '../utils/api';
+import { user as userApi, wallet, affiliate, auth } from '../utils/api';
 import type { UpdateProfileRequest, Transaction } from '../utils/api';
 
 import EditIcon from '@mui/icons-material/Edit';
@@ -23,13 +23,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import ShieldIcon from '@mui/icons-material/Shield';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import BarChartIcon from '@mui/icons-material/BarChart';
-import QrCodeIcon from '@mui/icons-material/QrCode';
-import PaymentsIcon from '@mui/icons-material/Payments';
-import ChatIcon from '@mui/icons-material/Chat';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -310,272 +304,6 @@ function PwField({
 }
 
 // ---------------------------------------------------------------------------
-// Admin Upgrade Modal
-// ---------------------------------------------------------------------------
-const PERKS = [
-  { icon: <BarChartIcon sx={{ fontSize: 16 }} />,   label: 'Analytics Dashboard',   desc: 'Real-time revenue & user stats'       },
-  { icon: <QrCodeIcon sx={{ fontSize: 16 }} />,     label: 'Booking Code Access',   desc: 'Create & manage booking codes'        },
-  { icon: <GroupAddIcon sx={{ fontSize: 16 }} />,   label: 'Affiliate Tools',       desc: 'Referral links & commission tracking' },
-  { icon: <PaymentsIcon sx={{ fontSize: 16 }} />,   label: 'Withdrawal Management', desc: 'Approve & reject user withdrawals'    },
-  { icon: <ChatIcon sx={{ fontSize: 16 }} />,       label: 'Upgrade Chat Support',  desc: 'Direct chat with super admins'        },
-];
-
-function AdminUpgradeModal({ onClose }: { onClose: () => void }) {
-  const { showToast } = useAppStore();
-  const [loading, setLoading] = useState(false);
-  const [done, setDone]       = useState(false);
-  const [step, setStep]       = useState<'overview' | 'confirm'>('overview');
-
-  const handleUpgrade = async () => {
-    setLoading(true);
-    try {
-      const res = await adminUpgrade.initPaystack();
-      if (res.success && res.data) {
-        const d = res.data as Record<string, unknown>;
-        if (typeof d.authorizationUrl === 'string') { window.location.href = d.authorizationUrl; return; }
-        if (typeof d.authorization_url === 'string') { window.location.href = d.authorization_url; return; }
-      }
-      setDone(true);
-      showToast('Upgrade request initiated!', 'success');
-    } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'Failed to initiate upgrade.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-stretch justify-start"
-      style={{ backgroundColor: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <style>{`
-        @keyframes adminPanelSlideIn {
-          from { transform: translateX(-100%); }
-          to   { transform: translateX(0); }
-        }
-        .admin-upgrade-panel { height: 100vh; height: 100dvh; }
-      `}</style>
-
-      <div
-        className="admin-upgrade-panel relative flex flex-col w-full max-w-sm shadow-2xl overflow-hidden"
-        style={{
-          backgroundColor: 'var(--card-bg)',
-          animation: 'adminPanelSlideIn 0.30s cubic-bezier(0.22, 1, 0.36, 1) both',
-        }}
-      >
-        {/* top accent bar */}
-        <div className="h-1 w-full shrink-0" style={{ background: 'linear-gradient(to right, var(--primary), color-mix(in srgb, var(--primary) 70%, transparent), #34d399)' }} />
-
-        {done ? (
-          <div className="flex flex-col items-center justify-center flex-1 px-6 py-12 text-center">
-            <div
-              className="w-20 h-20 rounded-full flex items-center justify-center mb-5"
-              style={{
-                backgroundColor: 'color-mix(in srgb, #10b981 12%, transparent)',
-                boxShadow: '0 0 0 8px color-mix(in srgb, #10b981 8%, transparent)',
-              }}
-            >
-              <RocketLaunchIcon sx={{ fontSize: 36, color: '#10b981' }} />
-            </div>
-            <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--text-main)' }}>You're on your way!</h3>
-            <p className="text-sm mb-8 leading-relaxed max-w-xs" style={{ color: 'var(--text-muted)' }}>
-              Your upgrade request has been submitted. Our team will review and activate your admin account shortly.
-            </p>
-            <BtnPrimary size="lg" onClick={onClose}>Got it, thanks!</BtnPrimary>
-          </div>
-
-        ) : step === 'overview' ? (
-          <>
-            <div className="flex items-start justify-between px-5 pt-5 pb-3 shrink-0">
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: 'color-mix(in srgb, var(--primary) 12%, transparent)' }}
-                >
-                  <AdminPanelSettingsIcon sx={{ fontSize: 20, color: 'var(--primary)' }} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-base leading-tight" style={{ color: 'var(--text-main)' }}>Become an Admin</h3>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Unlock the full platform</p>
-                </div>
-              </div>
-              <BtnIcon onClick={onClose} aria-label="Close">
-                <CloseIcon fontSize="small" />
-              </BtnIcon>
-            </div>
-
-            <div className="flex-1 min-h-0 overflow-y-auto px-5 py-2">
-              {/* Hero promo card */}
-              <div
-                className="mb-4 rounded-2xl p-5 text-white relative overflow-hidden"
-                style={{ background: 'linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 75%, #000))' }}
-              >
-                <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-white/10" />
-                <div className="absolute -bottom-8 -left-4 w-20 h-20 rounded-full bg-white/5" />
-                <div className="relative z-10">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <AutoAwesomeIcon sx={{ fontSize: 14, color: '#fde68a' }} />
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-white/80">Admin Access</span>
-                  </div>
-                  <p className="text-2xl font-black leading-tight mb-1">Run your own<br />betting platform</p>
-                  <p className="text-xs text-white/70 leading-relaxed">One-time upgrade. Manage matches, users, payouts & more.</p>
-                </div>
-              </div>
-
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>Everything included</p>
-              <div className="space-y-2 pb-4">
-                {PERKS.map((perk) => (
-                  <div
-                    key={perk.label}
-                    className="flex items-center gap-3 p-3 rounded-xl"
-                    style={{ backgroundColor: 'var(--card-alt)', border: '1px solid var(--border-light)' }}
-                  >
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: 'color-mix(in srgb, var(--primary) 12%, transparent)', color: 'var(--primary)' }}
-                    >
-                      {perk.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold leading-tight" style={{ color: 'var(--text-main)' }}>{perk.label}</p>
-                      <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{perk.desc}</p>
-                    </div>
-                    <CheckCircleIcon sx={{ fontSize: 16, color: '#10b981' }} className="shrink-0" />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div
-              className="shrink-0 px-5 pt-3 pb-6"
-              style={{
-                borderTop: '1px solid var(--border-light)',
-                backgroundColor: 'var(--card-bg)',
-                paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))',
-              }}
-            >
-              <p className="text-[11px] text-center mb-3 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                A one-time upgrade fee applies. Payment processed securely via Paystack.
-              </p>
-              <div className="flex gap-3">
-                <BtnGhost
-                  onClick={onClose}
-                  className="flex-1 py-3.5"
-                  style={{
-                    border: '1px solid var(--border-light)',
-                    color: 'var(--text-muted)',
-                    backgroundColor: 'transparent',
-                    borderRadius: 12,
-                  }}
-                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.backgroundColor = 'var(--card-alt)')}
-                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.backgroundColor = 'transparent')}
-                >
-                  Maybe Later
-                </BtnGhost>
-                <BtnPrimary onClick={() => setStep('confirm')} className="flex-1 py-3.5" icon={<KeyboardArrowRightIcon fontSize="small" />}>
-                  Continue
-                </BtnPrimary>
-              </div>
-            </div>
-          </>
-
-        ) : (
-          <>
-            <div className="flex items-center gap-3 px-5 pt-5 pb-3 shrink-0">
-              <BtnIcon onClick={() => setStep('overview')} aria-label="Back">
-                <KeyboardArrowRightIcon fontSize="small" style={{ transform: 'rotate(180deg)' }} />
-              </BtnIcon>
-              <div>
-                <h3 className="font-bold text-base" style={{ color: 'var(--text-main)' }}>Confirm Upgrade</h3>
-                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Review before proceeding</p>
-              </div>
-            </div>
-
-            <div className="flex-1 min-h-0 overflow-y-auto px-5 py-2 space-y-4">
-              <div
-                className="rounded-2xl p-4"
-                style={{
-                  border: '1px solid color-mix(in srgb, var(--primary) 20%, transparent)',
-                  backgroundColor: 'color-mix(in srgb, var(--primary) 5%, transparent)',
-                }}
-              >
-                <div className="flex items-center gap-3 mb-4">
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center"
-                    style={{ backgroundColor: 'color-mix(in srgb, var(--primary) 15%, transparent)', color: 'var(--primary)' }}
-                  >
-                    <AdminPanelSettingsIcon sx={{ fontSize: 20 }} />
-                  </div>
-                  <div>
-                    <p className="font-bold text-sm" style={{ color: 'var(--text-main)' }}>Admin Account Upgrade</p>
-                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>One-time payment via Paystack</p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  {[
-                    'Full admin dashboard access',
-                    'Manage all platform features',
-                    'Affiliate commission earnings',
-                    'Priority support via upgrade chat',
-                  ].map((item) => (
-                    <div key={item} className="flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
-                      <CheckCircleIcon sx={{ fontSize: 14, color: 'var(--primary)' }} className="shrink-0" />
-                      <span className="text-xs">{item}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div
-                className="rounded-xl p-3.5 flex gap-2.5"
-                style={{
-                  backgroundColor: 'color-mix(in srgb, #f59e0b 10%, transparent)',
-                  border: '1px solid color-mix(in srgb, #f59e0b 30%, transparent)',
-                }}
-              >
-                <ShieldIcon sx={{ fontSize: 16, color: '#d97706' }} className="shrink-0 mt-0.5" />
-                <p className="text-xs leading-relaxed" style={{ color: '#b45309' }}>
-                  You'll be redirected to Paystack's secure payment page. After payment, your account will be reviewed and upgraded within 24 hours.
-                </p>
-              </div>
-            </div>
-
-            <div
-              className="shrink-0 px-5 pt-3 pb-6"
-              style={{
-                borderTop: '1px solid var(--border-light)',
-                backgroundColor: 'var(--card-bg)',
-                paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))',
-              }}
-            >
-              <BtnPrimary
-                onClick={handleUpgrade}
-                loading={loading}
-                size="lg"
-                className="mb-3"
-                icon={<RocketLaunchIcon fontSize="small" />}
-              >
-                {loading ? 'Redirecting to Paystack…' : 'Proceed to Payment'}
-              </BtnPrimary>
-              <button
-                onClick={onClose}
-                disabled={loading}
-                className="w-full py-2.5 text-xs font-semibold transition-opacity hover:opacity-60 disabled:opacity-40"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                Cancel
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Tab definitions
 // ---------------------------------------------------------------------------
 type TabId = 'overview' | 'profile' | 'security' | 'preferences';
@@ -595,7 +323,6 @@ export default function AccountPage() {
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<TabId>('overview');
-  const [showAdminUpgrade, setShowAdminUpgrade] = useState(false);
 
   // Data state
   const [profileData, setProfileData]           = useState<Record<string, unknown> | null>(null);
@@ -745,9 +472,6 @@ export default function AccountPage() {
   // ---------------------------------------------------------------------------
   return (
     <div className="min-h-screen pb-28" style={{ backgroundColor: 'var(--card-alt)' }}>
-
-      {/* Admin Upgrade Modal */}
-      {showAdminUpgrade && <AdminUpgradeModal onClose={() => setShowAdminUpgrade(false)} />}
 
       {/* ═══ HERO HEADER ═══ */}
       <div style={{ backgroundColor: 'var(--card-bg)', borderBottom: '1px solid var(--border-light)' }}>
@@ -1007,24 +731,6 @@ export default function AccountPage() {
               >
                 Open Admin Panel
               </BtnPrimary>
-            )}
-
-            {/* Admin upgrade CTA — only shown to regular users */}
-            {user.role !== 'admin' && (
-              <button
-                onClick={() => setShowAdminUpgrade(true)}
-                className="w-full rounded-2xl py-3.5 flex items-center justify-center gap-2 font-semibold text-sm transition-all active:scale-[0.98]"
-                style={{
-                  backgroundColor: 'color-mix(in srgb, var(--primary) 8%, transparent)',
-                  border: '1px solid color-mix(in srgb, var(--primary) 25%, transparent)',
-                  color: 'var(--primary)',
-                }}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.backgroundColor = 'color-mix(in srgb, var(--primary) 14%, transparent)')}
-                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.backgroundColor = 'color-mix(in srgb, var(--primary) 8%, transparent)')}
-              >
-                <AdminPanelSettingsIcon fontSize="small" />
-                Become an Admin
-              </button>
             )}
           </>
         )}
