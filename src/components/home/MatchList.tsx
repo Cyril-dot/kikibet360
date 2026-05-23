@@ -9,6 +9,10 @@
 //     to showing all available matches (with a subtle notice)
 //   • RecentWinnersBar: now uses same CSS variables as match cards for
 //     full light/dark mode parity — no more hardcoded palette
+//   • FIX 6: Regular matches that share a home+away team fingerprint with any
+//     admin match are suppressed from the main Live/Today/Upcoming/Results
+//     sections so the same game never appears in both "Special Games" and the
+//     regular list.
 // ---------------------------------------------------------------------------
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -49,17 +53,15 @@ const AWAY_LOGO_POOL: string[] = [
 // ---------------------------------------------------------------------------
 // ╔══════════════════════════════════════════════════════════════════════════╗
 // ║  RECENT WINNERS — 30 hardcoded entries                                  ║
-// ║  Each entry has a masked phone number instead of a name                 ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
 interface Winner {
-  phone: string;       // e.g. "0244****89"
+  phone: string;
   amount: string;
   currency: 'GHS' | 'NGN' | 'USD';
   timeAgo: string;
 }
 
 const RECENT_WINNERS: Winner[] = [
-  // ── GHS ──
   { phone: '0244****12', amount: '23,500',    currency: 'GHS', timeAgo: '2m'  },
   { phone: '0557****78', amount: '47,200',    currency: 'GHS', timeAgo: '5m'  },
   { phone: '0201****34', amount: '88,000',    currency: 'GHS', timeAgo: '9m'  },
@@ -70,7 +72,6 @@ const RECENT_WINNERS: Winner[] = [
   { phone: '0598****11', amount: '20,500',    currency: 'GHS', timeAgo: '31m' },
   { phone: '0241****45', amount: '76,300',    currency: 'GHS', timeAgo: '35m' },
   { phone: '0277****88', amount: '43,100',    currency: 'GHS', timeAgo: '40m' },
-  // ── NGN ──
   { phone: '0803****21', amount: '4,200,000',  currency: 'NGN', timeAgo: '3m'  },
   { phone: '0816****54', amount: '850,000',    currency: 'NGN', timeAgo: '7m'  },
   { phone: '0705****77', amount: '22,500,000', currency: 'NGN', timeAgo: '11m' },
@@ -81,7 +82,6 @@ const RECENT_WINNERS: Winner[] = [
   { phone: '0907****76', amount: '14,300,000', currency: 'NGN', timeAgo: '33m' },
   { phone: '0802****19', amount: '600,000',    currency: 'NGN', timeAgo: '37m' },
   { phone: '0818****52', amount: '33,000,000', currency: 'NGN', timeAgo: '42m' },
-  // ── USD ──
   { phone: '+1 (***) ***-3812', amount: '3,800',  currency: 'USD', timeAgo: '1m'  },
   { phone: '+1 (***) ***-7491', amount: '47,500', currency: 'USD', timeAgo: '6m'  },
   { phone: '+44 ****-***-220',  amount: '12,200', currency: 'USD', timeAgo: '10m' },
@@ -94,7 +94,6 @@ const RECENT_WINNERS: Winner[] = [
   { phone: '+81 ****-***-762',  amount: '36,500', currency: 'USD', timeAgo: '41m' },
 ];
 
-// Currency symbol lookup — presentation only, colours come from CSS vars
 const CURRENCY_SYMBOL: Record<Winner['currency'], string> = {
   GHS: 'GHS',
   NGN: '₦',
@@ -103,18 +102,12 @@ const CURRENCY_SYMBOL: Record<Winner['currency'], string> = {
 
 // ---------------------------------------------------------------------------
 // RecentWinnersBar
-// Uses the same CSS variables as match cards:
-//   --bg-card, --border-card, --text-main, --text-muted, --text-faint,
-//   --primary, --live-green, --bg-page
-// so it automatically adapts to whatever light/dark theme the host sets.
 // ---------------------------------------------------------------------------
 function RecentWinnersBar() {
   const doubled = useMemo(() => [...RECENT_WINNERS, ...RECENT_WINNERS], []);
 
   return (
     <div style={{ overflow: 'hidden', marginBottom: 14, position: 'relative' }}>
-
-      {/* Scrolling track */}
       <div style={{ overflow: 'hidden', padding: '2px 0 6px' }}>
         <div style={{
           display: 'flex',
@@ -124,69 +117,43 @@ function RecentWinnersBar() {
         }}>
           {doubled.map((w, i) => (
             <div key={i} className="wc-card">
-              {/* top shimmer line — uses --primary at low opacity */}
               <div className="wc-shimmer" />
-              {/* live pulse dot — uses --live-green */}
               <span className="wc-dot" />
               <div style={{ lineHeight: 1 }}>
-                {/* phone — uses --text-muted */}
                 <div className="wc-phone">{w.phone}</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, whiteSpace: 'nowrap' }}>
-                  {/* currency badge — uses --primary bg tint */}
                   <span className="wc-symbol">{CURRENCY_SYMBOL[w.currency]}</span>
-                  {/* amount — uses --text-main */}
                   <span className="wc-amount">{w.amount}</span>
                 </div>
               </div>
-              {/* time ago — uses --text-faint */}
               <div className="wc-time">{w.timeAgo}</div>
             </div>
           ))}
         </div>
       </div>
-
-      {/* Fade edge masks — blend into --bg-page */}
       <div className="wc-fade-left" />
       <div className="wc-fade-right" />
 
       <style>{`
-        /* ─────────────────────────────────────────────────────────────────────
-           All colours use the same CSS variables as the match / game cards.
-           The host stylesheet (light or dark) sets these vars — we just consume
-           them here, so RecentWinnersBar automatically matches the card theme.
-           ───────────────────────────────────────────────────────────────────── */
-
         .wc-card {
           flex-shrink: 0;
-          /* same surface as match cards */
           background: var(--bg-card, rgba(255,255,255,0.6));
           border-radius: 12px;
           padding: 11px 16px;
           display: flex;
           align-items: center;
           gap: 14px;
-          /* same border as match cards */
           border: 1px solid var(--border-card, rgba(0,0,0,0.08));
           min-width: 0;
           position: relative;
           overflow: hidden;
-          /* same subtle shadow as match cards */
           box-shadow: 0 1px 4px rgba(0,0,0,0.06);
         }
-
-        /* top shimmer line — accent colour at low opacity */
         .wc-shimmer {
           position: absolute; top: 0; left: 0; right: 0; height: 1px;
-          background: linear-gradient(
-            90deg,
-            transparent 0%,
-            var(--primary, #f5a623) 50%,
-            transparent 100%
-          );
+          background: linear-gradient(90deg, transparent 0%, var(--primary, #f5a623) 50%, transparent 100%);
           opacity: 0.25;
         }
-
-        /* live pulse dot — matches the live green used in match cards */
         .wc-dot {
           width: 7px; height: 7px; border-radius: 50%;
           background: var(--live-green, #22c55e);
@@ -195,52 +162,30 @@ function RecentWinnersBar() {
           flex-shrink: 0;
           animation: winnerPulse 1.6s ease-in-out infinite;
         }
-
-        /* phone number — secondary label, same as league name text */
         .wc-phone {
-          font-size: 12px;
-          font-weight: 600;
+          font-size: 12px; font-weight: 600;
           color: var(--text-muted, #64748b);
-          white-space: nowrap;
-          margin-bottom: 6px;
-          font-family: system-ui, sans-serif;
-          letter-spacing: 0.03em;
+          white-space: nowrap; margin-bottom: 6px;
+          font-family: system-ui, sans-serif; letter-spacing: 0.03em;
         }
-
-        /* currency badge — uses primary tint, same as odds-btn accent */
         .wc-symbol {
-          font-size: 10px;
-          font-weight: 700;
+          font-size: 10px; font-weight: 700;
           color: var(--primary, #f5a623);
           background: color-mix(in srgb, var(--primary, #f5a623) 12%, transparent);
-          border-radius: 4px;
-          padding: 2px 6px;
-          letter-spacing: 0.06em;
+          border-radius: 4px; padding: 2px 6px; letter-spacing: 0.06em;
           font-family: system-ui, sans-serif;
         }
-
-        /* win amount — main text, same as team name weight */
         .wc-amount {
-          font-size: 15px;
-          font-weight: 800;
+          font-size: 15px; font-weight: 800;
           color: var(--text-main, #0f172a);
-          letter-spacing: -0.01em;
-          font-family: system-ui, sans-serif;
+          letter-spacing: -0.01em; font-family: system-ui, sans-serif;
         }
-
-        /* time ago — faintest text, same as "more markets" label */
         .wc-time {
-          font-size: 10px;
-          font-weight: 600;
+          font-size: 10px; font-weight: 600;
           color: var(--text-faint, #94a3b8);
-          white-space: nowrap;
-          align-self: flex-start;
-          margin-top: 1px;
-          font-family: system-ui, sans-serif;
-          letter-spacing: 0.04em;
+          white-space: nowrap; align-self: flex-start; margin-top: 1px;
+          font-family: system-ui, sans-serif; letter-spacing: 0.04em;
         }
-
-        /* fade masks — blend into the page background */
         .wc-fade-left {
           position: absolute; top: 0; left: 0; bottom: 0; width: 28px;
           background: linear-gradient(90deg, var(--bg-page, #ffffff) 0%, transparent 100%);
@@ -251,14 +196,10 @@ function RecentWinnersBar() {
           background: linear-gradient(270deg, var(--bg-page, #ffffff) 0%, transparent 100%);
           pointer-events: none; z-index: 2;
         }
-
-        /* scroll animation */
         @keyframes winnersScroll {
           0%   { transform: translateX(0); }
           100% { transform: translateX(-50%); }
         }
-
-        /* pulse dot animation */
         @keyframes winnerPulse {
           0%, 100% { opacity: 1; }
           50%       { opacity: 0.35; }
@@ -281,19 +222,11 @@ function FloatingBetSlipButton() {
       onClick={() => navigate('/betslip')}
       aria-label="Open bet slip"
       style={{
-        position: 'fixed',
-        bottom: 80,
-        right: 16,
-        zIndex: 1000,
-        width: 52,
-        height: 52,
-        borderRadius: '50%',
+        position: 'fixed', bottom: 80, right: 16, zIndex: 1000,
+        width: 52, height: 52, borderRadius: '50%',
         background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
-        border: '1px solid rgba(96,165,250,0.3)',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        border: '1px solid rgba(96,165,250,0.3)', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
         boxShadow: '0 4px 18px rgba(37,99,235,0.5)',
         transition: 'transform 0.15s ease, box-shadow 0.15s ease',
       }}
@@ -308,25 +241,13 @@ function FloatingBetSlipButton() {
     >
       <ReceiptLongIcon sx={{ fontSize: 24, color: '#e2e8f0' }} />
       {count > 0 && (
-        <span
-          style={{
-            position: 'absolute',
-            top: -2,
-            right: -2,
-            background: '#1e3a5f',
-            color: '#93c5fd',
-            borderRadius: '50%',
-            width: 18,
-            height: 18,
-            fontSize: 10,
-            fontWeight: 800,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '2px solid #0d1117',
-            lineHeight: 1,
-          }}
-        >
+        <span style={{
+          position: 'absolute', top: -2, right: -2,
+          background: '#1e3a5f', color: '#93c5fd', borderRadius: '50%',
+          width: 18, height: 18, fontSize: 10, fontWeight: 800,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: '2px solid #0d1117', lineHeight: 1,
+        }}>
           {count > 9 ? '9+' : count}
         </span>
       )}
@@ -377,6 +298,30 @@ function assignAdminLogos(matches: EnrichedMatch[]): EnrichedMatch[] {
   });
 }
 
+// ---------------------------------------------------------------------------
+// FIX 6: Build + test admin team fingerprints
+// Fingerprint = `${homeTeamLower}|${awayTeamLower}` (no date — admin matches
+// may not share the exact kickoffAt of the live-feed entry for the same game).
+// ---------------------------------------------------------------------------
+function buildAdminTeamFingerprints(adminMatches: EnrichedMatch[]): Set<string> {
+  const fps = new Set<string>();
+  for (const m of adminMatches) {
+    const home = (m.homeTeam ?? '').toLowerCase().trim();
+    const away = (m.awayTeam ?? '').toLowerCase().trim();
+    if (home && away) fps.add(`${home}|${away}`);
+  }
+  return fps;
+}
+
+function isMatchInAdminSet(match: EnrichedMatch, adminFps: Set<string>): boolean {
+  const home = (match.homeTeam ?? '').toLowerCase().trim();
+  const away = (match.awayTeam ?? '').toLowerCase().trim();
+  return adminFps.has(`${home}|${away}`);
+}
+
+// ---------------------------------------------------------------------------
+// localStorage helpers
+// ---------------------------------------------------------------------------
 const HIDDEN_ADMIN_IDS_KEY = 'hidden_finished_admin_match_ids';
 function loadHiddenAdminIds(): Set<string> {
   try {
@@ -894,7 +839,6 @@ function normalizeMatch(raw: unknown): Match | null {
     r.kickoffAt ?? r.kickoff_at ?? r.startTime ?? r.start_time ?? r.date ?? r.scheduledAt ?? r.datetime ??
     firstComp?.date ?? ''
   );
-
   const rawHomeLogo = String(
     r.homeLogo ?? r.home_logo ?? r.homeCrest ?? r.homeTeamLogo ?? r.home_team_logo ??
     r.homeImage ?? r.home_image ?? r.homePhoto ?? r.home_photo ??
@@ -1167,9 +1111,7 @@ function filterByLeagueTab(
   }
 
   const filtered = matches.filter((m) => matchBelongsToLeagueTab(m, tab));
-  if (filtered.length === 0) {
-    return { matches, isFallback: true };
-  }
+  if (filtered.length === 0) return { matches, isFallback: true };
   return { matches: filtered, isFallback: false };
 }
 
@@ -1287,15 +1229,9 @@ function useLiveTimer(match: EnrichedMatch): string {
 const ADMIN_FINISHED_LINGER_MS = 10_000;
 
 function MatchCard({
-  match,
-  hasDraw = true,
-  onClick,
-  isAdmin = false,
+  match, hasDraw = true, onClick, isAdmin = false,
 }: {
-  match: EnrichedMatch;
-  hasDraw?: boolean;
-  onClick?: () => void;
-  isAdmin?: boolean;
+  match: EnrichedMatch; hasDraw?: boolean; onClick?: () => void; isAdmin?: boolean;
 }) {
   const { betSlip, addToBetSlip, showToast } = useAppStore() as {
     betSlip: BetSlipEntry[];
@@ -1360,13 +1296,8 @@ function MatchCard({
         )}
         {isUpcoming && match.kickoffAt && (
           <span style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 3,
-            fontSize: 10,
-            fontWeight: 400,
-            color: 'var(--text-faint, #475569)',
-            letterSpacing: '0.02em',
+            display: 'inline-flex', alignItems: 'center', gap: 3,
+            fontSize: 10, fontWeight: 400, color: 'var(--text-faint, #475569)', letterSpacing: '0.02em',
           }}>
             <ScheduleIcon sx={{ fontSize: 10, opacity: 0.5 }} />
             {`${formatDate(match.kickoffAt)} · ${formatKickoff(match.kickoffAt)}`}
@@ -1383,12 +1314,8 @@ function MatchCard({
           )}
           {isUpcoming && match.kickoffAt && (
             <span style={{
-              marginLeft: 'auto',
-              fontSize: 9,
-              fontWeight: 400,
-              color: 'var(--text-faint, #475569)',
-              opacity: 0.7,
-              whiteSpace: 'nowrap',
+              marginLeft: 'auto', fontSize: 9, fontWeight: 400,
+              color: 'var(--text-faint, #475569)', opacity: 0.7, whiteSpace: 'nowrap',
             }}>
               {formatCountdown(match.kickoffAt)}
             </span>
@@ -1463,7 +1390,14 @@ function LeagueCard({ league, matches, leagueLogo, showDraw }: { league: string;
   );
 }
 
-function SpecialGamesSection() {
+// ---------------------------------------------------------------------------
+// SpecialGamesSection — FIX 6: accepts onAdminFingerprintsChange callback
+// ---------------------------------------------------------------------------
+function SpecialGamesSection({
+  onAdminFingerprintsChange,
+}: {
+  onAdminFingerprintsChange: (fps: Set<string>) => void;
+}) {
   const navigate = useNavigate();
   const permanentlyHiddenRef = useRef<Set<string>>(loadHiddenAdminIds());
   const finishedAtRef = useRef<Map<string, number>>(new Map());
@@ -1481,7 +1415,12 @@ function SpecialGamesSection() {
         ).then((r) => r.json());
         if (!alive()) return;
         const matches = unwrapAdminMatches(raw);
-        if (matches.length === 0) { setAdminMatches([]); return; }
+        if (matches.length === 0) {
+          setAdminMatches([]);
+          // FIX 6: clear fingerprints when there are no admin matches
+          onAdminFingerprintsChange(new Set());
+          return;
+        }
         const oddsResults = await Promise.allSettled(matches.map((m) => fetchAdminMatchOdds(m.id)));
         if (!alive()) return;
         const enriched: EnrichedMatch[] = matches.map((match, idx) => {
@@ -1499,6 +1438,9 @@ function SpecialGamesSection() {
           }
         }
         setAdminMatches(withLogos);
+        // FIX 6: publish fingerprints of ALL admin matches (not just visible ones)
+        // so the regular list suppresses them immediately.
+        onAdminFingerprintsChange(buildAdminTeamFingerprints(withLogos));
       } catch { /* silent */ }
     }
     load();
@@ -1506,6 +1448,7 @@ function SpecialGamesSection() {
     const onVisible = () => { if (document.visibilityState === 'visible') load(); };
     document.addEventListener('visibilitychange', onVisible);
     return () => { genRef.current++; clearInterval(interval); document.removeEventListener('visibilitychange', onVisible); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -1636,21 +1579,12 @@ function SectionDivider({ label }: { label: string }) {
 function FallbackNotice({ tabLabel }: { tabLabel: string }) {
   return (
     <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 7,
-      padding: '8px 12px',
-      marginBottom: 12,
-      borderRadius: 8,
-      background: 'rgba(59,130,246,0.07)',
-      border: '1px solid rgba(59,130,246,0.15)',
+      display: 'flex', alignItems: 'center', gap: 7,
+      padding: '8px 12px', marginBottom: 12, borderRadius: 8,
+      background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.15)',
     }}>
       <span style={{ fontSize: 13 }}>ℹ️</span>
-      <span style={{
-        fontSize: 11,
-        color: 'var(--text-muted, #64748b)',
-        fontFamily: 'system-ui, sans-serif',
-      }}>
+      <span style={{ fontSize: 11, color: 'var(--text-muted, #64748b)', fontFamily: 'system-ui, sans-serif' }}>
         No <strong style={{ color: 'var(--text-main, #cbd5e1)', fontWeight: 700 }}>{tabLabel}</strong> matches right now — showing all available games.
       </span>
     </div>
@@ -1687,6 +1621,9 @@ export default function MatchList() {
   });
 
   const [error, setError] = useState<string | null>(null);
+
+  // FIX 6: fingerprint set from admin matches — used to suppress duplicates
+  const [adminFingerprints, setAdminFingerprints] = useState<Set<string>>(new Set());
 
   const footballGenRef = useRef(0);
   const sportGenRefs   = useRef<Record<SportTab, number>>({ football: 0, basketball: 0, tennis: 0, baseball: 0, nfl: 0, mma: 0 });
@@ -1760,13 +1697,18 @@ export default function MatchList() {
     return () => { clearInterval(interval); document.removeEventListener('visibilitychange', refresh); };
   }, [activeSport, fetchFootball, fetchSport]);
 
+  // FIX 6: strip admin-match games from the regular list before categorising
   const { allMatches, isFallback } = useMemo((): { allMatches: EnrichedMatch[]; isFallback: boolean } => {
     if (activeSport === 'football') {
       const result = filterByLeagueTab(allFootballMatches, activeLeagueTab);
-      return { allMatches: result.matches, isFallback: result.isFallback };
+      // Remove any match whose team-pair fingerprint belongs to an admin game
+      const filtered = adminFingerprints.size > 0
+        ? result.matches.filter((m) => !isMatchInAdminSet(m, adminFingerprints))
+        : result.matches;
+      return { allMatches: filtered, isFallback: result.isFallback };
     }
     return { allMatches: sportMatches[activeSport], isFallback: false };
-  }, [activeSport, activeLeagueTab, allFootballMatches, sportMatches]);
+  }, [activeSport, activeLeagueTab, allFootballMatches, sportMatches, adminFingerprints]);
 
   const grouped = useMemo(() => {
     const cats: Record<MatchCategory, EnrichedMatch[]> = { live: [], today: [], upcoming: [], finished: [] };
@@ -1884,8 +1826,10 @@ export default function MatchList() {
         </div>
       )}
 
-      {/* ── Special Games ── */}
-      {activeSport === 'football' && <SpecialGamesSection />}
+      {/* ── Special Games — FIX 6: passes fingerprint updater ── */}
+      {activeSport === 'football' && (
+        <SpecialGamesSection onAdminFingerprintsChange={setAdminFingerprints} />
+      )}
 
       {/* ── Fallback notice ── */}
       {isFallback && !isLoading && (
