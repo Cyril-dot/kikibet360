@@ -10,17 +10,22 @@ export default function Layout() {
   const theme = useAppStore((s) => s.theme);
 
   return (
-    <div className={theme === 'super-bet-dark' ? 'dark' : ''}>
-      <div className="min-h-screen bg-surface-light dark:bg-surface-dark transition-colors">
+    <div data-theme={theme}>
+      {/* ── full-height flex column so footer is always pushed to the bottom ── */}
+      <div className="flex flex-col min-h-screen bg-[var(--bg-page)] transition-colors">
         <Header />
-        <div className="flex max-w-[1440px] mx-auto w-full">
+
+        {/* ── content row: sidebar + main — flex-1 makes this fill remaining height ── */}
+        <div className="flex flex-1 max-w-[1440px] mx-auto w-full">
           <Sidebar />
-          {/* pb-32 + mb-16 on mobile = padding inside + margin outside the main, well clear of 64px BottomNav */}
-          <main className="flex-1 min-w-0 min-h-[calc(100vh-4rem)] pb-32 mb-16 lg:pb-6 lg:mb-0">
+          <main className="flex-1 min-w-0 pb-32 mb-16 lg:pb-6 lg:mb-0">
             <Outlet />
           </main>
         </div>
+
+        {/* ── footer sits at the bottom, only visible when user scrolls there ── */}
         <Footer />
+
         <BottomNav />
         <Toast />
       </div>
