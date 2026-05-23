@@ -23,17 +23,16 @@ import DownloadIcon             from '@mui/icons-material/Download';
 import PublicIcon               from '@mui/icons-material/Public';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import TrendingUpIcon           from '@mui/icons-material/TrendingUp';
+import EmojiEventsIcon          from '@mui/icons-material/EmojiEvents';
+import StarIcon                 from '@mui/icons-material/Star';
 
-// ─── Currency detection (same pattern as WalletPage) ─────────────────────────
-// Inline here so this file is self-contained; if you extract to currencyUtils.ts
-// replace these with imports from there.
+// ─── Currency detection ───────────────────────────────────────────────────────
 
 export interface CurrencyInfo {
-  code: string;        // "GHS", "NGN", "USD" …
-  symbol: string;      // "GH₵", "₦", "$" …
-  name: string;        // "Ghanaian Cedi" …
-  countryCode: string; // "GH", "NG", "US" …
-  /** Units of this currency that equal 1 GHS. For GHS = 1. */
+  code: string;
+  symbol: string;
+  name: string;
+  countryCode: string;
   rateFromGhs: number;
 }
 
@@ -69,7 +68,6 @@ export const DEFAULT_CURRENCY: CurrencyInfo = {
   countryCode: 'GH', rateFromGhs: 1,
 };
 
-// Module-level cache — fetched once per browser session, shared across pages
 let _currencyCache: CurrencyInfo | null = null;
 let _currencyInflight: Promise<CurrencyInfo> | null = null;
 
@@ -79,126 +77,66 @@ async function detectCurrencyInfo(): Promise<CurrencyInfo> {
 
   _currencyInflight = (async (): Promise<CurrencyInfo> => {
     let countryCode = '';
-
-    // Step 1 — ipapi.co — free, HTTPS, browser-friendly, 1k req/day
     try {
-      const res = await fetch('https://ipapi.co/json/', {
-        signal: AbortSignal.timeout(4000),
-      });
+      const res = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(4000) });
       if (res.ok) countryCode = (await res.json()).country_code ?? '';
-    } catch { /* fall through */ }
-
-    // Step 2 — freeipapi.com — free, HTTPS, no key needed
+    } catch { }
     if (!countryCode) {
       try {
-        const res = await fetch('https://freeipapi.com/api/json', {
-          signal: AbortSignal.timeout(4000),
-        });
+        const res = await fetch('https://freeipapi.com/api/json', { signal: AbortSignal.timeout(4000) });
         if (res.ok) countryCode = (await res.json()).countryCode ?? '';
-      } catch { /* fall through */ }
+      } catch { }
     }
-
-    // Step 3 — ip.guide — free, HTTPS, no key needed
     if (!countryCode) {
       try {
-        const res = await fetch('https://ip.guide/', {
-          signal: AbortSignal.timeout(4000),
-          headers: { Accept: 'application/json' },
-        });
+        const res = await fetch('https://ip.guide/', { signal: AbortSignal.timeout(4000), headers: { Accept: 'application/json' } });
         if (res.ok) countryCode = (await res.json()).location?.country_code ?? '';
-      } catch { /* fall through */ }
+      } catch { }
     }
-
     const localMeta = countryCode ? COUNTRY_CURRENCY[countryCode] : undefined;
     if (!localMeta) { _currencyCache = DEFAULT_CURRENCY; return _currencyCache; }
-
-    // Step 4 — live rate GHS → local (open.er-api.com)
     let rateFromGhs = 1;
     if (localMeta.code !== 'GHS') {
       try {
-        const res = await fetch('https://open.er-api.com/v6/latest/GHS', {
-          signal: AbortSignal.timeout(5000),
-        });
-        if (res.ok) {
-          const d = await res.json();
-          rateFromGhs = d.rates?.[localMeta.code] ?? 1;
-        }
-      } catch { /* fall through */ }
-
-      // Step 5 — fallback rate: exchangerate.host
+        const res = await fetch('https://open.er-api.com/v6/latest/GHS', { signal: AbortSignal.timeout(5000) });
+        if (res.ok) { const d = await res.json(); rateFromGhs = d.rates?.[localMeta.code] ?? 1; }
+      } catch { }
       if (rateFromGhs === 1) {
         try {
-          const res = await fetch(
-            `https://api.exchangerate.host/convert?from=GHS&to=${localMeta.code}&amount=1`,
-            { signal: AbortSignal.timeout(5000) },
-          );
-          if (res.ok) {
-            const d = await res.json();
-            if (d.success && d.result) rateFromGhs = d.result;
-          }
-        } catch { /* fall through */ }
+          const res = await fetch(`https://api.exchangerate.host/convert?from=GHS&to=${localMeta.code}&amount=1`, { signal: AbortSignal.timeout(5000) });
+          if (res.ok) { const d = await res.json(); if (d.success && d.result) rateFromGhs = d.result; }
+        } catch { }
       }
     }
-
-    _currencyCache = {
-      code: localMeta.code,
-      symbol: localMeta.symbol,
-      name: localMeta.name,
-      countryCode,
-      rateFromGhs,
-    };
+    _currencyCache = { code: localMeta.code, symbol: localMeta.symbol, name: localMeta.name, countryCode, rateFromGhs };
     return _currencyCache;
   })();
-
   return _currencyInflight;
 }
-// ─── Currency helpers ─────────────────────────────────────────────────────────
 
-/** Format a GHS amount into the user's local currency string. */
 function formatLocal(amountInGhs: number, currency: CurrencyInfo): string {
   const converted = amountInGhs * currency.rateFromGhs;
   try {
-    return new Intl.NumberFormat('en', {
-      style: 'currency',
-      currency: currency.code,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(converted);
+    return new Intl.NumberFormat('en', { style: 'currency', currency: currency.code, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(converted);
   } catch {
-    return `${currency.symbol}${converted.toLocaleString('en', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
+    return `${currency.symbol}${converted.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 }
 
-/** User-entered local amount → GHS for the API. */
 function localToGhs(localAmount: number, currency: CurrencyInfo): number {
   if (!currency.rateFromGhs) return localAmount;
   return localAmount / currency.rateFromGhs;
 }
 
-/** GHS amount → local currency numeric value. */
 function ghsToLocal(ghsAmount: number, currency: CurrencyInfo): number {
   return ghsAmount * currency.rateFromGhs;
 }
 
-/** Minimum stake the backend accepts, in GHS. */
 const MIN_STAKE_GHS = 300;
 
-// ─── Debug logger ─────────────────────────────────────────────────────────────
-const DEBUG = (() => {
-  try { return localStorage.getItem('NXTBET_DEBUG') === 'true'; } catch { return false; }
-})();
-function log(area: string, ...args: unknown[]) {
-  if (!DEBUG) return;
-  console.log(`%c[Nxtbet:${area}]`, 'color:#E6192E;font-weight:bold', ...args);
-}
-function logError(area: string, ...args: unknown[]) {
-  console.error(`[Nxtbet:${area}]`, ...args);
-}
-
-// ─── Normalisation helpers ────────────────────────────────────────────────────
+const DEBUG = (() => { try { return localStorage.getItem('NXTBET_DEBUG') === 'true'; } catch { return false; } })();
+function log(area: string, ...args: unknown[]) { if (!DEBUG) return; console.log(`%c[Nxtbet:${area}]`, 'color:#E6192E;font-weight:bold', ...args); }
+function logError(area: string, ...args: unknown[]) { console.error(`[Nxtbet:${area}]`, ...args); }
 
 function buildMatchLabel(s: Record<string, unknown>): string {
   if (!s) return 'Unknown match';
@@ -274,10 +212,6 @@ function Skeleton({ className = '' }: { className?: string }) {
   return <div className={`bg-slate-200 dark:bg-slate-700 rounded animate-pulse ${className}`} />;
 }
 
-/**
- * Small pill showing detected currency code.
- * Shows a pulsing "Detecting…" state while the geo lookup is in flight.
- */
 function CurrencyPill({ currency, detecting }: { currency: CurrencyInfo; detecting: boolean }) {
   if (detecting) {
     return (
@@ -313,106 +247,73 @@ function GuestPrompt({ message }: { message: string }) {
   );
 }
 
-// ─── Share-slip image generator ───────────────────────────────────────────────
-// NOTE: the slip image always shows both GHS and local currency amounts so
-// Nigerian/Kenyan etc. users share a slip that's meaningful in their context.
+// ─── Share slip image generator ───────────────────────────────────────────────
 
-async function generateSlipImage(
-  bet: Bet,
-  isWin: boolean,
-  currency: CurrencyInfo,
-): Promise<string> {
+async function generateSlipImage(bet: Bet, isWin: boolean, currency: CurrencyInfo): Promise<string> {
   const container = document.createElement('div');
-  container.style.cssText = `
-    position: fixed; top: -9999px; left: -9999px; width: 380px;
-    background: #0f172a; border-radius: 24px; overflow: hidden;
-    font-family: 'Inter', sans-serif;
-  `;
-  const winColor    = '#22c55e';
-  const lossColor   = '#ef4444';
-  const accentColor = isWin ? winColor : lossColor;
-  const emoji       = isWin ? '🏆' : '😭';
-
-  // payout / stake in local currency
-  const payoutGhs    = bet.potentialReturn;
-  const payoutLocal  = ghsToLocal(payoutGhs,  currency);
-  const stakeLocal   = ghsToLocal(bet.stake,  currency);
-
-  // headline amount: show local currency + GHS in smaller text if non-GHS
-  const headlineAmount = isWin
-    ? formatLocal(payoutGhs, currency)
-    : formatLocal(bet.stake, currency);
-  const headlineSubGhs = currency.code !== 'GHS'
-    ? isWin ? `(GH₵${payoutGhs.toFixed(2)})` : `(GH₵${bet.stake.toFixed(2)})`
-    : '';
-
+  container.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:380px;background:#0f172a;border-radius:24px;overflow:hidden;font-family:'Inter',sans-serif;`;
+  const winColor = '#FFD700'; const lossColor = '#ef4444'; const accentColor = isWin ? winColor : lossColor;
+  const payoutGhs = bet.potentialReturn;
+  const headlineAmount = isWin ? formatLocal(payoutGhs, currency) : formatLocal(bet.stake, currency);
+  const headlineSubGhs = currency.code !== 'GHS' ? (isWin ? `(GH₵${payoutGhs.toFixed(2)})` : `(GH₵${bet.stake.toFixed(2)})`) : '';
   container.innerHTML = `
     <style>* { box-sizing: border-box; margin: 0; padding: 0; }</style>
-    <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);">
-      <div style="background:${accentColor}; padding:6px 20px; display:flex; align-items:center; justify-content:space-between;">
-        <span style="font-size:11px;font-weight:800;color:#fff;letter-spacing:2px;text-transform:uppercase;">NXTBET</span>
-        <span style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.8);">Bet Slip</span>
+    <div style="background: linear-gradient(135deg, #0a0a0a 0%, #1a1200 50%, #0a0a0a 100%);">
+      <div style="background: linear-gradient(90deg, #1a1200, #E6192E, #1a1200); padding:6px 20px; display:flex; align-items:center; justify-content:space-between;">
+        <span style="font-size:13px;font-weight:900;color:#FFD700;letter-spacing:2px;">✗ NXTBET</span>
+        <span style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.7);">Bet Slip</span>
       </div>
-      <div style="padding:28px 24px 20px;text-align:center;">
-        <div style="font-size:48px;margin-bottom:8px;">${emoji}</div>
-        <div style="font-size:13px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-bottom:6px;">
-          ${isWin ? 'YOU WON' : 'BETTER LUCK NEXT TIME'}
-        </div>
-        <div style="font-size:36px;font-weight:900;color:${accentColor};line-height:1.1;">
-          ${headlineAmount}
-        </div>
-        ${headlineSubGhs
-          ? `<div style="font-size:14px;font-weight:500;color:rgba(255,255,255,0.4);margin-top:4px;">${headlineSubGhs}</div>`
-          : ''}
+      <div style="padding:24px 24px 16px;text-align:center;">
+        <div style="font-size:14px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#FFD700;margin-bottom:8px;">${isWin ? '🏆 YOU WON!' : '😭 BETTER LUCK NEXT TIME'}</div>
+        <div style="font-size:38px;font-weight:900;color:#FFD700;line-height:1.1;">${headlineAmount}</div>
+        ${headlineSubGhs ? `<div style="font-size:13px;color:rgba(255,255,255,0.4);margin-top:4px;">${headlineSubGhs}</div>` : ''}
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px;">Congrats! Your bet was successful.</div>
       </div>
-      <div style="height:1px;background:rgba(255,255,255,0.08);margin:0 24px;"></div>
-      <div style="padding:16px 24px;display:flex;flex-direction:column;gap:10px;">
-        ${bet.selections.map(sel => `
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                ${sel.homeTeam ? `${sel.homeTeam} vs ${sel.awayTeam}` : sel.matchId}
-              </div>
-              <div style="font-size:13px;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                ${sel.market}: ${sel.selection}
-              </div>
+      <div style="background:rgba(255,255,255,0.05);margin:0 16px;border-radius:12px;overflow:hidden;">
+        <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:0;padding:8px 12px;background:rgba(230,25,46,0.3);">
+          <span style="font-size:10px;font-weight:800;color:#FFD700;text-transform:uppercase;padding-right:12px;">#</span>
+          <span style="font-size:10px;font-weight:800;color:#FFD700;text-transform:uppercase;">SELECTION</span>
+          <span style="font-size:10px;font-weight:800;color:#FFD700;text-transform:uppercase;padding:0 12px;">ODDS</span>
+          <span style="font-size:10px;font-weight:800;color:#FFD700;text-transform:uppercase;">RESULT</span>
+        </div>
+        ${bet.selections.map((sel, i) => `
+          <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:0;padding:10px 12px;border-top:1px solid rgba(255,255,255,0.06);">
+            <span style="font-size:12px;font-weight:800;color:#FFD700;padding-right:12px;">${i + 1}</span>
+            <div>
+              <div style="font-size:12px;font-weight:700;color:#fff;">${sel.homeTeam && sel.awayTeam ? sel.selection : sel.selection}</div>
+              <div style="font-size:10px;color:rgba(255,255,255,0.4);">${sel.homeTeam && sel.awayTeam ? `${sel.homeTeam} vs ${sel.awayTeam}` : sel.matchId}</div>
+              <div style="font-size:10px;color:rgba(255,255,255,0.5);">${sel.market}</div>
             </div>
-            <div style="font-size:13px;font-weight:800;color:${accentColor};white-space:nowrap;background:rgba(255,255,255,0.06);padding:3px 8px;border-radius:6px;">
-              ${sel.oddsLocked.toFixed(2)}
-              ${sel.result ? `<span style="color:${sel.result === 'WON' ? winColor : lossColor};margin-left:4px;">${sel.result === 'WON' ? '✓' : '✗'}</span>` : ''}
-            </div>
+            <span style="font-size:12px;font-weight:800;color:#fff;padding:0 12px;">${sel.oddsLocked.toFixed(2)}</span>
+            <span style="font-size:12px;font-weight:800;color:${sel.result === 'WON' ? '#22c55e' : sel.result === 'LOST' ? '#ef4444' : '#FFD700'};">${sel.result === 'WON' ? 'WON ✓' : sel.result === 'LOST' ? 'LOST ✗' : '—'}</span>
           </div>
         `).join('')}
       </div>
-      <div style="height:1px;background:rgba(255,255,255,0.08);margin:0 24px;"></div>
-      <div style="padding:14px 24px;display:flex;justify-content:space-between;">
-        <div style="text-align:center;">
-          <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:2px;text-transform:uppercase;letter-spacing:1px;">Stake</div>
-          <div style="font-size:13px;font-weight:700;color:#fff;">${formatLocal(bet.stake, currency)}</div>
+      <div style="padding:16px 24px;display:flex;justify-content:space-between;gap:8px;margin-top:8px;">
+        <div style="text-align:center;flex:1;">
+          <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:3px;text-transform:uppercase;letter-spacing:1px;">TOTAL ODDS</div>
+          <div style="font-size:14px;font-weight:900;color:#FFD700;">${bet.totalOdds.toFixed(2)}</div>
+        </div>
+        <div style="text-align:center;flex:1;">
+          <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:3px;text-transform:uppercase;letter-spacing:1px;">STAKE</div>
+          <div style="font-size:14px;font-weight:900;color:#fff;">${formatLocal(bet.stake, currency)}</div>
           ${currency.code !== 'GHS' ? `<div style="font-size:10px;color:rgba(255,255,255,0.3);">GH₵${bet.stake.toFixed(2)}</div>` : ''}
         </div>
-        <div style="text-align:center;">
-          <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:2px;text-transform:uppercase;letter-spacing:1px;">Total Odds</div>
-          <div style="font-size:13px;font-weight:700;color:${accentColor};">${bet.totalOdds.toFixed(2)}x</div>
-        </div>
-        <div style="text-align:center;">
-          <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:2px;text-transform:uppercase;letter-spacing:1px;">Return</div>
-          <div style="font-size:13px;font-weight:700;color:${accentColor};">${formatLocal(bet.potentialReturn, currency)}</div>
+        <div style="text-align:center;flex:1;">
+          <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:3px;text-transform:uppercase;letter-spacing:1px;">TOTAL WINNINGS</div>
+          <div style="font-size:14px;font-weight:900;color:#FFD700;">${formatLocal(bet.potentialReturn, currency)}</div>
           ${currency.code !== 'GHS' ? `<div style="font-size:10px;color:rgba(255,255,255,0.3);">GH₵${bet.potentialReturn.toFixed(2)}</div>` : ''}
         </div>
       </div>
-      <div style="background:rgba(0,0,0,0.3);padding:12px 24px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="background:rgba(0,0,0,0.4);padding:10px 24px;display:flex;justify-content:space-between;align-items:center;">
         <div style="font-size:10px;color:rgba(255,255,255,0.3);">${new Date(bet.placedAt).toLocaleString()}</div>
-        <div style="font-size:11px;font-weight:800;color:${accentColor};letter-spacing:1px;">NXTBET</div>
+        <div style="font-size:12px;font-weight:900;color:#FFD700;letter-spacing:1px;">✗ NXTBET</div>
       </div>
     </div>
   `;
-
   document.body.appendChild(container);
   try {
-    const canvas = await html2canvas(container, {
-      scale: 2, useCORS: true, backgroundColor: null, logging: false,
-    });
+    const canvas = await html2canvas(container, { scale: 2, useCORS: true, backgroundColor: null, logging: false });
     return canvas.toDataURL('image/png');
   } finally {
     document.body.removeChild(container);
@@ -424,9 +325,7 @@ async function generateSlipImage(
 function ShareImageModal({ imageUrl, onClose }: { imageUrl: string; onClose: () => void }) {
   const handleDownload = () => {
     const a = document.createElement('a');
-    a.href     = imageUrl;
-    a.download = `nxtbet-slip-${Date.now()}.png`;
-    a.click();
+    a.href = imageUrl; a.download = `nxtbet-slip-${Date.now()}.png`; a.click();
   };
   const handleShare = async () => {
     try {
@@ -434,30 +333,17 @@ function ShareImageModal({ imageUrl, onClose }: { imageUrl: string; onClose: () 
       const file = new File([blob], 'nxtbet-bet.png', { type: 'image/png' });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], title: 'My Nxtbet Bet Slip' });
-      } else {
-        handleDownload();
-      }
+      } else { handleDownload(); }
     } catch { handleDownload(); }
   };
-
   return (
-    <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-slate-900 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden"
-        onClick={e => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="bg-slate-900 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
           <h3 className="font-bold text-white text-base">Your Bet Slip</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 transition-colors">
-            <CloseIcon fontSize="small" />
-          </button>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 transition-colors"><CloseIcon fontSize="small" /></button>
         </div>
-        <div className="p-4">
-          <img src={imageUrl} alt="Bet slip" className="w-full rounded-2xl shadow-xl" />
-        </div>
+        <div className="p-4"><img src={imageUrl} alt="Bet slip" className="w-full rounded-2xl shadow-xl" /></div>
         <div className="px-4 pb-5 flex gap-3">
           <button onClick={handleDownload} className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors">
             <DownloadIcon fontSize="small" /> Save
@@ -471,212 +357,404 @@ function ShareImageModal({ imageUrl, onClose }: { imageUrl: string; onClose: () 
   );
 }
 
-// ─── Win modal ────────────────────────────────────────────────────────────────
-// Shows the GHS payout CONVERTED to user's local currency at the top,
-// with the GHS equivalent in smaller text beneath — same pattern as wallet page.
+// ─── WIN MODAL — redesigned to match reference image ─────────────────────────
 
-function WinModal({
-  bet,
-  currency,
-  onClose,
-}: {
-  bet: Bet;
-  currency: CurrencyInfo;
-  onClose: () => void;
-}) {
+function WinModal({ bet, currency, onClose }: { bet: Bet; currency: CurrencyInfo; onClose: () => void }) {
   const [generatingImage, setGeneratingImage] = useState(false);
-  const [shareImageUrl,   setShareImageUrl]   = useState<string | null>(null);
+  const [shareImageUrl, setShareImageUrl] = useState<string | null>(null);
+  const [sparkles] = useState(() =>
+    Array.from({ length: 60 }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      delay: Math.random() * 2,
+      duration: 2 + Math.random() * 2,
+      size: 4 + Math.random() * 8,
+      color: ['#FFD700','#FFA500','#E6192E','#ffffff','#FFD700','#22c55e'][Math.floor(Math.random() * 6)],
+      shape: Math.random() > 0.5 ? '50%' : '2px',
+    }))
+  );
 
-  const payoutGhs   = bet.potentialReturn;
+  const payoutGhs = bet.potentialReturn;
+  const stakeLocal = ghsToLocal(bet.stake, currency);
   const payoutLocal = ghsToLocal(payoutGhs, currency);
-  const stakeLocal  = ghsToLocal(bet.stake, currency);
+  const bonusGhs = payoutGhs - (bet.stake * bet.totalOdds);
+  const hasBonus = bonusGhs > 0.5;
 
-  const confettiColors = ['#E6192E','#FFD700','#22C55E','#3B82F6','#F59E0B','#A855F7','#ffffff'];
+  const placedDate = bet.placedAt
+    ? new Date(bet.placedAt).toLocaleString('en-GH', { hour: '2-digit', minute: '2-digit', hour12: false, month: '2-digit', day: '2-digit', year: 'numeric' }).replace(',', '')
+    : '';
 
   const handleShowOff = async () => {
     setGeneratingImage(true);
-    try {
-      const url = await generateSlipImage(bet, true, currency);
-      setShareImageUrl(url);
-    } catch (err) {
-      logError('WinModal', 'Failed to generate image:', err);
-      if (navigator.share) {
-        await navigator.share({
-          title: `I won ${formatLocal(payoutGhs, currency)} on Nxtbet! 🏆`,
-          text:  `Stake: ${formatLocal(bet.stake, currency)} · Odds: ${bet.totalOdds.toFixed(2)}x`,
-        });
-      }
-    } finally {
-      setGeneratingImage(false);
-    }
+    try { const url = await generateSlipImage(bet, true, currency); setShareImageUrl(url); }
+    catch (err) { logError('WinModal', err); }
+    finally { setGeneratingImage(false); }
   };
-
-  const placedDate = bet.placedAt
-    ? new Date(bet.placedAt).toLocaleString('en-GH', {
-        hour: '2-digit', minute: '2-digit', hour12: true,
-        month: 'numeric', day: 'numeric', year: 'numeric',
-      })
-    : '';
 
   return (
     <>
       <style>{`
         @keyframes confettiFall {
-          0%   { transform: translateY(-10px) rotate(0deg); opacity: 1; }
-          100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+          0%   { transform: translateY(-20px) rotate(0deg) scale(1); opacity: 1; }
+          80%  { opacity: 1; }
+          100% { transform: translateY(110vh) rotate(720deg) scale(0.5); opacity: 0; }
         }
-        @keyframes stakeSlideUp {
-          from { opacity: 0; transform: translateY(32px) scale(0.98); }
-          to   { opacity: 1; transform: translateY(0)  scale(1); }
+        @keyframes winSlideUp {
+          from { opacity: 0; transform: translateY(40px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
-        .stake-slide-up { animation: stakeSlideUp 0.35s cubic-bezier(0.16,1,0.3,1) both; }
+        @keyframes trophyGlow {
+          0%, 100% { filter: drop-shadow(0 0 20px #FFD700) drop-shadow(0 0 40px #FFA500) drop-shadow(0 0 60px #FF6B00); }
+          50%       { filter: drop-shadow(0 0 30px #FFD700) drop-shadow(0 0 60px #FFA500) drop-shadow(0 0 90px #FF8C00); }
+        }
+        @keyframes trophyBounce {
+          0%, 100% { transform: translateY(0) scale(1); }
+          50%       { transform: translateY(-8px) scale(1.04); }
+        }
+        @keyframes rayRotate {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        @keyframes shimmer {
+          0%   { background-position: -200% center; }
+          100% { background-position: 200% center; }
+        }
+        @keyframes pulseGold {
+          0%, 100% { opacity: 0.6; }
+          50%       { opacity: 1; }
+        }
+        @keyframes countUp {
+          from { opacity: 0; transform: scale(0.8); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+        .win-modal-enter { animation: winSlideUp 0.4s cubic-bezier(0.16,1,0.3,1) both; }
+        .trophy-anim {
+          animation: trophyBounce 2.5s ease-in-out infinite, trophyGlow 2s ease-in-out infinite;
+        }
+        .rays-anim { animation: rayRotate 12s linear infinite; }
+        .shimmer-text {
+          background: linear-gradient(90deg, #FFD700 0%, #FFF8DC 40%, #FFD700 60%, #FFA500 100%);
+          background-size: 200% auto;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          animation: shimmer 2s linear infinite;
+        }
+        .win-amount-anim { animation: countUp 0.5s cubic-bezier(0.16,1,0.3,1) 0.3s both; }
       `}</style>
 
       <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
+        {/* Backdrop */}
+        <div className="absolute inset-0 bg-black/90" onClick={onClose} />
 
         {/* Confetti */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-10">
-          {Array.from({ length: 50 }).map((_, i) => (
-            <div key={i} style={{
-              position: 'absolute', left: `${Math.random() * 100}%`, top: '-12px',
-              width: i % 4 === 0 ? '10px' : '7px',
-              height: i % 4 === 0 ? '10px' : '12px',
-              backgroundColor: confettiColors[i % confettiColors.length],
-              borderRadius: i % 3 === 0 ? '50%' : '2px', opacity: 0,
-              animation: `confettiFall ${2 + Math.random() * 2.5}s ease-in ${Math.random() * 1.5}s forwards`,
-              transform: `rotate(${Math.random() * 360}deg)`,
+          {sparkles.map(s => (
+            <div key={s.id} style={{
+              position: 'absolute', left: `${s.left}%`, top: '-16px',
+              width: `${s.size}px`, height: `${s.size * (Math.random() > 0.5 ? 1.5 : 1)}px`,
+              backgroundColor: s.color, borderRadius: s.shape, opacity: 0,
+              animation: `confettiFall ${s.duration}s ease-in ${s.delay}s forwards`,
             }} />
           ))}
         </div>
 
-        {/* Card */}
+        {/* Modal card */}
         <div
-          className="relative z-20 w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl overflow-hidden stake-slide-up"
+          className="relative z-20 w-full sm:max-w-md overflow-hidden win-modal-enter"
           style={{
-            background: '#1a2332',
-            border: '1px solid rgba(255,255,255,0.08)',
+            background: 'linear-gradient(180deg, #0a0800 0%, #140d00 40%, #0a0000 100%)',
+            borderTop: '1px solid rgba(255,215,0,0.3)',
+            borderLeft: '1px solid rgba(255,215,0,0.15)',
+            borderRight: '1px solid rgba(255,215,0,0.15)',
+            borderRadius: '24px 24px 0 0',
             paddingBottom: 'calc(env(safe-area-inset-bottom) + 80px)',
+            maxHeight: '95vh',
           }}
         >
-          {/* Top bar */}
-          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-black px-2.5 py-1 rounded-md" style={{ background: '#22c55e', color: '#fff', letterSpacing: '0.05em' }}>
-                Win
-              </span>
-              <span className="text-sm text-slate-400">{placedDate}</span>
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 z-30 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+            style={{ background: 'rgba(255,255,255,0.1)', color: '#fff' }}
+          >
+            <CloseIcon sx={{ fontSize: 18 }} />
+          </button>
+
+          {/* ── HERO SECTION ── */}
+          <div className="relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #1a0d00 0%, #0d0500 100%)', paddingTop: '32px', paddingBottom: '24px' }}>
+            {/* Radial glow behind trophy */}
+            <div className="absolute inset-0 pointer-events-none" style={{
+              background: 'radial-gradient(ellipse 70% 60% at 50% 60%, rgba(255,165,0,0.25) 0%, rgba(255,100,0,0.1) 40%, transparent 70%)',
+            }} />
+
+            {/* Rotating rays */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ top: '10%' }}>
+              <div className="rays-anim" style={{ width: '280px', height: '280px', opacity: 0.15 }}>
+                <svg viewBox="0 0 280 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  {Array.from({ length: 16 }, (_, i) => {
+                    const angle = (i * 360) / 16;
+                    const rad = (angle * Math.PI) / 180;
+                    const x1 = 140 + 50 * Math.cos(rad); const y1 = 140 + 50 * Math.sin(rad);
+                    const x2 = 140 + 140 * Math.cos(rad); const y2 = 140 + 140 * Math.sin(rad);
+                    return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#FFD700" strokeWidth="2" />;
+                  })}
+                </svg>
+              </div>
             </div>
-            <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors">
-              <CloseIcon sx={{ fontSize: 17 }} />
-            </button>
+
+            {/* NXTBET logo */}
+            <div className="text-center mb-2">
+              <span className="text-lg font-black tracking-widest" style={{ color: '#FFD700', letterSpacing: '0.2em' }}>
+                ✗ NXTBET
+              </span>
+            </div>
+
+            {/* YOU WON */}
+            <div className="text-center mb-3">
+              <h1 className="shimmer-text font-black" style={{ fontSize: '42px', letterSpacing: '0.05em', lineHeight: 1 }}>
+                YOU WON!
+              </h1>
+            </div>
+
+            {/* Trophy SVG — big, borderless, glowing */}
+            <div className="flex justify-center mb-3">
+              <div className="trophy-anim relative">
+                {/* Glow halo */}
+                <div style={{
+                  position: 'absolute', inset: '-20px',
+                  borderRadius: '50%',
+                  background: 'radial-gradient(circle, rgba(255,165,0,0.4) 0%, rgba(255,100,0,0.2) 50%, transparent 70%)',
+                  animation: 'pulseGold 2s ease-in-out infinite',
+                }} />
+                <svg width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="trophyGrad" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#FFF8DC"/>
+                      <stop offset="20%" stopColor="#FFD700"/>
+                      <stop offset="50%" stopColor="#FFA500"/>
+                      <stop offset="70%" stopColor="#FFD700"/>
+                      <stop offset="100%" stopColor="#B8860B"/>
+                    </linearGradient>
+                    <linearGradient id="trophyShine" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#FFFDE7" stopOpacity="0.9"/>
+                      <stop offset="100%" stopColor="#F59E0B" stopOpacity="0.3"/>
+                    </linearGradient>
+                    <radialGradient id="cupGlow" cx="50%" cy="30%" r="60%">
+                      <stop offset="0%" stopColor="#FFFDE7" stopOpacity="0.8"/>
+                      <stop offset="100%" stopColor="#FFD700" stopOpacity="0"/>
+                    </radialGradient>
+                    <filter id="glow">
+                      <feGaussianBlur stdDeviation="3" result="blur"/>
+                      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                    </filter>
+                  </defs>
+
+                  {/* Base platform */}
+                  <rect x="52" y="138" width="56" height="8" rx="4" fill="url(#trophyGrad)" filter="url(#glow)"/>
+                  <rect x="44" y="134" width="72" height="8" rx="4" fill="url(#trophyGrad)" filter="url(#glow)"/>
+
+                  {/* Stem */}
+                  <rect x="68" y="112" width="24" height="24" rx="3" fill="url(#trophyGrad)" filter="url(#glow)"/>
+                  <rect x="72" y="112" width="16" height="24" rx="2" fill="url(#trophyShine)" opacity="0.4"/>
+
+                  {/* Main cup body */}
+                  <path d="M36 28 L124 28 L116 92 Q110 116 80 116 Q50 116 44 92 Z" fill="url(#trophyGrad)" filter="url(#glow)"/>
+                  {/* Cup shine */}
+                  <path d="M46 28 L90 28 L84 85 Q78 108 60 112 Q44 100 44 92 Z" fill="url(#cupGlow)" opacity="0.5"/>
+                  {/* Cup inner shadow */}
+                  <path d="M50 35 L110 35 L103 88 Q98 108 80 110 Q62 108 57 88 Z" fill="none" stroke="rgba(139,90,0,0.3)" strokeWidth="1"/>
+
+                  {/* Left handle */}
+                  <path d="M36 38 Q16 38 16 58 Q16 76 36 76" stroke="url(#trophyGrad)" strokeWidth="12" fill="none" strokeLinecap="round" filter="url(#glow)"/>
+                  <path d="M36 44 Q22 44 22 58 Q22 72 36 70" stroke="url(#trophyShine)" strokeWidth="4" fill="none" strokeLinecap="round" opacity="0.5"/>
+
+                  {/* Right handle */}
+                  <path d="M124 38 Q144 38 144 58 Q144 76 124 76" stroke="url(#trophyGrad)" strokeWidth="12" fill="none" strokeLinecap="round" filter="url(#glow)"/>
+                  <path d="M124 44 Q138 44 138 58 Q138 72 124 70" stroke="url(#trophyShine)" strokeWidth="4" fill="none" strokeLinecap="round" opacity="0.5"/>
+
+                  {/* Stars on cup */}
+                  <text x="80" y="82" textAnchor="middle" fontSize="28" fill="#FFF8DC" opacity="0.9">★</text>
+
+                  {/* NXTBET text on cup */}
+                  <text x="80" y="58" textAnchor="middle" fontSize="9" fontWeight="900" fill="#7C4A00" letterSpacing="1" opacity="0.7">NXT</text>
+                  <text x="80" y="70" textAnchor="middle" fontSize="9" fontWeight="900" fill="#7C4A00" letterSpacing="1" opacity="0.7">BET</text>
+
+                  {/* WINNER ribbon */}
+                  <rect x="48" y="120" width="64" height="16" rx="3" fill="#E6192E"/>
+                  <text x="80" y="131" textAnchor="middle" fontSize="8" fontWeight="900" fill="#FFD700" letterSpacing="2">WINNER</text>
+                </svg>
+              </div>
+            </div>
+
+            {/* Payout amount */}
+            <div className="text-center win-amount-anim">
+              <div className="font-black" style={{ fontSize: '32px', color: '#FFD700', letterSpacing: '-0.5px' }}>
+                {formatLocal(payoutGhs, currency)}
+              </div>
+              {currency.code !== 'GHS' && (
+                <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>
+                  GH₵{payoutGhs.toFixed(2)}
+                </div>
+              )}
+              <div style={{ fontSize: '12px', color: 'rgba(255,200,0,0.7)', marginTop: '4px', fontWeight: 600 }}>
+                Congrats! Your bet was successful.
+              </div>
+            </div>
           </div>
 
-          {/* Scrollable body */}
-          <div className="overflow-y-auto" style={{ maxHeight: 'calc(85vh - 80px)' }}>
-            {bet.selections.map((sel, i) => {
-              const matchLabel = buildMatchLabel(sel as unknown as Record<string, unknown>);
-              const settledAt  = bet.settledAt
-                ? new Date(bet.settledAt).toLocaleString('en-GH', {
-                    weekday: 'short', month: 'short', day: 'numeric',
-                    hour: '2-digit', minute: '2-digit', hour12: true,
-                  })
-                : '';
-              return (
-                <div key={sel.id ?? i} className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                      <SportsSoccerIcon sx={{ fontSize: 15 }} className="text-slate-300" />
-                    </div>
-                    <p className="text-sm font-bold text-white truncate">{matchLabel}</p>
-                  </div>
-                  {settledAt && <p className="text-xs text-slate-400 mb-3">{settledAt}</p>}
-                  <div className="inline-flex items-center px-3 py-1.5 rounded-lg mb-2 text-sm font-bold text-white" style={{ border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)' }}>
-                    {sel.selection}
-                  </div>
-                  <p className="text-xs text-slate-400 mb-3">{sel.market}</p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-emerald-400" style={{ fontSize: 16 }}>✓</span>
-                      <span className="text-sm font-bold text-white">{sel.selection}</span>
-                    </div>
-                    <span className="text-sm font-bold text-white">{(sel.oddsLocked ?? bet.totalOdds).toFixed(2)}</span>
-                  </div>
-                </div>
-              );
-            })}
+          {/* ── TICKET DETAILS SECTION ── */}
+          <div className="overflow-y-auto" style={{ maxHeight: 'calc(95vh - 380px)' }}>
 
-            {/* NXTBET divider */}
-            <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
-              <div className="flex items-center gap-1.5">
-                <SportsSoccerIcon sx={{ fontSize: 14 }} className="text-primary" />
-                <span className="text-sm font-black text-white tracking-wide">NXTBET</span>
-              </div>
-              <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
+            {/* Ticket meta row */}
+            <div className="grid grid-cols-3 gap-0 mx-4 mt-4 rounded-xl overflow-hidden border" style={{ borderColor: 'rgba(255,215,0,0.15)' }}>
+              {[
+                { icon: '🎫', label: 'TICKET ID', value: `NXT${bet.id.slice(-8).toUpperCase()}` },
+                { icon: '📅', label: 'DATE', value: placedDate },
+                { icon: '🏆', label: 'BET TYPE', value: bet.selections.length > 1 ? 'MULTIPLE' : 'SINGLE' },
+              ].map((item, i) => (
+                <div key={i} className="flex flex-col items-center justify-center py-3 px-2 text-center" style={{ background: 'rgba(255,255,255,0.03)', borderRight: i < 2 ? '1px solid rgba(255,215,0,0.1)' : 'none' }}>
+                  <span style={{ fontSize: '14px', marginBottom: '3px' }}>{item.icon}</span>
+                  <span style={{ fontSize: '9px', color: 'rgba(255,215,0,0.6)', fontWeight: 700, letterSpacing: '0.8px', marginBottom: '2px' }}>{item.label}</span>
+                  <span style={{ fontSize: '10px', color: '#fff', fontWeight: 700 }}>{item.value}</span>
+                </div>
+              ))}
             </div>
 
-            {/* Odds / Stake / Payout — all in local currency */}
-            <div className="px-4 py-3 space-y-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-400">Odds</span>
-                <span className="text-sm font-bold" style={{ color: '#3b82f6' }}>{bet.totalOdds.toFixed(2)}</span>
+            {/* STATUS badge */}
+            <div className="flex justify-center mt-3 mx-4">
+              <div className="flex items-center gap-2 px-5 py-2 rounded-xl border" style={{ background: 'rgba(34,197,94,0.1)', borderColor: 'rgba(34,197,94,0.3)' }}>
+                <CheckCircleIcon sx={{ fontSize: 18, color: '#22c55e' }} />
+                <span style={{ fontSize: '16px', fontWeight: 900, color: '#22c55e', letterSpacing: '2px' }}>WON</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-400">Stake</span>
-                <div className="text-right">
-                  <span className="text-sm font-bold text-white">{formatLocal(bet.stake, currency)}</span>
-                  {currency.code !== 'GHS' && (
-                    <p className="text-xs text-slate-500 mt-0.5">GH₵{bet.stake.toFixed(2)}</p>
-                  )}
+            </div>
+
+            {/* Selections table */}
+            <div className="mx-4 mt-4 rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,215,0,0.15)' }}>
+              {/* Table header */}
+              <div className="grid gap-0 px-3 py-2" style={{ gridTemplateColumns: '20px 1fr 50px 56px', background: 'rgba(230,25,46,0.5)' }}>
+                {['#', 'SELECTION', 'ODDS', 'RESULT'].map(h => (
+                  <span key={h} style={{ fontSize: '9px', fontWeight: 800, color: '#FFD700', letterSpacing: '1px', textTransform: 'uppercase' }}>{h}</span>
+                ))}
+              </div>
+
+              {/* Rows */}
+              {bet.selections.map((sel, i) => {
+                const isWon = sel.result === 'WON';
+                const isLost = sel.result === 'LOST';
+                const matchLabel = buildMatchLabel(sel as unknown as Record<string, unknown>);
+                return (
+                  <div
+                    key={sel.id ?? i}
+                    className="grid gap-0 px-3 py-3"
+                    style={{
+                      gridTemplateColumns: '20px 1fr 50px 56px',
+                      borderTop: '1px solid rgba(255,215,0,0.08)',
+                      background: i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent',
+                    }}
+                  >
+                    <span style={{ fontSize: '11px', fontWeight: 800, color: '#FFD700', paddingTop: '2px' }}>{i + 1}</span>
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#fff', lineHeight: 1.3 }}>
+                        {sel.selection || sel.market}
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginTop: '1px', lineHeight: 1.3 }}>
+                        {matchLabel}
+                      </div>
+                      <div style={{ fontSize: '9px', color: 'rgba(255,215,0,0.5)', marginTop: '1px' }}>
+                        {sel.market}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '12px', fontWeight: 800, color: '#fff', paddingTop: '2px' }}>
+                      {sel.oddsLocked.toFixed(2)}
+                    </span>
+                    <div style={{ paddingTop: '2px' }}>
+                      {sel.result ? (
+                        <span style={{
+                          fontSize: '10px', fontWeight: 800,
+                          color: isWon ? '#22c55e' : isLost ? '#ef4444' : '#94a3b8',
+                          display: 'flex', alignItems: 'center', gap: '3px',
+                        }}>
+                          {isWon ? '✓' : isLost ? '✗' : '—'} {sel.result}
+                        </span>
+                      ) : <span style={{ fontSize: '10px', color: '#94a3b8' }}>—</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Dashed separator */}
+            <div className="mx-4 my-3 relative flex items-center">
+              <div style={{ flex: 1, borderTop: '1.5px dashed rgba(255,215,0,0.2)' }} />
+              <div className="mx-2" style={{ fontSize: '12px', color: 'rgba(255,215,0,0.4)' }}>✗</div>
+              <div style={{ flex: 1, borderTop: '1.5px dashed rgba(255,215,0,0.2)' }} />
+            </div>
+
+            {/* Summary rows */}
+            <div className="mx-4 space-y-2.5 pb-3">
+              {[
+                { label: 'TOTAL ODDS:', value: bet.totalOdds.toFixed(2), valueColor: '#FFD700' },
+                { label: 'STAKE:', value: formatLocal(bet.stake, currency), sub: currency.code !== 'GHS' ? `GH₵${bet.stake.toFixed(2)}` : undefined, valueColor: '#fff' },
+                ...(hasBonus ? [{ label: 'BONUS:', value: formatLocal(bonusGhs, currency), sub: currency.code !== 'GHS' ? `GH₵${bonusGhs.toFixed(2)}` : undefined, valueColor: '#22c55e' }] : []),
+              ].map(row => (
+                <div key={row.label} className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.5px' }}>{row.label}</span>
+                  </div>
+                  <div className="text-right">
+                    <span style={{ fontSize: '14px', fontWeight: 800, color: row.valueColor }}>{row.value}</span>
+                    {(row as any).sub && <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginTop: '1px' }}>{(row as any).sub}</p>}
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-400">Payout</span>
+              ))}
+
+              {/* Total winnings — highlighted */}
+              <div className="flex items-start justify-between pt-2 mt-1" style={{ borderTop: '1.5px solid rgba(255,215,0,0.3)' }}>
+                <span style={{ fontSize: '13px', fontWeight: 900, color: '#FFD700', letterSpacing: '0.5px' }}>TOTAL WINNINGS:</span>
                 <div className="text-right">
-                  <span className="text-base font-black" style={{ color: '#22c55e' }}>
+                  <span style={{ fontSize: '20px', fontWeight: 900, color: '#FFD700' }}>
                     {formatLocal(payoutGhs, currency)}
                   </span>
                   {currency.code !== 'GHS' && (
-                    <p className="text-xs text-slate-500 mt-0.5">GH₵{payoutGhs.toFixed(2)}</p>
+                    <p style={{ fontSize: '11px', color: 'rgba(255,215,0,0.5)', marginTop: '2px' }}>GH₵{payoutGhs.toFixed(2)}</p>
                   )}
                 </div>
               </div>
-              {/* Note: wallet is credited in GHS; local display is for reference */}
+
+              {/* Non-GHS note */}
               {currency.code !== 'GHS' && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  <InfoOutlinedIcon sx={{ fontSize: 13 }} className="text-slate-400 shrink-0" />
-                  <p className="text-xs text-slate-400">
+                <div className="flex items-start gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,215,0,0.1)' }}>
+                  <InfoOutlinedIcon sx={{ fontSize: 13, color: 'rgba(255,215,0,0.6)', flexShrink: 0, marginTop: '1px' }} />
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>
                     GH₵{payoutGhs.toFixed(2)} credited to your wallet · displayed as{' '}
-                    <span className="font-semibold text-emerald-400">{formatLocal(payoutGhs, currency)}</span> in {currency.code}
+                    <span style={{ color: '#22c55e', fontWeight: 700 }}>{formatLocal(payoutGhs, currency)}</span> in {currency.code}
                   </p>
                 </div>
               )}
             </div>
 
             {/* Action buttons */}
-            <div className="px-4 py-4 flex gap-3">
+            <div className="px-4 pt-2 pb-2 flex gap-3">
               <button
                 onClick={handleShowOff}
                 disabled={generatingImage}
-                className="flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.97] disabled:opacity-60"
-                style={{ background: '#22c55e', color: '#fff' }}
+                className="flex-1 py-3.5 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.97] disabled:opacity-60"
+                style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: '#fff', boxShadow: '0 4px 20px rgba(34,197,94,0.3)' }}
               >
-                {generatingImage
-                  ? <><CircularProgress fontSize="small" className="animate-spin" /> Generating…</>
-                  : <><ShareIcon fontSize="small" /> Share Slip</>}
+                {generatingImage ? <><CircularProgress fontSize="small" className="animate-spin" /> Generating…</> : <><ShareIcon fontSize="small" /> Share Slip</>}
               </button>
               <Link
                 to="/wallet"
                 onClick={onClose}
-                className="flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center transition-all active:scale-[0.97]"
-                style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)' }}
+                className="flex-1 py-3.5 rounded-xl font-black text-sm flex items-center justify-center transition-all active:scale-[0.97]"
+                style={{ background: 'linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,140,0,0.15))', color: '#FFD700', border: '1px solid rgba(255,215,0,0.3)' }}
               >
                 Withdraw
               </Link>
             </div>
 
-            <button onClick={onClose} className="w-full pb-5 text-xs font-semibold text-slate-500 hover:text-slate-300 transition-colors">
+            <button onClick={onClose} className="w-full pb-4 text-xs font-semibold transition-colors" style={{ color: 'rgba(255,255,255,0.3)' }}>
               Continue Betting
             </button>
           </div>
@@ -690,35 +768,19 @@ function WinModal({
 
 // ─── Loss modal ───────────────────────────────────────────────────────────────
 
-function LossModal({
-  bet,
-  currency,
-  onClose,
-}: {
-  bet: Bet;
-  currency: CurrencyInfo;
-  onClose: () => void;
-}) {
+function LossModal({ bet, currency, onClose }: { bet: Bet; currency: CurrencyInfo; onClose: () => void }) {
   const [generatingImage, setGeneratingImage] = useState(false);
-  const [shareImageUrl,   setShareImageUrl]   = useState<string | null>(null);
+  const [shareImageUrl, setShareImageUrl] = useState<string | null>(null);
 
   const handleShowOff = async () => {
     setGeneratingImage(true);
-    try {
-      const url = await generateSlipImage(bet, false, currency);
-      setShareImageUrl(url);
-    } catch (err) {
-      logError('LossModal', 'Failed to generate image:', err);
-    } finally {
-      setGeneratingImage(false);
-    }
+    try { const url = await generateSlipImage(bet, false, currency); setShareImageUrl(url); }
+    catch (err) { logError('LossModal', err); }
+    finally { setGeneratingImage(false); }
   };
 
   const placedDate = bet.placedAt
-    ? new Date(bet.placedAt).toLocaleString('en-GH', {
-        hour: '2-digit', minute: '2-digit', hour12: true,
-        month: 'numeric', day: 'numeric', year: 'numeric',
-      })
+    ? new Date(bet.placedAt).toLocaleString('en-GH', { hour: '2-digit', minute: '2-digit', hour12: true, month: 'numeric', day: 'numeric', year: 'numeric' })
     : '';
 
   return (
@@ -732,22 +794,13 @@ function LossModal({
 
       <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center overflow-hidden">
         <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
-
         <div
           className="relative z-20 w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl overflow-hidden"
-          style={{
-            background: '#1a2332',
-            border: '1px solid rgba(255,255,255,0.08)',
-            animation: 'stakeSlideUp 0.35s cubic-bezier(0.16,1,0.3,1) both',
-            paddingBottom: 'calc(env(safe-area-inset-bottom) + 80px)',
-          }}
+          style={{ background: '#1a2332', border: '1px solid rgba(255,255,255,0.08)', animation: 'stakeSlideUp 0.35s cubic-bezier(0.16,1,0.3,1) both', paddingBottom: 'calc(env(safe-area-inset-bottom) + 80px)' }}
         >
-          {/* Top bar */}
           <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center gap-3">
-              <span className="text-xs font-black px-2.5 py-1 rounded-md" style={{ background: '#ef4444', color: '#fff', letterSpacing: '0.05em' }}>
-                Lost
-              </span>
+              <span className="text-xs font-black px-2.5 py-1 rounded-md" style={{ background: '#ef4444', color: '#fff', letterSpacing: '0.05em' }}>Lost</span>
               <span className="text-sm text-slate-400">{placedDate}</span>
             </div>
             <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors">
@@ -758,12 +811,7 @@ function LossModal({
           <div className="overflow-y-auto" style={{ maxHeight: 'calc(85vh - 80px)' }}>
             {bet.selections.map((sel, i) => {
               const matchLabel = buildMatchLabel(sel as unknown as Record<string, unknown>);
-              const settledAt  = bet.settledAt
-                ? new Date(bet.settledAt).toLocaleString('en-GH', {
-                    weekday: 'short', month: 'short', day: 'numeric',
-                    hour: '2-digit', minute: '2-digit', hour12: true,
-                  })
-                : '';
+              const settledAt = bet.settledAt ? new Date(bet.settledAt).toLocaleString('en-GH', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : '';
               const isWonSel = sel.result === 'WON';
               return (
                 <div key={sel.id ?? i} className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
@@ -788,64 +836,29 @@ function LossModal({
                 </div>
               );
             })}
-
-            {/* NXTBET divider */}
             <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
               <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
-              <div className="flex items-center gap-1.5">
-                <SportsSoccerIcon sx={{ fontSize: 14 }} className="text-primary" />
-                <span className="text-sm font-black text-white tracking-wide">NXTBET</span>
-              </div>
+              <div className="flex items-center gap-1.5"><SportsSoccerIcon sx={{ fontSize: 14 }} className="text-primary" /><span className="text-sm font-black text-white tracking-wide">NXTBET</span></div>
               <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
             </div>
-
-            {/* Summary */}
             <div className="px-4 py-3 space-y-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-400">Odds</span>
-                <span className="text-sm font-bold" style={{ color: '#3b82f6' }}>{bet.totalOdds.toFixed(2)}</span>
-              </div>
+              <div className="flex items-center justify-between"><span className="text-sm text-slate-400">Odds</span><span className="text-sm font-bold" style={{ color: '#3b82f6' }}>{bet.totalOdds.toFixed(2)}</span></div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-400">Stake</span>
                 <div className="text-right">
                   <span className="text-sm font-bold text-white">{formatLocal(bet.stake, currency)}</span>
-                  {currency.code !== 'GHS' && (
-                    <p className="text-xs text-slate-500 mt-0.5">GH₵{bet.stake.toFixed(2)}</p>
-                  )}
+                  {currency.code !== 'GHS' && <p className="text-xs text-slate-500 mt-0.5">GH₵{bet.stake.toFixed(2)}</p>}
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-400">Payout</span>
-                <span className="text-base font-black" style={{ color: '#ef4444' }}>
-                  {formatLocal(0, currency)}
-                </span>
-              </div>
+              <div className="flex items-center justify-between"><span className="text-sm text-slate-400">Payout</span><span className="text-base font-black" style={{ color: '#ef4444' }}>{formatLocal(0, currency)}</span></div>
             </div>
-
-            {/* Actions */}
             <div className="px-4 py-4 flex gap-3">
-              <button
-                onClick={onClose}
-                className="flex-1 py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97]"
-                style={{ background: '#E6192E', color: '#fff' }}
-              >
-                Try Again
-              </button>
-              <button
-                onClick={handleShowOff}
-                disabled={generatingImage}
-                className="flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.97] disabled:opacity-60"
-                style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)' }}
-              >
-                {generatingImage
-                  ? <CircularProgress fontSize="small" className="animate-spin" />
-                  : <><ShareIcon fontSize="small" /> Share</>}
+              <button onClick={onClose} className="flex-1 py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97]" style={{ background: '#E6192E', color: '#fff' }}>Try Again</button>
+              <button onClick={handleShowOff} disabled={generatingImage} className="flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.97] disabled:opacity-60" style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)' }}>
+                {generatingImage ? <CircularProgress fontSize="small" className="animate-spin" /> : <><ShareIcon fontSize="small" /> Share</>}
               </button>
             </div>
-
-            <button onClick={onClose} className="w-full pb-5 text-xs font-semibold text-slate-500 hover:text-slate-300 transition-colors">
-              Back to Bets
-            </button>
+            <button onClick={onClose} className="w-full pb-5 text-xs font-semibold text-slate-500 hover:text-slate-300 transition-colors">Back to Bets</button>
           </div>
         </div>
       </div>
@@ -857,35 +870,19 @@ function LossModal({
 
 // ─── Bet detail bottom sheet ──────────────────────────────────────────────────
 
-function BetDetailSheet({
-  bet,
-  currency,
-  onClose,
-}: {
-  bet: Bet;
-  currency: CurrencyInfo;
-  onClose: () => void;
-}) {
-  const [showWin,  setShowWin]  = useState(false);
+function BetDetailSheet({ bet, currency, onClose }: { bet: Bet; currency: CurrencyInfo; onClose: () => void }) {
+  const [showWin, setShowWin] = useState(false);
   const [showLoss, setShowLoss] = useState(false);
 
   return (
     <>
-      <div
-        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      >
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
         <div
           className="bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md overflow-y-auto"
-          style={{
-            maxHeight: 'calc(100vh - 80px - env(safe-area-inset-bottom))',
-            paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))',
-          }}
+          style={{ maxHeight: 'calc(100vh - 80px - env(safe-area-inset-bottom))', paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
           onClick={e => e.stopPropagation()}
         >
           <div className="w-10 h-1 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto mt-3 mb-1 sm:hidden" />
-
-          {/* Sticky header */}
           <div className="sticky top-0 bg-white dark:bg-slate-900 flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 z-10">
             <div>
               <h3 className="font-bold text-base text-slate-900 dark:text-white">Bet Details</h3>
@@ -893,70 +890,43 @@ function BetDetailSheet({
             </div>
             <div className="flex items-center gap-2">
               <StatusBadge status={bet.status} />
-              <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors">
-                <CloseIcon fontSize="small" />
-              </button>
+              <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors"><CloseIcon fontSize="small" /></button>
             </div>
           </div>
-
-          {/* Selections */}
           <div className="px-5 py-4 space-y-2">
             {bet.selections.map((sel, i) => (
               <div key={sel.id ?? i} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
                 <div className="min-w-0 flex-1 mr-3">
                   <p className="text-xs text-slate-400 truncate">{buildMatchLabel(sel as unknown as Record<string, unknown>)}</p>
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
-                    {sel.market}: {sel.selection}
-                    <SelectionResult result={sel.result} />
-                  </p>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{sel.market}: {sel.selection}<SelectionResult result={sel.result} /></p>
                 </div>
                 <span className="font-bold text-primary text-sm shrink-0">{sel.oddsLocked.toFixed(2)}</span>
               </div>
             ))}
           </div>
-
           <div className="border-t border-slate-100 dark:border-slate-800 mx-5" />
-
-          {/* Summary rows — local currency with GHS sub-label */}
           <div className="px-5 py-4 space-y-2.5">
             {[
-              {
-                label: `Stake (${currency.code})`,
-                value: formatLocal(bet.stake, currency),
-                sub:   currency.code !== 'GHS' ? `GH₵${bet.stake.toFixed(2)}` : undefined,
-              },
+              { label: `Stake (${currency.code})`, value: formatLocal(bet.stake, currency), sub: currency.code !== 'GHS' ? `GH₵${bet.stake.toFixed(2)}` : undefined },
               { label: 'Total Odds', value: bet.totalOdds.toFixed(2) },
-              {
-                label: `Potential Return (${currency.code})`,
-                value: formatLocal(bet.potentialReturn, currency),
-                sub:   currency.code !== 'GHS' ? `GH₵${bet.potentialReturn.toFixed(2)}` : undefined,
-                highlight: true,
-              },
-              { label: 'Placed At',  value: new Date(bet.placedAt).toLocaleString() },
+              { label: `Potential Return (${currency.code})`, value: formatLocal(bet.potentialReturn, currency), sub: currency.code !== 'GHS' ? `GH₵${bet.potentialReturn.toFixed(2)}` : undefined, highlight: true },
+              { label: 'Placed At', value: new Date(bet.placedAt).toLocaleString() },
               ...(bet.settledAt ? [{ label: 'Settled At', value: new Date(bet.settledAt).toLocaleString() }] : []),
             ].map(({ label, value, sub, highlight }) => (
               <div key={label} className="flex justify-between items-start text-sm">
                 <span className="text-slate-400 shrink-0">{label}</span>
                 <div className="text-right ml-3">
-                  <span className={`font-semibold ${highlight ? 'text-emerald-600' : 'text-slate-800 dark:text-slate-100'}`}>
-                    {value}
-                  </span>
+                  <span className={`font-semibold ${highlight ? 'text-emerald-600' : 'text-slate-800 dark:text-slate-100'}`}>{value}</span>
                   {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
                 </div>
               </div>
             ))}
           </div>
-
-          {/* CTA */}
           {(bet.status === 'WON' || bet.status === 'LOST') && (
             <div className="px-5 pt-1 pb-2">
               <button
                 onClick={() => bet.status === 'WON' ? setShowWin(true) : setShowLoss(true)}
-                className={`w-full py-3 rounded-xl text-sm font-bold transition-colors ${
-                  bet.status === 'WON'
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
+                className={`w-full py-3 rounded-xl text-sm font-bold transition-colors ${bet.status === 'WON' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
               >
                 {bet.status === 'WON' ? '🏆 View Winnings' : '😭 View Result'}
               </button>
@@ -964,14 +934,11 @@ function BetDetailSheet({
           )}
           {bet.status === 'VOID' && (
             <div className="px-5 pt-1 pb-2">
-              <div className="w-full py-3 px-4 rounded-xl text-sm font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-center">
-                ↩ Stake refunded to your wallet
-              </div>
+              <div className="w-full py-3 px-4 rounded-xl text-sm font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-center">↩ Stake refunded to your wallet</div>
             </div>
           )}
         </div>
       </div>
-
       {showWin  && <WinModal  bet={bet} currency={currency} onClose={() => { setShowWin(false);  onClose(); }} />}
       {showLoss && <LossModal bet={bet} currency={currency} onClose={() => { setShowLoss(false); onClose(); }} />}
     </>
@@ -983,10 +950,10 @@ function BetDetailSheet({
 function BookingCodePanel() {
   const { clearBetSlip, addToBetSlip, showToast, user } = useAppStore();
   const navigate = useNavigate();
-  const [code,     setCode]     = useState('');
-  const [loading,  setLoading]  = useState(false);
-  const [preview,  setPreview]  = useState<any>(null);
-  const [error,    setError]    = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [preview, setPreview] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
 
   const handleLoad = async () => {
@@ -994,16 +961,11 @@ function BookingCodePanel() {
     setLoading(true); setError(null); setPreview(null);
     try {
       const res = await booking.redeem({ code: code.trim().toUpperCase() });
-      if (res.success && res.data) {
-        setPreview(res.data);
-      } else {
-        setError('Invalid or expired booking code.');
-      }
+      if (res.success && res.data) { setPreview(res.data); }
+      else { setError('Invalid or expired booking code.'); }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Invalid booking code.');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleAddToSlip = () => {
@@ -1011,11 +973,11 @@ function BookingCodePanel() {
     if (!user) { showToast('Log in to place this bet', 'info'); navigate('/login'); return; }
     const enriched: Record<string, unknown>[] = preview.enrichedSelections ?? [];
     const mapped = enriched.map(s => ({
-      matchId:   String(s.matchId ?? s.match_id ?? s.fixtureId ?? s.fixture_id ?? ''),
+      matchId: String(s.matchId ?? s.match_id ?? s.fixtureId ?? s.fixture_id ?? ''),
       matchName: buildMatchLabel(s),
-      market:    String(s.market ?? s.marketKey ?? ''),
+      market: String(s.market ?? s.marketKey ?? ''),
       selection: String(s.selection ?? s.pick ?? s.name ?? s.label ?? ''),
-      odd:       extractOdds(s),
+      odd: extractOdds(s),
     }));
     clearBetSlip();
     mapped.forEach((sel: any) => addToBetSlip(sel));
@@ -1024,7 +986,7 @@ function BookingCodePanel() {
   };
 
   const selectionCount = (preview?.enrichedSelections ?? []).length;
-  const totalOdds      = preview?.currentTotalOdds ?? preview?.booking?.totalOdds ?? 0;
+  const totalOdds = preview?.currentTotalOdds ?? preview?.booking?.totalOdds ?? 0;
 
   return (
     <div className="mt-2">
@@ -1050,9 +1012,7 @@ function BookingCodePanel() {
         <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900 shadow-sm">
           <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-700/60">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
-                <QrCodeIcon sx={{ fontSize: 13 }} className="text-primary" />
-              </div>
+              <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center"><QrCodeIcon sx={{ fontSize: 13 }} className="text-primary" /></div>
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Booking Code</span>
             </div>
             {!preview && (
@@ -1061,72 +1021,34 @@ function BookingCodePanel() {
               </button>
             )}
           </div>
-
           {!preview && (
             <div className="p-4">
               <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <input
-                    type="text"
-                    value={code}
-                    onChange={e => { setCode(e.target.value.toUpperCase()); setError(null); }}
-                    placeholder="e.g. ABC12345"
-                    className={`w-full px-4 py-3 rounded-xl border text-sm font-mono tracking-widest uppercase bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 outline-none transition-all focus:ring-2 ${
-                      error
-                        ? 'border-rose-300 dark:border-rose-700 focus:ring-rose-200'
-                        : 'border-slate-200 dark:border-slate-700 focus:ring-primary/20 focus:border-primary/50'
-                    }`}
-                    disabled={loading}
-                    onKeyDown={e => e.key === 'Enter' && handleLoad()}
-                    autoFocus
-                  />
-                </div>
-                <button
-                  onClick={handleLoad}
-                  disabled={loading || !code.trim()}
-                  className="px-5 py-3 bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-all active:scale-95 shrink-0 flex items-center gap-2"
-                >
+                <input
+                  type="text" value={code}
+                  onChange={e => { setCode(e.target.value.toUpperCase()); setError(null); }}
+                  placeholder="e.g. ABC12345"
+                  className={`flex-1 px-4 py-3 rounded-xl border text-sm font-mono tracking-widest uppercase bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 outline-none transition-all focus:ring-2 ${error ? 'border-rose-300 dark:border-rose-700 focus:ring-rose-200' : 'border-slate-200 dark:border-slate-700 focus:ring-primary/20 focus:border-primary/50'}`}
+                  disabled={loading} onKeyDown={e => e.key === 'Enter' && handleLoad()} autoFocus
+                />
+                <button onClick={handleLoad} disabled={loading || !code.trim()} className="px-5 py-3 bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-all active:scale-95 shrink-0 flex items-center gap-2">
                   {loading ? <CircularProgress sx={{ fontSize: 16 }} className="animate-spin" /> : 'Load'}
                 </button>
               </div>
-              {error && (
-                <div className="mt-2.5 flex items-center gap-1.5 text-xs text-rose-500">
-                  <InfoOutlinedIcon sx={{ fontSize: 13 }} /><span>{error}</span>
-                </div>
-              )}
-              {!user && (
-                <p className="mt-2.5 text-xs text-slate-400 flex items-center gap-1.5">
-                  <InfoOutlinedIcon sx={{ fontSize: 13 }} />
-                  You can preview without logging in.{' '}
-                  <Link to="/login" className="text-primary font-semibold hover:underline">Log in</Link> to place.
-                </p>
-              )}
+              {error && <div className="mt-2.5 flex items-center gap-1.5 text-xs text-rose-500"><InfoOutlinedIcon sx={{ fontSize: 13 }} /><span>{error}</span></div>}
             </div>
           )}
-
           {preview && (
             <>
               <div className="px-4 pt-4 pb-3 flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-mono text-base font-black tracking-widest text-slate-800 dark:text-white">
-                      {preview.booking?.code ?? code}
-                    </span>
+                    <span className="font-mono text-base font-black tracking-widest text-slate-800 dark:text-white">{preview.booking?.code ?? code}</span>
                     <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">Valid</span>
                   </div>
-                  <p className="text-xs text-slate-400">
-                    {selectionCount} selection{selectionCount !== 1 ? 's' : ''} · Odds:{' '}
-                    <span className="font-bold text-primary">{totalOdds.toFixed(2)}x</span>
-                  </p>
+                  <p className="text-xs text-slate-400">{selectionCount} selection{selectionCount !== 1 ? 's' : ''} · Odds: <span className="font-bold text-primary">{totalOdds.toFixed(2)}x</span></p>
                 </div>
-                <button onClick={() => { setPreview(null); setCode(''); setExpanded(true); }} className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors shrink-0">
-                  <CloseIcon sx={{ fontSize: 16 }} />
-                </button>
-              </div>
-              <div className="relative mx-4 my-1">
-                <div className="border-t border-dashed border-slate-200 dark:border-slate-700" />
-                <div className="absolute -left-6 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700" />
-                <div className="absolute -right-6 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700" />
+                <button onClick={() => { setPreview(null); setCode(''); setExpanded(true); }} className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors shrink-0"><CloseIcon sx={{ fontSize: 16 }} /></button>
               </div>
               <div className="max-h-52 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60 px-1">
                 {(preview.enrichedSelections ?? []).map((sel: Record<string, unknown>, i: number) => {
@@ -1135,35 +1057,18 @@ function BookingCodePanel() {
                     <div key={i} className="px-3 py-2.5 flex justify-between items-center">
                       <div className="min-w-0 flex-1 mr-3">
                         <p className="text-[11px] text-slate-400 truncate mb-0.5">{buildMatchLabel(sel)}</p>
-                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">
-                          {String(sel.market ?? '')}
-                          <span className="text-slate-400 font-normal mx-1">·</span>
-                          {String(sel.selection ?? '')}
-                        </p>
+                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{String(sel.market ?? '')}<span className="text-slate-400 font-normal mx-1">·</span>{String(sel.selection ?? '')}</p>
                       </div>
-                      <span className="text-xs font-black text-primary shrink-0 bg-primary/8 dark:bg-primary/15 px-2 py-1 rounded-lg">
-                        {odds > 1 ? odds.toFixed(2) : '—'}
-                      </span>
+                      <span className="text-xs font-black text-primary shrink-0 bg-primary/8 dark:bg-primary/15 px-2 py-1 rounded-lg">{odds > 1 ? odds.toFixed(2) : '—'}</span>
                     </div>
                   );
                 })}
               </div>
-              <div className="relative mx-4 my-1">
-                <div className="border-t border-dashed border-slate-200 dark:border-slate-700" />
-                <div className="absolute -left-6 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700" />
-                <div className="absolute -right-6 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700" />
-              </div>
               <div className="px-4 pb-4 pt-3">
-                <button
-                  onClick={handleAddToSlip}
-                  className="w-full py-3 rounded-xl bg-primary hover:bg-primary/90 active:scale-[0.98] text-white text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-sm shadow-primary/20"
-                >
+                <button onClick={handleAddToSlip} className="w-full py-3 rounded-xl bg-primary hover:bg-primary/90 active:scale-[0.98] text-white text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-sm shadow-primary/20">
                   <CheckCircleIcon sx={{ fontSize: 17 }} />
-                  {user
-                    ? `Add ${selectionCount} Selection${selectionCount !== 1 ? 's' : ''} to Slip`
-                    : `Log in & Add ${selectionCount} Selection${selectionCount !== 1 ? 's' : ''}`}
+                  {user ? `Add ${selectionCount} Selection${selectionCount !== 1 ? 's' : ''} to Slip` : `Log in & Add ${selectionCount} Selection${selectionCount !== 1 ? 's' : ''}`}
                 </button>
-                {!user && <p className="text-center text-xs text-slate-400 mt-2">You'll be taken to the login page</p>}
               </div>
             </>
           )}
@@ -1178,36 +1083,24 @@ function BookingCodePanel() {
 function SlipTab() {
   const { betSlip, removeFromBetSlip, clearBetSlip, showToast, user } = useAppStore();
   const navigate = useNavigate();
-
-  const [stakeInput,       setStakeInput]       = useState('');
-  const [placing,          setPlacing]          = useState(false);
-  const [placed,           setPlaced]           = useState(false);
+  const [stakeInput, setStakeInput] = useState('');
+  const [placing, setPlacing] = useState(false);
+  const [placed, setPlaced] = useState(false);
   const [walletBalanceGhs, setWalletBalanceGhs] = useState<number | null>(null);
-  const [balanceLoading,   setBalanceLoading]   = useState(false);
-  const [currency,         setCurrency]         = useState<CurrencyInfo>(DEFAULT_CURRENCY);
-  const [currencyLoading,  setCurrencyLoading]  = useState(true);
+  const [balanceLoading, setBalanceLoading] = useState(false);
+  const [currency, setCurrency] = useState<CurrencyInfo>(DEFAULT_CURRENCY);
+  const [currencyLoading, setCurrencyLoading] = useState(true);
   const stakeInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Currency detection — same two-step + live-rate pattern as WalletPage ──
   useEffect(() => {
     setCurrencyLoading(true);
-    detectCurrencyInfo()
-      .then(setCurrency)
-      .finally(() => setCurrencyLoading(false));
+    detectCurrencyInfo().then(setCurrency).finally(() => setCurrencyLoading(false));
   }, []);
 
-  // ── Minimum stake in local currency ───────────────────────────────────────
   const minStakeLocal = ghsToLocal(MIN_STAKE_GHS, currency);
+  const QUICK_AMOUNTS = [minStakeLocal, minStakeLocal * 2, minStakeLocal * 5, minStakeLocal * 10]
+    .map(v => currency.code === 'GHS' ? Math.round(v * 100) / 100 : Math.round(v));
 
-  // Quick-add amounts: min, ×2, ×5, ×10
-  const QUICK_AMOUNTS = [
-    minStakeLocal,
-    minStakeLocal * 2,
-    minStakeLocal * 5,
-    minStakeLocal * 10,
-  ].map(v => currency.code === 'GHS' ? Math.round(v * 100) / 100 : Math.round(v));
-
-  // ── Wallet balance ────────────────────────────────────────────────────────
   const fetchBalance = useCallback(async () => {
     if (!user) return;
     setBalanceLoading(true);
@@ -1215,36 +1108,26 @@ function SlipTab() {
       const res = await walletApi.getWallet();
       if (res.success && res.data) {
         const d = res.data as Record<string, unknown>;
-        const balGhs =
-          typeof d.balance          === 'number' ? d.balance :
-          typeof d.mainBalance      === 'number' ? d.mainBalance :
-          typeof d.availableBalance === 'number' ? d.availableBalance : null;
+        const balGhs = typeof d.balance === 'number' ? d.balance : typeof d.mainBalance === 'number' ? d.mainBalance : typeof d.availableBalance === 'number' ? d.availableBalance : null;
         setWalletBalanceGhs(balGhs);
       }
-    } catch (err) {
-      logError('SlipTab', 'Failed to fetch wallet:', err);
-    } finally {
-      setBalanceLoading(false);
-    }
+    } catch (err) { logError('SlipTab', err); }
+    finally { setBalanceLoading(false); }
   }, [user]);
 
   useEffect(() => { fetchBalance(); }, [fetchBalance]);
 
-  // ── Derived values ────────────────────────────────────────────────────────
-  const totalOdds      = calculateTotalOdds(betSlip.map(s => s.odd));
-  const parsedLocal    = parseFloat(stakeInput) || 0;
-  const parsedGhs      = localToGhs(parsedLocal, currency);        // sent to API
-  const potentialGhs   = calculatePotentialReturn(parsedGhs, totalOdds);
-  const potentialLocal = ghsToLocal(potentialGhs, currency);       // shown to user
+  const totalOdds = calculateTotalOdds(betSlip.map(s => s.odd));
+  const parsedLocal = parseFloat(stakeInput) || 0;
+  const parsedGhs = localToGhs(parsedLocal, currency);
+  const potentialGhs = calculatePotentialReturn(parsedGhs, totalOdds);
 
-  const walletGhs   = walletBalanceGhs ?? 0;
-  const walletLocal = ghsToLocal(walletGhs, currency);
+  const walletGhs = walletBalanceGhs ?? 0;
 
-  const belowMinStake     = parsedLocal > 0 && parsedLocal < minStakeLocal;
+  const belowMinStake = parsedLocal > 0 && parsedLocal < minStakeLocal;
   const insufficientFunds = parsedLocal > 0 && walletBalanceGhs !== null && parsedGhs > walletGhs;
-  const canPlace          = !!user && parsedLocal >= minStakeLocal && !insufficientFunds && betSlip.length > 0;
+  const canPlace = !!user && parsedLocal >= minStakeLocal && !insufficientFunds && betSlip.length > 0;
 
-  // ── Input helpers ─────────────────────────────────────────────────────────
   const addToStake = (amount: number) => {
     const next = (parseFloat(stakeInput) || 0) + amount;
     setStakeInput(currency.code === 'GHS' ? next.toFixed(2) : String(Math.round(next)));
@@ -1262,58 +1145,33 @@ function SlipTab() {
 
   const clearStake = () => { setStakeInput(''); stakeInputRef.current?.focus(); };
 
-  // ── Place bet ─────────────────────────────────────────────────────────────
   const handlePlace = async () => {
     if (!user) { navigate('/login'); return; }
-    if (parsedGhs < MIN_STAKE_GHS) {
-      showToast(`Minimum stake is ${formatLocal(MIN_STAKE_GHS, currency)}`, 'error');
-      return;
-    }
+    if (parsedGhs < MIN_STAKE_GHS) { showToast(`Minimum stake is ${formatLocal(MIN_STAKE_GHS, currency)}`, 'error'); return; }
     setPlacing(true);
     try {
-      const verifiedSelections = await Promise.all(
-        betSlip.map(async s => {
-          if (!s.matchId) return { matchId: s.matchId, market: s.market, selection: s.selection, submittedOdds: Number(s.odd) };
-          try {
-            const res = await publicMatches.odds(s.matchId);
-            if (res.success && Array.isArray(res.data)) {
-              const match = res.data.find((o: any) =>
-                (o.market === s.market || o.marketKey === s.market) &&
-                (o.selection === s.selection || o.name === s.selection)
-              );
-              return { matchId: s.matchId, market: s.market, selection: s.selection, submittedOdds: match ? Number(match.value ?? match.odds ?? s.odd) : Number(s.odd) };
-            }
-          } catch { /* use stored */ }
-          return { matchId: s.matchId, market: s.market, selection: s.selection, submittedOdds: Number(s.odd) };
-        })
-      );
-
+      const verifiedSelections = await Promise.all(betSlip.map(async s => {
+        if (!s.matchId) return { matchId: s.matchId, market: s.market, selection: s.selection, submittedOdds: Number(s.odd) };
+        try {
+          const res = await publicMatches.odds(s.matchId);
+          if (res.success && Array.isArray(res.data)) {
+            const match = res.data.find((o: any) => (o.market === s.market || o.marketKey === s.market) && (o.selection === s.selection || o.name === s.selection));
+            return { matchId: s.matchId, market: s.market, selection: s.selection, submittedOdds: match ? Number(match.value ?? match.odds ?? s.odd) : Number(s.odd) };
+          }
+        } catch { }
+        return { matchId: s.matchId, market: s.market, selection: s.selection, submittedOdds: Number(s.odd) };
+      }));
       const payload = {
-        stake:      parsedGhs,   // always GHS to backend
-        currency:   'GHS',
-        selections: verifiedSelections.map(s => ({
-          matchId: s.matchId, fixtureId: s.matchId,
-          market: s.market, selection: s.selection,
-          submittedOdds: s.submittedOdds,
-        })) as any,
+        stake: parsedGhs, currency: 'GHS',
+        selections: verifiedSelections.map(s => ({ matchId: s.matchId, fixtureId: s.matchId, market: s.market, selection: s.selection, submittedOdds: s.submittedOdds })) as any,
       };
-
       const res = await betsApi.place(payload);
-      if (res.success) {
-        clearBetSlip(); setStakeInput(''); setPlaced(true);
-        showToast('Bet placed successfully!', 'success');
-        fetchBalance();
-      } else {
-        throw new Error((res as any).message ?? 'Failed to place bet.');
-      }
-    } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'Failed to place bet.', 'error');
-    } finally {
-      setPlacing(false);
-    }
+      if (res.success) { clearBetSlip(); setStakeInput(''); setPlaced(true); showToast('Bet placed successfully!', 'success'); fetchBalance(); }
+      else { throw new Error((res as any).message ?? 'Failed to place bet.'); }
+    } catch (err: unknown) { showToast(err instanceof Error ? err.message : 'Failed to place bet.', 'error'); }
+    finally { setPlacing(false); }
   };
 
-  // ── Success screen ────────────────────────────────────────────────────────
   if (placed) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
@@ -1327,7 +1185,6 @@ function SlipTab() {
     );
   }
 
-  // ── Empty slip ────────────────────────────────────────────────────────────
   if (betSlip.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-10 text-center px-6">
@@ -1344,268 +1201,136 @@ function SlipTab() {
     );
   }
 
-  // ── Main slip UI ──────────────────────────────────────────────────────────
   return (
     <div className="space-y-3">
-
-      {/* Selections list */}
       <div className="space-y-2">
         {betSlip.map(sel => (
-          <div
-            key={`${sel.matchId}-${sel.market}-${sel.selection}`}
-            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden"
-          >
+          <div key={`${sel.matchId}-${sel.market}-${sel.selection}`} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden">
             <div className="flex items-center justify-between px-4 pt-3 pb-1.5">
-              <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100 truncate leading-tight flex-1 mr-2">
-                {sel.matchName}
-              </p>
-              <button
-                onClick={() => removeFromBetSlip(sel.matchId, sel.market, sel.selection)}
-                className="p-1.5 text-slate-300 hover:text-rose-500 active:scale-90 transition-all rounded-lg shrink-0"
-              >
+              <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100 truncate leading-tight flex-1 mr-2">{sel.matchName}</p>
+              <button onClick={() => removeFromBetSlip(sel.matchId, sel.market, sel.selection)} className="p-1.5 text-slate-300 hover:text-rose-500 active:scale-90 transition-all rounded-lg shrink-0">
                 <DeleteIcon sx={{ fontSize: 16 }} />
               </button>
             </div>
             <div className="flex items-center justify-between px-4 pb-3">
               <div className="min-w-0 flex-1 mr-3">
-                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">
-                  {sel.market}
-                  {sel.selection && <span className="text-slate-400 font-normal"> · {sel.selection}</span>}
-                </p>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 truncate">{sel.market}{sel.selection && <span className="text-slate-400 font-normal"> · {sel.selection}</span>}</p>
               </div>
               <div className="shrink-0 flex flex-col items-end">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Odds</span>
-                <span className="inline-flex items-center text-sm font-black text-white bg-primary px-3 py-1 rounded-xl tracking-wide">
-                  {sel.odd.toFixed(2)}
-                </span>
+                <span className="inline-flex items-center text-sm font-black text-white bg-primary px-3 py-1 rounded-xl tracking-wide">{sel.odd.toFixed(2)}</span>
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Stake card */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden">
-
-        {/* Card header */}
         <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-700/60">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
-              <AccountBalanceWalletIcon sx={{ fontSize: 13 }} className="text-primary" />
-            </div>
+            <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center"><AccountBalanceWalletIcon sx={{ fontSize: 13 }} className="text-primary" /></div>
             <p className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Stake</p>
           </div>
           <div className="flex items-center gap-2">
-            {/* Wallet balance badge — always in local currency */}
             {user && walletBalanceGhs !== null && !balanceLoading && (
-              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-lg">
-                {formatLocal(walletGhs, currency)}
-              </span>
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-lg">{formatLocal(walletGhs, currency)}</span>
             )}
-            {user && balanceLoading && (
-              <span className="inline-block w-16 h-4 bg-slate-200 dark:bg-slate-700 rounded-lg animate-pulse" />
-            )}
+            {user && balanceLoading && <span className="inline-block w-16 h-4 bg-slate-200 dark:bg-slate-700 rounded-lg animate-pulse" />}
             <CurrencyPill currency={currency} detecting={currencyLoading} />
           </div>
         </div>
 
         <div className="p-4 space-y-3">
-
-          {/* Stake input */}
           <div className="relative">
-            <div
-              className="absolute left-0 top-0 bottom-0 flex items-center justify-center pointer-events-none select-none z-10"
-              style={{ width: '52px' }}
-            >
-              <span className="text-base font-black text-slate-500 dark:text-slate-400 leading-none">
-                {currency.symbol}
-              </span>
+            <div className="absolute left-0 top-0 bottom-0 flex items-center justify-center pointer-events-none select-none z-10" style={{ width: '52px' }}>
+              <span className="text-base font-black text-slate-500 dark:text-slate-400 leading-none">{currency.symbol}</span>
             </div>
-
             <input
               ref={stakeInputRef}
-              type="text"
-              inputMode="decimal"
-              value={stakeInput}
-              onChange={handleStakeChange}
-              placeholder="0"
-              className={[
-                'w-full rounded-2xl border-2 text-2xl font-black',
-                'bg-slate-50 dark:bg-slate-800',
-                'text-slate-800 dark:text-slate-100',
-                'placeholder:text-slate-300 dark:placeholder:text-slate-600',
-                'outline-none transition-all',
-                'focus:bg-white dark:focus:bg-slate-800/80',
-                stakeInput ? 'pr-10' : 'pr-4',
-                'pl-14 py-4',
-                belowMinStake
-                  ? 'border-amber-400 dark:border-amber-600 focus:ring-2 focus:ring-amber-200/50'
-                  : insufficientFunds
-                    ? 'border-rose-400 dark:border-rose-600 focus:ring-2 focus:ring-rose-200/50'
-                    : parsedLocal >= minStakeLocal
-                      ? 'border-primary/60 focus:ring-2 focus:ring-primary/20'
-                      : 'border-slate-200 dark:border-slate-700 focus:border-primary/40 focus:ring-2 focus:ring-primary/10',
+              type="text" inputMode="decimal" value={stakeInput}
+              onChange={handleStakeChange} placeholder="0"
+              className={['w-full rounded-2xl border-2 text-2xl font-black', 'bg-slate-50 dark:bg-slate-800', 'text-slate-800 dark:text-slate-100', 'placeholder:text-slate-300 dark:placeholder:text-slate-600', 'outline-none transition-all', 'focus:bg-white dark:focus:bg-slate-800/80', stakeInput ? 'pr-10' : 'pr-4', 'pl-14 py-4',
+                belowMinStake ? 'border-amber-400 dark:border-amber-600 focus:ring-2 focus:ring-amber-200/50'
+                : insufficientFunds ? 'border-rose-400 dark:border-rose-600 focus:ring-2 focus:ring-rose-200/50'
+                : parsedLocal >= minStakeLocal ? 'border-primary/60 focus:ring-2 focus:ring-primary/20'
+                : 'border-slate-200 dark:border-slate-700 focus:border-primary/40 focus:ring-2 focus:ring-primary/10',
               ].join(' ')}
             />
-
             {stakeInput && (
-              <button
-                onClick={clearStake}
-                type="button"
-                aria-label="Clear stake"
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-600 hover:text-slate-700 dark:hover:text-slate-200 transition-all active:scale-90"
-              >
+              <button onClick={clearStake} type="button" aria-label="Clear stake" className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-600 transition-all active:scale-90">
                 <CloseIcon sx={{ fontSize: 14 }} />
               </button>
             )}
-
             {!stakeInput && (
               <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                <span className="text-xs text-slate-300 dark:text-slate-600 font-medium">
-                  min {currency.symbol}{Math.round(minStakeLocal).toLocaleString()}
-                </span>
+                <span className="text-xs text-slate-300 dark:text-slate-600 font-medium">min {currency.symbol}{Math.round(minStakeLocal).toLocaleString()}</span>
               </div>
             )}
           </div>
 
-          {/* Validation messages */}
           {belowMinStake && (
             <div className="flex items-center justify-between px-3 py-2.5 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200/60 dark:border-amber-800/40">
-              <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-                <InfoOutlinedIcon sx={{ fontSize: 13 }} />
-                Min stake: {formatLocal(MIN_STAKE_GHS, currency)}
-                {currency.code !== 'GHS' && <span className="text-amber-500/70 ml-1">(GH₵{MIN_STAKE_GHS})</span>}
-              </p>
-              <button
-                onClick={setStakeToMin}
-                className="text-xs font-bold text-amber-600 hover:text-amber-700 dark:text-amber-400 ml-3 shrink-0 underline underline-offset-2"
-              >
-                Use min
-              </button>
+              <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5"><InfoOutlinedIcon sx={{ fontSize: 13 }} />Min stake: {formatLocal(MIN_STAKE_GHS, currency)}{currency.code !== 'GHS' && <span className="text-amber-500/70 ml-1">(GH₵{MIN_STAKE_GHS})</span>}</p>
+              <button onClick={setStakeToMin} className="text-xs font-bold text-amber-600 hover:text-amber-700 dark:text-amber-400 ml-3 shrink-0 underline underline-offset-2">Use min</button>
             </div>
           )}
           {insufficientFunds && !belowMinStake && (
             <div className="flex items-center gap-2 px-3 py-2.5 bg-rose-50 dark:bg-rose-900/20 rounded-xl border border-rose-200/60 dark:border-rose-800/40">
               <InfoOutlinedIcon sx={{ fontSize: 13 }} className="text-rose-500 shrink-0" />
-              <p className="text-xs text-rose-600 dark:text-rose-400">
-                Insufficient balance · available{' '}
-                <span className="font-bold">{formatLocal(walletGhs, currency)}</span>
-                {currency.code !== 'GHS' && <span className="text-rose-400/70 ml-1">(GH₵{walletGhs.toFixed(2)})</span>}
-              </p>
+              <p className="text-xs text-rose-600 dark:text-rose-400">Insufficient balance · available <span className="font-bold">{formatLocal(walletGhs, currency)}</span>{currency.code !== 'GHS' && <span className="text-rose-400/70 ml-1">(GH₵{walletGhs.toFixed(2)})</span>}</p>
             </div>
           )}
 
-          {/* Quick-add buttons */}
           <div className="grid grid-cols-4 gap-2">
             {QUICK_AMOUNTS.map((amount, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => addToStake(amount)}
-                className="py-2.5 text-[12px] font-bold bg-slate-50 dark:bg-slate-800 hover:bg-primary hover:text-white text-slate-600 dark:text-slate-400 rounded-xl transition-all active:scale-95 border border-slate-200 dark:border-slate-700 hover:border-primary"
-              >
+              <button key={idx} type="button" onClick={() => addToStake(amount)} className="py-2.5 text-[12px] font-bold bg-slate-50 dark:bg-slate-800 hover:bg-primary hover:text-white text-slate-600 dark:text-slate-400 rounded-xl transition-all active:scale-95 border border-slate-200 dark:border-slate-700 hover:border-primary">
                 +{currency.symbol}{amount >= 1000 ? `${(amount / 1000).toFixed(amount % 1000 === 0 ? 0 : 1)}k` : amount}
               </button>
             ))}
           </div>
 
-          {/* Conversion note for non-GHS users */}
           {!currencyLoading && currency.code !== 'GHS' && parsedLocal > 0 && (
             <div className="flex items-center gap-2 px-3 py-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
               <PublicIcon sx={{ fontSize: 14 }} className="text-slate-400 shrink-0" />
-              <p className="text-xs text-slate-500">
-                {formatLocal(parsedGhs, currency)} ≈{' '}
-                <span className="font-bold text-slate-700 dark:text-slate-300">GH₵{parsedGhs.toFixed(2)}</span>
-                <span className="text-slate-400 ml-1">· bet settled in GH₵</span>
-              </p>
+              <p className="text-xs text-slate-500">{formatLocal(parsedGhs, currency)} ≈ <span className="font-bold text-slate-700 dark:text-slate-300">GH₵{parsedGhs.toFixed(2)}</span><span className="text-slate-400 ml-1">· bet settled in GH₵</span></p>
             </div>
           )}
 
           <div className="border-t border-slate-100 dark:border-slate-800" />
 
-          {/* Summary */}
           <div className="space-y-2.5">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-slate-400">
-                {betSlip.length} selection{betSlip.length !== 1 ? 's' : ''}
-                {betSlip.length > 1 && (
-                  <span className="ml-1.5 text-[11px] text-slate-300 dark:text-slate-600">
-                    {betSlip.map(s => s.odd.toFixed(2)).join(' × ')}
-                  </span>
-                )}
-              </span>
-              <span className="font-black text-primary bg-primary/10 px-2.5 py-1 rounded-xl text-sm">
-                {totalOdds.toFixed(2)}x
-              </span>
+              <span className="text-sm text-slate-400">{betSlip.length} selection{betSlip.length !== 1 ? 's' : ''}{betSlip.length > 1 && <span className="ml-1.5 text-[11px] text-slate-300 dark:text-slate-600">{betSlip.map(s => s.odd.toFixed(2)).join(' × ')}</span>}</span>
+              <span className="font-black text-primary bg-primary/10 px-2.5 py-1 rounded-xl text-sm">{totalOdds.toFixed(2)}x</span>
             </div>
-
-            {/* Potential return — local currency primary, GHS secondary */}
             <div className="flex justify-between items-center p-3 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl border border-emerald-100 dark:border-emerald-800/30">
-              <div className="flex items-center gap-2">
-                <TrendingUpIcon sx={{ fontSize: 16 }} className="text-emerald-600" />
-                <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Potential return</span>
-              </div>
+              <div className="flex items-center gap-2"><TrendingUpIcon sx={{ fontSize: 16 }} className="text-emerald-600" /><span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Potential return</span></div>
               <div className="text-right">
-                <span className="font-black text-emerald-600 dark:text-emerald-400 text-sm">
-                  {parsedLocal > 0 ? formatLocal(potentialGhs, currency) : '—'}
-                </span>
-                {parsedLocal > 0 && currency.code !== 'GHS' && (
-                  <p className="text-xs text-slate-400 mt-0.5">GH₵{potentialGhs.toFixed(2)}</p>
-                )}
+                <span className="font-black text-emerald-600 dark:text-emerald-400 text-sm">{parsedLocal > 0 ? formatLocal(potentialGhs, currency) : '—'}</span>
+                {parsedLocal > 0 && currency.code !== 'GHS' && <p className="text-xs text-slate-400 mt-0.5">GH₵{potentialGhs.toFixed(2)}</p>}
               </div>
             </div>
-
-            {/* Wallet balance row */}
             {user && (
               <div className="flex justify-between items-center text-xs pt-0.5">
-                <span className="text-slate-400 flex items-center gap-1.5">
-                  <AccountBalanceWalletIcon sx={{ fontSize: 13 }} />
-                  Wallet balance
-                </span>
+                <span className="text-slate-400 flex items-center gap-1.5"><AccountBalanceWalletIcon sx={{ fontSize: 13 }} />Wallet balance</span>
                 <div className="text-right">
-                  {balanceLoading ? (
-                    <span className="inline-block w-16 h-3 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
-                  ) : walletBalanceGhs !== null ? (
-                    <>
-                      <span className="text-slate-500 font-semibold">{formatLocal(walletGhs, currency)}</span>
-                      {currency.code !== 'GHS' && (
-                        <p className="text-slate-400 mt-0.5">GH₵{walletGhs.toFixed(2)}</p>
-                      )}
-                    </>
-                  ) : (
-                    <span className="text-slate-400">–</span>
-                  )}
+                  {balanceLoading ? <span className="inline-block w-16 h-3 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                  : walletBalanceGhs !== null ? (
+                    <><span className="text-slate-500 font-semibold">{formatLocal(walletGhs, currency)}</span>{currency.code !== 'GHS' && <p className="text-slate-400 mt-0.5">GH₵{walletGhs.toFixed(2)}</p>}</>
+                  ) : <span className="text-slate-400">–</span>}
                 </div>
               </div>
             )}
           </div>
 
-          {/* Place bet CTA */}
           {user ? (
             <button
-              onClick={handlePlace}
-              disabled={!canPlace || placing}
-              className={`w-full py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
-                canPlace && !placing
-                  ? 'bg-primary hover:bg-primary/90 text-white shadow-sm shadow-primary/25'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
-              }`}
+              onClick={handlePlace} disabled={!canPlace || placing}
+              className={`w-full py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${canPlace && !placing ? 'bg-primary hover:bg-primary/90 text-white shadow-sm shadow-primary/25' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'}`}
             >
-              {placing ? (
-                <><CircularProgress fontSize="small" className="animate-spin" /> Placing Bet…</>
-              ) : parsedLocal > 0 && canPlace ? (
-                <>
-                  Place Bet · {formatLocal(parsedGhs, currency)}
-                  {currency.code !== 'GHS' && <span className="font-normal opacity-60"> (GH₵{parsedGhs.toFixed(2)})</span>}
-                </>
-              ) : (
-                <>
-                  Place Bet
-                  {belowMinStake
-                    ? ` · min ${currency.symbol}${Math.round(minStakeLocal).toLocaleString()}`
-                    : parsedLocal === 0 ? ' · enter stake' : ''}
-                </>
-              )}
+              {placing ? <><CircularProgress fontSize="small" className="animate-spin" /> Placing Bet…</>
+              : parsedLocal > 0 && canPlace ? <>Place Bet · {formatLocal(parsedGhs, currency)}{currency.code !== 'GHS' && <span className="font-normal opacity-60"> (GH₵{parsedGhs.toFixed(2)})</span>}</>
+              : <>Place Bet{belowMinStake ? ` · min ${currency.symbol}${Math.round(minStakeLocal).toLocaleString()}` : parsedLocal === 0 ? ' · enter stake' : ''}</>}
             </button>
           ) : (
             <Link to="/login" className="btn-primary w-full py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-2">
@@ -1613,9 +1338,7 @@ function SlipTab() {
             </Link>
           )}
 
-          <button onClick={clearBetSlip} className="w-full py-2 text-xs font-semibold text-slate-400 hover:text-rose-500 transition-colors">
-            Clear slip
-          </button>
+          <button onClick={clearBetSlip} className="w-full py-2 text-xs font-semibold text-slate-400 hover:text-rose-500 transition-colors">Clear slip</button>
         </div>
       </div>
 
@@ -1638,49 +1361,37 @@ const EMPTY_STATE: Record<BetsFilter, { emoji: string; label: string; sub: strin
 
 function MyBetsTab() {
   const { user } = useAppStore();
-  const [apiBets,     setApiBets]     = useState<Bet[]>([]);
-  const [loading,     setLoading]     = useState(false);
-  const [page,        setPage]        = useState(0);
-  const [totalPages,  setTotalPages]  = useState(1);
-  const [filter,      setFilter]      = useState<BetsFilter>('ALL');
-  const [detailBet,   setDetailBet]   = useState<Bet | null>(null);
-  const [unseenWins,  setUnseenWins]  = useState<Bet[]>([]);
-  const [winPopup,    setWinPopup]    = useState<Bet | null>(null);
-  const [currency,    setCurrency]    = useState<CurrencyInfo>(DEFAULT_CURRENCY);
+  const [apiBets, setApiBets] = useState<Bet[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [filter, setFilter] = useState<BetsFilter>('ALL');
+  const [detailBet, setDetailBet] = useState<Bet | null>(null);
+  const [unseenWins, setUnseenWins] = useState<Bet[]>([]);
+  const [winPopup, setWinPopup] = useState<Bet | null>(null);
+  const [currency, setCurrency] = useState<CurrencyInfo>(DEFAULT_CURRENCY);
   const [currencyLoading, setCurrencyLoading] = useState(true);
   const didCheckUnseen = useRef(false);
 
-  // ── Same currency detection — module cache means this is instant if SlipTab already ran ──
   useEffect(() => {
     setCurrencyLoading(true);
-    detectCurrencyInfo()
-      .then(setCurrency)
-      .finally(() => setCurrencyLoading(false));
+    detectCurrencyInfo().then(setCurrency).finally(() => setCurrencyLoading(false));
   }, []);
 
   const normalisedBets = apiBets.map(normaliseBet);
   const totalStakedGhs = normalisedBets.reduce((s, b) => s + (b.stake ?? 0), 0);
-  const totalWonGhs    = normalisedBets.filter(b => b.status === 'WON').reduce((s, b) => s + (b.potentialReturn ?? 0), 0);
-  const settledBets    = normalisedBets.filter(b => b.status !== 'PENDING');
-  const winRate        = settledBets.length
-    ? Math.round((normalisedBets.filter(b => b.status === 'WON').length / settledBets.length) * 100)
-    : 0;
+  const totalWonGhs = normalisedBets.filter(b => b.status === 'WON').reduce((s, b) => s + (b.potentialReturn ?? 0), 0);
+  const settledBets = normalisedBets.filter(b => b.status !== 'PENDING');
+  const winRate = settledBets.length ? Math.round((normalisedBets.filter(b => b.status === 'WON').length / settledBets.length) * 100) : 0;
 
   const fetchBets = useCallback(async (p = 0) => {
     if (!user) return;
     setLoading(true);
     try {
       const res = await betsApi.getMyBets(p, 10);
-      if (res.success) {
-        setApiBets(prev => p === 0 ? res.data.content : [...prev, ...res.data.content]);
-        setTotalPages(res.data.totalPages);
-        setPage(p);
-      }
-    } catch (err) {
-      logError('MyBets', 'Failed to fetch bets:', err);
-    } finally {
-      setLoading(false);
-    }
+      if (res.success) { setApiBets(prev => p === 0 ? res.data.content : [...prev, ...res.data.content]); setTotalPages(res.data.totalPages); setPage(p); }
+    } catch (err) { logError('MyBets', err); }
+    finally { setLoading(false); }
   }, [user]);
 
   const checkUnseenWins = useCallback(async () => {
@@ -1688,17 +1399,14 @@ function MyBetsTab() {
     didCheckUnseen.current = true;
     try {
       const res = await betsApi.getUnseenWins();
-      if (res.success && res.data.length > 0) {
-        setUnseenWins(res.data);
-        setWinPopup(res.data[0]);
-      }
-    } catch { /* non-critical */ }
+      if (res.success && res.data.length > 0) { setUnseenWins(res.data); setWinPopup(res.data[0]); }
+    } catch { }
   }, [user]);
 
   useEffect(() => { fetchBets(0); checkUnseenWins(); }, [fetchBets, checkUnseenWins]);
 
   const dismissWin = async (bet: Bet) => {
-    try { await betsApi.dismissWin(bet.id); } catch { /* ignore */ }
+    try { await betsApi.dismissWin(bet.id); } catch { }
     const remaining = unseenWins.filter(b => b.id !== bet.id);
     setUnseenWins(remaining);
     setWinPopup(remaining[0] ?? null);
@@ -1707,13 +1415,12 @@ function MyBetsTab() {
   if (!user) return <GuestPrompt message="Log in to view your bets" />;
 
   const filtered = filter === 'ALL' ? normalisedBets : normalisedBets.filter(b => b.status === filter);
-
   const FILTERS: { key: BetsFilter; label: string }[] = [
-    { key: 'ALL',     label: `All (${normalisedBets.length})` },
+    { key: 'ALL', label: `All (${normalisedBets.length})` },
     { key: 'PENDING', label: 'Open' },
-    { key: 'WON',     label: 'Won' },
-    { key: 'LOST',    label: 'Lost' },
-    { key: 'VOID',    label: 'Void' },
+    { key: 'WON', label: 'Won' },
+    { key: 'LOST', label: 'Lost' },
+    { key: 'VOID', label: 'Void' },
   ];
 
   return (
@@ -1721,17 +1428,15 @@ function MyBetsTab() {
       {normalisedBets.length > 0 && (
         <div className="flex gap-2 overflow-x-auto pb-1">
           {[
-            { label: 'Staked',   value: formatLocal(totalStakedGhs, currency), color: 'text-slate-800 dark:text-slate-100' },
-            { label: 'Won',      value: formatLocal(totalWonGhs, currency),    color: 'text-emerald-600' },
-            { label: 'Win Rate', value: winRate ? `${winRate}%` : '—',        color: 'text-primary' },
+            { label: 'Staked', value: formatLocal(totalStakedGhs, currency), color: 'text-slate-800 dark:text-slate-100' },
+            { label: 'Won', value: formatLocal(totalWonGhs, currency), color: 'text-emerald-600' },
+            { label: 'Win Rate', value: winRate ? `${winRate}%` : '—', color: 'text-primary' },
           ].map(({ label, value, color }) => (
             <div key={label} className="shrink-0 flex-1 min-w-0 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 px-3 py-2.5">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">{label}</p>
               <p className={`text-sm font-bold font-mono ${color}`}>{value}</p>
               {currency.code !== 'GHS' && label !== 'Win Rate' && !currencyLoading && (
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  GH₵{(label === 'Staked' ? totalStakedGhs : totalWonGhs).toFixed(2)}
-                </p>
+                <p className="text-[10px] text-slate-400 mt-0.5">GH₵{(label === 'Staked' ? totalStakedGhs : totalWonGhs).toFixed(2)}</p>
               )}
             </div>
           ))}
@@ -1740,22 +1445,9 @@ function MyBetsTab() {
 
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         {FILTERS.map(f => (
-          <button
-            key={f.key}
-            onClick={() => setFilter(f.key)}
-            className={`shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors ${
-              filter === f.key ? 'bg-primary text-white' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 hover:border-primary/40'
-            }`}
-          >
-            {f.label}
-          </button>
+          <button key={f.key} onClick={() => setFilter(f.key)} className={`shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors ${filter === f.key ? 'bg-primary text-white' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 hover:border-primary/40'}`}>{f.label}</button>
         ))}
-        <button
-          onClick={() => fetchBets(0)}
-          className="shrink-0 ml-auto p-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-primary transition-colors"
-        >
-          <RefreshIcon sx={{ fontSize: 16 }} />
-        </button>
+        <button onClick={() => fetchBets(0)} className="shrink-0 ml-auto p-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-primary transition-colors"><RefreshIcon sx={{ fontSize: 16 }} /></button>
       </div>
 
       {loading && apiBets.length === 0 && (
@@ -1763,8 +1455,7 @@ function MyBetsTab() {
           {[1, 2, 3].map(i => (
             <div key={i} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4">
               <div className="flex justify-between mb-3"><Skeleton className="h-4 w-20" /><Skeleton className="h-5 w-14" /></div>
-              <Skeleton className="h-3 w-full mb-1.5" />
-              <Skeleton className="h-3 w-3/4 mb-3" />
+              <Skeleton className="h-3 w-full mb-1.5" /><Skeleton className="h-3 w-3/4 mb-3" />
               <div className="flex justify-between"><Skeleton className="h-4 w-24" /><Skeleton className="h-4 w-20" /></div>
             </div>
           ))}
@@ -1785,62 +1476,42 @@ function MyBetsTab() {
       )}
 
       {filtered.map(bet => {
-        const isWon  = bet.status === 'WON';
+        const isWon = bet.status === 'WON';
         const isLost = bet.status === 'LOST';
         const isVoid = bet.status === 'VOID';
         return (
           <button
             key={bet.id}
             onClick={() => setDetailBet(bet)}
-            className={`w-full text-left bg-white dark:bg-slate-900 rounded-2xl border transition-all active:scale-[0.98] p-4 ${
-              isWon  ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/40 dark:bg-emerald-900/10'
-            : isLost ? 'border-slate-100 dark:border-slate-800 opacity-70'
-            : isVoid ? 'border-blue-100 dark:border-blue-900/40 opacity-70'
-                     : 'border-slate-100 dark:border-slate-800 hover:border-primary/20'
-            }`}
+            className={`w-full text-left bg-white dark:bg-slate-900 rounded-2xl border transition-all active:scale-[0.98] p-4 ${isWon ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/40 dark:bg-emerald-900/10' : isLost ? 'border-slate-100 dark:border-slate-800 opacity-70' : isVoid ? 'border-blue-100 dark:border-blue-900/40 opacity-70' : 'border-slate-100 dark:border-slate-800 hover:border-primary/20'}`}
           >
             <div className="flex justify-between items-start mb-2.5">
               <div>
-                <p className="text-xs text-slate-400">
-                  {new Date(bet.placedAt).toLocaleDateString('en-GH', { day: '2-digit', month: 'short' })}
-                </p>
-                <p className="text-xs font-semibold text-slate-500 mt-0.5">
-                  {bet.selections.length} selection{bet.selections.length !== 1 ? 's' : ''}
-                </p>
+                <p className="text-xs text-slate-400">{new Date(bet.placedAt).toLocaleDateString('en-GH', { day: '2-digit', month: 'short' })}</p>
+                <p className="text-xs font-semibold text-slate-500 mt-0.5">{bet.selections.length} selection{bet.selections.length !== 1 ? 's' : ''}</p>
               </div>
               <StatusBadge status={bet.status} />
             </div>
             <div className="space-y-1 mb-3">
               {bet.selections.slice(0, 2).map((sel: BetSelection, i: number) => (
                 <p key={sel.id ?? i} className="text-xs text-slate-600 dark:text-slate-400 truncate">
-                  {buildMatchLabel(sel as unknown as Record<string, unknown>)} ·{' '}
-                  <span className="font-medium text-slate-700 dark:text-slate-300">{sel.market}</span>
-                  {' · '}
-                  <span className="font-bold text-primary">{(sel.oddsLocked ?? 0).toFixed(2)}</span>
-                  <SelectionResult result={sel.result} />
+                  {buildMatchLabel(sel as unknown as Record<string, unknown>)} · <span className="font-medium text-slate-700 dark:text-slate-300">{sel.market}</span>{' · '}<span className="font-bold text-primary">{(sel.oddsLocked ?? 0).toFixed(2)}</span><SelectionResult result={sel.result} />
                 </p>
               ))}
               {bet.selections.length > 2 && <p className="text-xs text-slate-400">+{bet.selections.length - 2} more</p>}
             </div>
-            {/* Amounts in local currency */}
             <div className="flex justify-between items-center pt-2.5 border-t border-slate-100 dark:border-slate-800">
               <div>
                 <p className="text-xs text-slate-400">Stake</p>
                 <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{formatLocal(bet.stake, currency)}</p>
-                {currency.code !== 'GHS' && !currencyLoading && (
-                  <p className="text-[10px] text-slate-400">GH₵{bet.stake.toFixed(2)}</p>
-                )}
+                {currency.code !== 'GHS' && !currencyLoading && <p className="text-[10px] text-slate-400">GH₵{bet.stake.toFixed(2)}</p>}
               </div>
               <div className="text-right">
                 <p className="text-xs text-slate-400">Return</p>
                 <p className={`text-sm font-bold ${isWon ? 'text-emerald-600' : isVoid ? 'text-blue-500' : 'text-slate-500'}`}>
                   {isVoid ? formatLocal(bet.stake, currency) : formatLocal(bet.potentialReturn, currency)}
                 </p>
-                {currency.code !== 'GHS' && !currencyLoading && (
-                  <p className="text-[10px] text-slate-400">
-                    GH₵{(isVoid ? bet.stake : bet.potentialReturn).toFixed(2)}
-                  </p>
-                )}
+                {currency.code !== 'GHS' && !currencyLoading && <p className="text-[10px] text-slate-400">GH₵{(isVoid ? bet.stake : bet.potentialReturn).toFixed(2)}</p>}
               </div>
               <div className="text-right">
                 <p className="text-xs text-slate-400">Odds</p>
@@ -1852,30 +1523,14 @@ function MyBetsTab() {
       })}
 
       {page < totalPages - 1 && !loading && (
-        <button onClick={() => fetchBets(page + 1)} className="w-full py-3 text-sm font-semibold text-primary border border-primary/20 rounded-2xl hover:bg-primary/5 transition-colors">
-          Load More
-        </button>
+        <button onClick={() => fetchBets(page + 1)} className="w-full py-3 text-sm font-semibold text-primary border border-primary/20 rounded-2xl hover:bg-primary/5 transition-colors">Load More</button>
       )}
       {loading && apiBets.length > 0 && (
-        <div className="flex justify-center py-4">
-          <CircularProgress className="text-primary animate-spin" fontSize="small" />
-        </div>
+        <div className="flex justify-center py-4"><CircularProgress className="text-primary animate-spin" fontSize="small" /></div>
       )}
 
-      {detailBet && (
-        <BetDetailSheet
-          bet={detailBet}
-          currency={currency}
-          onClose={() => setDetailBet(null)}
-        />
-      )}
-      {winPopup && (
-        <WinModal
-          bet={winPopup}
-          currency={currency}
-          onClose={() => dismissWin(winPopup)}
-        />
-      )}
+      {detailBet && <BetDetailSheet bet={detailBet} currency={currency} onClose={() => setDetailBet(null)} />}
+      {winPopup && <WinModal bet={winPopup} currency={currency} onClose={() => dismissWin(winPopup)} />}
     </div>
   );
 }
@@ -1893,36 +1548,25 @@ export default function BetSlipPage() {
           <div className="flex">
             <button
               onClick={() => setActiveTab('slip')}
-              className={`flex-1 flex items-center justify-center gap-2 py-4 text-sm font-bold border-b-2 transition-colors ${
-                activeTab === 'slip' ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
-              }`}
+              className={`flex-1 flex items-center justify-center gap-2 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'slip' ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
             >
               <ReceiptLongIcon sx={{ fontSize: 18 }} />
               Bet Slip
               {betSlip.length > 0 && (
-                <span className="bg-primary text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                  {betSlip.length}
-                </span>
+                <span className="bg-primary text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">{betSlip.length}</span>
               )}
             </button>
             <button
               onClick={() => setActiveTab('bets')}
-              className={`flex-1 flex items-center justify-center gap-2 py-4 text-sm font-bold border-b-2 transition-colors ${
-                activeTab === 'bets' ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
-              }`}
+              className={`flex-1 flex items-center justify-center gap-2 py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'bets' ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
             >
               <HistoryIcon sx={{ fontSize: 18 }} />
               My Bets
-              {!user && (
-                <span className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded-md font-medium">
-                  Login
-                </span>
-              )}
+              {!user && <span className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded-md font-medium">Login</span>}
             </button>
           </div>
         </div>
       </div>
-
       <div className="max-w-lg mx-auto px-4 pt-4">
         {activeTab === 'slip' ? <SlipTab /> : <MyBetsTab />}
       </div>
