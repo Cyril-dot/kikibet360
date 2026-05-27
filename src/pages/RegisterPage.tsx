@@ -4,7 +4,6 @@ import { useAppStore } from '../store';
 import { auth } from '../utils/api';
 import { saveSession } from './LoginPage';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import SportsSoccerIcon from '@mui/icons-material/SportsSoccer';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import CircularProgress from '@mui/icons-material/Loop';
@@ -56,6 +55,130 @@ const NAME_PLACEHOLDERS: Record<string, [string, string]> = {
 
 function getNamePlaceholders(countryCode: string): [string, string] {
   return NAME_PLACEHOLDERS[countryCode] ?? ['Jordan', 'Smith'];
+}
+
+// ---------------------------------------------------------------------------
+// OddsKingLogo — same as Header
+// ---------------------------------------------------------------------------
+function OddsKingLogo() {
+  return (
+    <div className="flex items-center gap-0 select-none" aria-label="OddsKing">
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 56 56"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+        style={{ marginRight: 6, flexShrink: 0 }}
+      >
+        <defs>
+          <linearGradient id="ok-crown-grad-reg" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#FFD740" />
+            <stop offset="100%" stopColor="#D4900A" />
+          </linearGradient>
+        </defs>
+        <rect x="8" y="34" width="40" height="8" rx="2" fill="url(#ok-crown-grad-reg)" />
+        <polygon
+          points="8,34 14,12 22,22 28,10 34,22 42,12 48,34"
+          fill="url(#ok-crown-grad-reg)"
+        />
+        <polygon points="28,2 34,10 28,16 22,10" fill="#FFE57A" />
+        <circle cx="14" cy="12" r="3.5" fill="#FFD740" />
+        <circle cx="42" cy="12" r="3.5" fill="#FFD740" />
+      </svg>
+
+      <div style={{ display: 'flex', alignItems: 'baseline', lineHeight: 1 }}>
+        <span
+          style={{
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontWeight: 900,
+            fontStyle: 'italic',
+            fontSize: '1.25rem',
+            letterSpacing: '-0.02em',
+            color: 'var(--text-main)',
+          }}
+        >
+          Odds
+        </span>
+        <span
+          style={{
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontWeight: 900,
+            fontStyle: 'italic',
+            fontSize: '1.25rem',
+            letterSpacing: '-0.02em',
+            background: 'linear-gradient(135deg, #FFD740 0%, #D4900A 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}
+        >
+          King
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// OddsKingLogo — large variant for left panel
+// ---------------------------------------------------------------------------
+function OddsKingLogoLarge() {
+  return (
+    <div className="flex flex-col items-center gap-3 select-none" aria-label="OddsKing">
+      <svg
+        width="72"
+        height="72"
+        viewBox="0 0 56 56"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
+        <defs>
+          <linearGradient id="ok-crown-grad-reg-lg" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#FFD740" />
+            <stop offset="100%" stopColor="#D4900A" />
+          </linearGradient>
+        </defs>
+        <rect x="8" y="34" width="40" height="8" rx="2" fill="url(#ok-crown-grad-reg-lg)" />
+        <polygon
+          points="8,34 14,12 22,22 28,10 34,22 42,12 48,34"
+          fill="url(#ok-crown-grad-reg-lg)"
+        />
+        <polygon points="28,2 34,10 28,16 22,10" fill="#FFE57A" />
+        <circle cx="14" cy="12" r="3.5" fill="#FFD740" />
+        <circle cx="42" cy="12" r="3.5" fill="#FFD740" />
+      </svg>
+
+      <div style={{ display: 'flex', alignItems: 'baseline', lineHeight: 1 }}>
+        <span
+          style={{
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontWeight: 900,
+            fontStyle: 'italic',
+            fontSize: '2.5rem',
+            letterSpacing: '-0.02em',
+            color: '#ffffff',
+          }}
+        >
+          Odds
+        </span>
+        <span
+          style={{
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontWeight: 900,
+            fontStyle: 'italic',
+            fontSize: '2.5rem',
+            letterSpacing: '-0.02em',
+            color: '#FFD740',
+          }}
+        >
+          King
+        </span>
+      </div>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -373,7 +496,7 @@ export default function RegisterPage() {
         referralCode: '',
       });
 
-      showToast('Welcome to NxtBet! 🎉', 'success');
+      showToast('Welcome to OddsKing! 🎉', 'success');
 
       if (res.data.mustSetup2fa) {
         navigate('/setup-2fa');
@@ -410,13 +533,11 @@ export default function RegisterPage() {
         <div className="absolute -bottom-28 -right-16 w-96 h-96 rounded-full opacity-10" style={{ backgroundColor: '#fff' }} />
 
         <div className="relative text-white text-center w-full max-w-xs">
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-2xl"
-            style={{ backgroundColor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)' }}
-          >
-            <SportsSoccerIcon sx={{ fontSize: 36 }} />
+          {/* OddsKing logo — large */}
+          <div className="mb-6">
+            <OddsKingLogoLarge />
           </div>
-          <h1 className="text-3xl font-black tracking-tight mb-1">NxtBet</h1>
+
           <p className="text-xs font-semibold tracking-[3px] uppercase mb-6" style={{ opacity: 0.6 }}>
             Join Today
           </p>
@@ -454,14 +575,56 @@ export default function RegisterPage() {
         style={{ background: 'linear-gradient(135deg, var(--primary) 0%, #b91c1c 100%)' }}
       >
         <div className="flex items-center gap-3 mb-3">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-            style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+          {/* Crown icon — small for mobile banner */}
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 56 56"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+            style={{ flexShrink: 0 }}
           >
-            <SportsSoccerIcon fontSize="small" />
-          </div>
+            <defs>
+              <linearGradient id="ok-crown-grad-reg-mob" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#FFD740" />
+                <stop offset="100%" stopColor="#D4900A" />
+              </linearGradient>
+            </defs>
+            <rect x="8" y="34" width="40" height="8" rx="2" fill="url(#ok-crown-grad-reg-mob)" />
+            <polygon points="8,34 14,12 22,22 28,10 34,22 42,12 48,34" fill="url(#ok-crown-grad-reg-mob)" />
+            <polygon points="28,2 34,10 28,16 22,10" fill="#FFE57A" />
+            <circle cx="14" cy="12" r="3.5" fill="#FFD740" />
+            <circle cx="42" cy="12" r="3.5" fill="#FFD740" />
+          </svg>
+
           <div>
-            <p className="font-black text-lg tracking-tight leading-none">NxtBet</p>
+            <div style={{ display: 'flex', alignItems: 'baseline', lineHeight: 1 }}>
+              <span
+                style={{
+                  fontFamily: 'Georgia, "Times New Roman", serif',
+                  fontWeight: 900,
+                  fontStyle: 'italic',
+                  fontSize: '1.25rem',
+                  letterSpacing: '-0.02em',
+                  color: '#ffffff',
+                }}
+              >
+                Odds
+              </span>
+              <span
+                style={{
+                  fontFamily: 'Georgia, "Times New Roman", serif',
+                  fontWeight: 900,
+                  fontStyle: 'italic',
+                  fontSize: '1.25rem',
+                  letterSpacing: '-0.02em',
+                  color: '#FFD740',
+                }}
+              >
+                King
+              </span>
+            </div>
             <p className="text-xs mt-0.5" style={{ opacity: 0.7 }}>Sports Betting</p>
           </div>
         </div>

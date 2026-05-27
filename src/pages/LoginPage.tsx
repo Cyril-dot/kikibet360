@@ -4,7 +4,6 @@ import { useAppStore } from '../store';
 import { auth } from '../utils/api';
 import type { AuthResponse } from '../utils/api';
 import LoginIcon from '@mui/icons-material/Login';
-import SportsSoccerIcon from '@mui/icons-material/SportsSoccer';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import CircularProgress from '@mui/icons-material/Loop';
@@ -35,6 +34,137 @@ function mapRole(apiRole: string): 'user' | 'admin' {
   if (apiRole === 'ADMIN' || apiRole === 'admin') return 'admin';
   if (apiRole === 'SUPER_ADMIN' || apiRole === 'super_admin') return 'admin';
   return 'user';
+}
+
+// ---------------------------------------------------------------------------
+// OddsKingLogo — same as Header
+// ---------------------------------------------------------------------------
+function OddsKingLogo() {
+  return (
+    <div className="flex items-center gap-0 select-none" aria-label="OddsKing">
+      {/* Crown icon */}
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 56 56"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+        style={{ marginRight: 6, flexShrink: 0 }}
+      >
+        <defs>
+          <linearGradient id="ok-crown-grad-login" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#FFD740" />
+            <stop offset="100%" stopColor="#D4900A" />
+          </linearGradient>
+        </defs>
+        <rect x="8" y="34" width="40" height="8" rx="2" fill="url(#ok-crown-grad-login)" />
+        <polygon
+          points="8,34 14,12 22,22 28,10 34,22 42,12 48,34"
+          fill="url(#ok-crown-grad-login)"
+        />
+        <polygon points="28,2 34,10 28,16 22,10" fill="#FFE57A" />
+        <circle cx="14" cy="12" r="3.5" fill="#FFD740" />
+        <circle cx="42" cy="12" r="3.5" fill="#FFD740" />
+      </svg>
+
+      {/* Wordmark */}
+      <div style={{ display: 'flex', alignItems: 'baseline', lineHeight: 1 }}>
+        <span
+          style={{
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontWeight: 900,
+            fontStyle: 'italic',
+            fontSize: '1.25rem',
+            letterSpacing: '-0.02em',
+            color: 'var(--text-main)',
+          }}
+        >
+          Odds
+        </span>
+        <span
+          style={{
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontWeight: 900,
+            fontStyle: 'italic',
+            fontSize: '1.25rem',
+            letterSpacing: '-0.02em',
+            background: 'linear-gradient(135deg, #FFD740 0%, #D4900A 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}
+        >
+          King
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// OddsKingLogo — large variant for the decorative left panel
+// ---------------------------------------------------------------------------
+function OddsKingLogoLarge() {
+  return (
+    <div className="flex flex-col items-center gap-3 select-none" aria-label="OddsKing">
+      {/* Crown icon — large */}
+      <svg
+        width="72"
+        height="72"
+        viewBox="0 0 56 56"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
+        <defs>
+          <linearGradient id="ok-crown-grad-login-lg" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#FFD740" />
+            <stop offset="100%" stopColor="#D4900A" />
+          </linearGradient>
+        </defs>
+        <rect x="8" y="34" width="40" height="8" rx="2" fill="url(#ok-crown-grad-login-lg)" />
+        <polygon
+          points="8,34 14,12 22,22 28,10 34,22 42,12 48,34"
+          fill="url(#ok-crown-grad-login-lg)"
+        />
+        <polygon points="28,2 34,10 28,16 22,10" fill="#FFE57A" />
+        <circle cx="14" cy="12" r="3.5" fill="#FFD740" />
+        <circle cx="42" cy="12" r="3.5" fill="#FFD740" />
+      </svg>
+
+      {/* Wordmark */}
+      <div style={{ display: 'flex', alignItems: 'baseline', lineHeight: 1 }}>
+        <span
+          style={{
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontWeight: 900,
+            fontStyle: 'italic',
+            fontSize: '2.5rem',
+            letterSpacing: '-0.02em',
+            color: '#ffffff',
+          }}
+        >
+          Odds
+        </span>
+        <span
+          style={{
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontWeight: 900,
+            fontStyle: 'italic',
+            fontSize: '2.5rem',
+            letterSpacing: '-0.02em',
+            background: 'linear-gradient(135deg, #FFD740 0%, #D4900A 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}
+        >
+          King
+        </span>
+      </div>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -111,11 +241,11 @@ export default function LoginPage() {
         <div className="absolute top-1/2 left-1/4 w-32 h-32 rounded-full opacity-5" style={{ backgroundColor: '#fff' }} />
 
         <div className="relative text-white text-center max-w-sm">
-          <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl"
-            style={{ backgroundColor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)' }}>
-            <SportsSoccerIcon sx={{ fontSize: 44 }} />
+          {/* OddsKing logo — large, white wordmark */}
+          <div className="mb-6">
+            <OddsKingLogoLarge />
           </div>
-          <h1 className="text-4xl font-black mb-2 tracking-tight">NxtBet</h1>
+
           <p className="text-sm font-semibold tracking-[3px] uppercase opacity-60 mb-6">Sports Betting</p>
           <p className="text-base opacity-85 leading-relaxed">
             Log in to your account and continue betting on your favourite sports.
@@ -140,14 +270,56 @@ export default function LoginPage() {
         className="md:hidden px-5 py-5 text-white flex items-center gap-3"
         style={{ background: 'linear-gradient(135deg, var(--primary) 0%, #b91c1c 100%)' }}
       >
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-          style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+        {/* Crown icon — small for mobile banner */}
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 56 56"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+          style={{ flexShrink: 0 }}
         >
-          <SportsSoccerIcon fontSize="small" />
-        </div>
+          <defs>
+            <linearGradient id="ok-crown-grad-login-mob" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#FFD740" />
+              <stop offset="100%" stopColor="#D4900A" />
+            </linearGradient>
+          </defs>
+          <rect x="8" y="34" width="40" height="8" rx="2" fill="url(#ok-crown-grad-login-mob)" />
+          <polygon points="8,34 14,12 22,22 28,10 34,22 42,12 48,34" fill="url(#ok-crown-grad-login-mob)" />
+          <polygon points="28,2 34,10 28,16 22,10" fill="#FFE57A" />
+          <circle cx="14" cy="12" r="3.5" fill="#FFD740" />
+          <circle cx="42" cy="12" r="3.5" fill="#FFD740" />
+        </svg>
+
         <div>
-          <p className="font-black text-lg tracking-tight leading-none">NxtBet</p>
+          <div style={{ display: 'flex', alignItems: 'baseline', lineHeight: 1 }}>
+            <span
+              style={{
+                fontFamily: 'Georgia, "Times New Roman", serif',
+                fontWeight: 900,
+                fontStyle: 'italic',
+                fontSize: '1.25rem',
+                letterSpacing: '-0.02em',
+                color: '#ffffff',
+              }}
+            >
+              Odds
+            </span>
+            <span
+              style={{
+                fontFamily: 'Georgia, "Times New Roman", serif',
+                fontWeight: 900,
+                fontStyle: 'italic',
+                fontSize: '1.25rem',
+                letterSpacing: '-0.02em',
+                color: '#FFD740',
+              }}
+            >
+              King
+            </span>
+          </div>
           <p className="text-xs opacity-70 mt-0.5">Sports Betting</p>
         </div>
       </div>
@@ -311,7 +483,7 @@ export default function LoginPage() {
               type="submit"
               disabled={loading}
               className="w-full py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all touch-manipulation disabled:opacity-60 disabled:cursor-not-allowed mt-2"
-              style={{ backgroundColor: 'var(--primary)', color: 'var(--nxtbet-secondary-text)', }}
+              style={{ backgroundColor: 'var(--primary)', color: 'var(--nxtbet-secondary-text)' }}
               onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLElement).style.opacity = '0.9'; }}
               onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = '1'}
             >

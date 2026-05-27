@@ -134,9 +134,9 @@ function ghsToLocal(ghsAmount: number, currency: CurrencyInfo): number {
 
 const MIN_STAKE_GHS = 300;
 
-const DEBUG = (() => { try { return localStorage.getItem('NXTBET_DEBUG') === 'true'; } catch { return false; } })();
-function log(area: string, ...args: unknown[]) { if (!DEBUG) return; console.log(`%c[Nxtbet:${area}]`, 'color:#E6192E;font-weight:bold', ...args); }
-function logError(area: string, ...args: unknown[]) { console.error(`[Nxtbet:${area}]`, ...args); }
+const DEBUG = (() => { try { return localStorage.getItem('ODDSKING_DEBUG') === 'true'; } catch { return false; } })();
+function log(area: string, ...args: unknown[]) { if (!DEBUG) return; console.log(`%c[OddsKing:${area}]`, 'color:#D4900A;font-weight:bold', ...args); }
+function logError(area: string, ...args: unknown[]) { console.error(`[OddsKing:${area}]`, ...args); }
 
 function buildMatchLabel(s: Record<string, unknown>): string {
   if (!s) return 'Unknown match';
@@ -178,6 +178,52 @@ function normaliseBet(bet: Bet): Bet {
       awayTeam:   s.awayTeam   ?? (s as any).away_team,
     })),
   };
+}
+
+// ─── OddsKing crown SVG (inline, reusable) ────────────────────────────────────
+
+function OddsKingCrownSvg({ size = 20 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 56 56"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      style={{ flexShrink: 0 }}
+    >
+      <defs>
+        <linearGradient id="ok-slip-crown" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#FFD740" />
+          <stop offset="100%" stopColor="#D4900A" />
+        </linearGradient>
+      </defs>
+      <rect x="8" y="34" width="40" height="8" rx="2" fill="url(#ok-slip-crown)" />
+      <polygon points="8,34 14,12 22,22 28,10 34,22 42,12 48,34" fill="url(#ok-slip-crown)" />
+      <polygon points="28,2 34,10 28,16 22,10" fill="#FFE57A" />
+      <circle cx="14" cy="12" r="3.5" fill="#FFD740" />
+      <circle cx="42" cy="12" r="3.5" fill="#FFD740" />
+    </svg>
+  );
+}
+
+/** Inline wordmark for dark backgrounds (used in modals/slips) */
+function OddsKingWordmarkDark({ size = 14 }: { size?: number }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', lineHeight: 1 }}>
+      <span style={{
+        fontFamily: 'Georgia, "Times New Roman", serif',
+        fontWeight: 900, fontStyle: 'italic',
+        fontSize: size, letterSpacing: '-0.02em', color: '#ffffff',
+      }}>Odds</span>
+      <span style={{
+        fontFamily: 'Georgia, "Times New Roman", serif',
+        fontWeight: 900, fontStyle: 'italic',
+        fontSize: size, letterSpacing: '-0.02em', color: '#FFD740',
+      }}>King</span>
+    </span>
+  );
 }
 
 // ─── Shared UI atoms ──────────────────────────────────────────────────────────
@@ -252,25 +298,33 @@ function GuestPrompt({ message }: { message: string }) {
 async function generateSlipImage(bet: Bet, isWin: boolean, currency: CurrencyInfo): Promise<string> {
   const container = document.createElement('div');
   container.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:380px;background:#0f172a;border-radius:24px;overflow:hidden;font-family:'Inter',sans-serif;`;
-  const winColor = '#FFD700'; const lossColor = '#ef4444'; const accentColor = isWin ? winColor : lossColor;
+
   const payoutGhs = bet.potentialReturn;
   const headlineAmount = isWin ? formatLocal(payoutGhs, currency) : formatLocal(bet.stake, currency);
   const headlineSubGhs = currency.code !== 'GHS' ? (isWin ? `(GH₵${payoutGhs.toFixed(2)})` : `(GH₵${bet.stake.toFixed(2)})`) : '';
+
+  // Crown SVG as data URI for the slip image
+  const crownSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 56 56'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='0%25' y2='100%25'><stop offset='0%25' stop-color='%23FFD740'/><stop offset='100%25' stop-color='%23D4900A'/></linearGradient></defs><rect x='8' y='34' width='40' height='8' rx='2' fill='url(%23g)'/><polygon points='8,34 14,12 22,22 28,10 34,22 42,12 48,34' fill='url(%23g)'/><polygon points='28,2 34,10 28,16 22,10' fill='%23FFE57A'/><circle cx='14' cy='12' r='3.5' fill='%23FFD740'/><circle cx='42' cy='12' r='3.5' fill='%23FFD740'/></svg>`;
+  const crownDataUri = `data:image/svg+xml,${crownSvg}`;
+
   container.innerHTML = `
     <style>* { box-sizing: border-box; margin: 0; padding: 0; }</style>
     <div style="background: linear-gradient(135deg, #0a0a0a 0%, #1a1200 50%, #0a0a0a 100%);">
-      <div style="background: linear-gradient(90deg, #1a1200, #E6192E, #1a1200); padding:6px 20px; display:flex; align-items:center; justify-content:space-between;">
-        <span style="font-size:13px;font-weight:900;color:#FFD700;letter-spacing:2px;">✗ NXTBET</span>
+      <div style="background: linear-gradient(90deg, #1a1200, #b91c1c, #1a1200); padding:6px 20px; display:flex; align-items:center; justify-content:space-between;">
+        <span style="display:flex;align-items:center;gap:6px;">
+          <img src="${crownDataUri}" width="18" height="18" style="display:inline-block;vertical-align:middle;" />
+          <span style="font-size:13px;font-weight:900;font-family:Georgia,serif;font-style:italic;color:#fff;">Odds<span style="color:#FFD740;">King</span></span>
+        </span>
         <span style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.7);">Bet Slip</span>
       </div>
       <div style="padding:24px 24px 16px;text-align:center;">
         <div style="font-size:14px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#FFD700;margin-bottom:8px;">${isWin ? '🏆 YOU WON!' : '😭 BETTER LUCK NEXT TIME'}</div>
         <div style="font-size:38px;font-weight:900;color:#FFD700;line-height:1.1;">${headlineAmount}</div>
         ${headlineSubGhs ? `<div style="font-size:13px;color:rgba(255,255,255,0.4);margin-top:4px;">${headlineSubGhs}</div>` : ''}
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px;">Congrats! Your bet was successful.</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px;">Your bet on OddsKing.</div>
       </div>
       <div style="background:rgba(255,255,255,0.05);margin:0 16px;border-radius:12px;overflow:hidden;">
-        <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:0;padding:8px 12px;background:rgba(230,25,46,0.3);">
+        <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:0;padding:8px 12px;background:rgba(180,20,40,0.4);">
           <span style="font-size:10px;font-weight:800;color:#FFD700;text-transform:uppercase;padding-right:12px;">#</span>
           <span style="font-size:10px;font-weight:800;color:#FFD700;text-transform:uppercase;">SELECTION</span>
           <span style="font-size:10px;font-weight:800;color:#FFD700;text-transform:uppercase;padding:0 12px;">ODDS</span>
@@ -280,7 +334,7 @@ async function generateSlipImage(bet: Bet, isWin: boolean, currency: CurrencyInf
           <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:0;padding:10px 12px;border-top:1px solid rgba(255,255,255,0.06);">
             <span style="font-size:12px;font-weight:800;color:#FFD700;padding-right:12px;">${i + 1}</span>
             <div>
-              <div style="font-size:12px;font-weight:700;color:#fff;">${sel.homeTeam && sel.awayTeam ? sel.selection : sel.selection}</div>
+              <div style="font-size:12px;font-weight:700;color:#fff;">${sel.selection}</div>
               <div style="font-size:10px;color:rgba(255,255,255,0.4);">${sel.homeTeam && sel.awayTeam ? `${sel.homeTeam} vs ${sel.awayTeam}` : sel.matchId}</div>
               <div style="font-size:10px;color:rgba(255,255,255,0.5);">${sel.market}</div>
             </div>
@@ -307,7 +361,10 @@ async function generateSlipImage(bet: Bet, isWin: boolean, currency: CurrencyInf
       </div>
       <div style="background:rgba(0,0,0,0.4);padding:10px 24px;display:flex;justify-content:space-between;align-items:center;">
         <div style="font-size:10px;color:rgba(255,255,255,0.3);">${new Date(bet.placedAt).toLocaleString()}</div>
-        <div style="font-size:12px;font-weight:900;color:#FFD700;letter-spacing:1px;">✗ NXTBET</div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <img src="${crownDataUri}" width="14" height="14" style="display:inline-block;vertical-align:middle;" />
+          <span style="font-size:12px;font-weight:900;font-family:Georgia,serif;font-style:italic;color:#fff;">Odds<span style="color:#FFD740;">King</span></span>
+        </div>
       </div>
     </div>
   `;
@@ -325,14 +382,14 @@ async function generateSlipImage(bet: Bet, isWin: boolean, currency: CurrencyInf
 function ShareImageModal({ imageUrl, onClose }: { imageUrl: string; onClose: () => void }) {
   const handleDownload = () => {
     const a = document.createElement('a');
-    a.href = imageUrl; a.download = `nxtbet-slip-${Date.now()}.png`; a.click();
+    a.href = imageUrl; a.download = `oddsking-slip-${Date.now()}.png`; a.click();
   };
   const handleShare = async () => {
     try {
       const blob = await (await fetch(imageUrl)).blob();
-      const file = new File([blob], 'nxtbet-bet.png', { type: 'image/png' });
+      const file = new File([blob], 'oddsking-bet.png', { type: 'image/png' });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'My Nxtbet Bet Slip' });
+        await navigator.share({ files: [file], title: 'My OddsKing Bet Slip' });
       } else { handleDownload(); }
     } catch { handleDownload(); }
   };
@@ -357,7 +414,7 @@ function ShareImageModal({ imageUrl, onClose }: { imageUrl: string; onClose: () 
   );
 }
 
-// ─── WIN MODAL — redesigned to match reference image ─────────────────────────
+// ─── WIN MODAL ────────────────────────────────────────────────────────────────
 
 function WinModal({ bet, currency, onClose }: { bet: Bet; currency: CurrencyInfo; onClose: () => void }) {
   const [generatingImage, setGeneratingImage] = useState(false);
@@ -369,7 +426,7 @@ function WinModal({ bet, currency, onClose }: { bet: Bet; currency: CurrencyInfo
       delay: Math.random() * 2,
       duration: 2 + Math.random() * 2,
       size: 4 + Math.random() * 8,
-      color: ['#FFD700','#FFA500','#E6192E','#ffffff','#FFD700','#22c55e'][Math.floor(Math.random() * 6)],
+      color: ['#FFD700','#FFA500','#b91c1c','#ffffff','#FFD700','#22c55e'][Math.floor(Math.random() * 6)],
       shape: Math.random() > 0.5 ? '50%' : '2px',
     }))
   );
@@ -483,7 +540,7 @@ function WinModal({ bet, currency, onClose }: { bet: Bet; currency: CurrencyInfo
 
           {/* ── HERO SECTION ── */}
           <div className="relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #1a0d00 0%, #0d0500 100%)', paddingTop: '32px', paddingBottom: '24px' }}>
-            {/* Radial glow behind trophy */}
+            {/* Radial glow */}
             <div className="absolute inset-0 pointer-events-none" style={{
               background: 'radial-gradient(ellipse 70% 60% at 50% 60%, rgba(255,165,0,0.25) 0%, rgba(255,100,0,0.1) 40%, transparent 70%)',
             }} />
@@ -503,11 +560,10 @@ function WinModal({ bet, currency, onClose }: { bet: Bet; currency: CurrencyInfo
               </div>
             </div>
 
-            {/* NXTBET logo */}
-            <div className="text-center mb-2">
-              <span className="text-lg font-black tracking-widest" style={{ color: '#FFD700', letterSpacing: '0.2em' }}>
-                ✗ NXTBET
-              </span>
+            {/* OddsKing branding */}
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <OddsKingCrownSvg size={22} />
+              <OddsKingWordmarkDark size={16} />
             </div>
 
             {/* YOU WON */}
@@ -517,13 +573,11 @@ function WinModal({ bet, currency, onClose }: { bet: Bet; currency: CurrencyInfo
               </h1>
             </div>
 
-            {/* Trophy SVG — big, borderless, glowing */}
+            {/* Trophy SVG */}
             <div className="flex justify-center mb-3">
               <div className="trophy-anim relative">
-                {/* Glow halo */}
                 <div style={{
-                  position: 'absolute', inset: '-20px',
-                  borderRadius: '50%',
+                  position: 'absolute', inset: '-20px', borderRadius: '50%',
                   background: 'radial-gradient(circle, rgba(255,165,0,0.4) 0%, rgba(255,100,0,0.2) 50%, transparent 70%)',
                   animation: 'pulseGold 2s ease-in-out infinite',
                 }} />
@@ -549,39 +603,22 @@ function WinModal({ bet, currency, onClose }: { bet: Bet; currency: CurrencyInfo
                       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
                     </filter>
                   </defs>
-
-                  {/* Base platform */}
                   <rect x="52" y="138" width="56" height="8" rx="4" fill="url(#trophyGrad)" filter="url(#glow)"/>
                   <rect x="44" y="134" width="72" height="8" rx="4" fill="url(#trophyGrad)" filter="url(#glow)"/>
-
-                  {/* Stem */}
                   <rect x="68" y="112" width="24" height="24" rx="3" fill="url(#trophyGrad)" filter="url(#glow)"/>
                   <rect x="72" y="112" width="16" height="24" rx="2" fill="url(#trophyShine)" opacity="0.4"/>
-
-                  {/* Main cup body */}
                   <path d="M36 28 L124 28 L116 92 Q110 116 80 116 Q50 116 44 92 Z" fill="url(#trophyGrad)" filter="url(#glow)"/>
-                  {/* Cup shine */}
                   <path d="M46 28 L90 28 L84 85 Q78 108 60 112 Q44 100 44 92 Z" fill="url(#cupGlow)" opacity="0.5"/>
-                  {/* Cup inner shadow */}
                   <path d="M50 35 L110 35 L103 88 Q98 108 80 110 Q62 108 57 88 Z" fill="none" stroke="rgba(139,90,0,0.3)" strokeWidth="1"/>
-
-                  {/* Left handle */}
                   <path d="M36 38 Q16 38 16 58 Q16 76 36 76" stroke="url(#trophyGrad)" strokeWidth="12" fill="none" strokeLinecap="round" filter="url(#glow)"/>
                   <path d="M36 44 Q22 44 22 58 Q22 72 36 70" stroke="url(#trophyShine)" strokeWidth="4" fill="none" strokeLinecap="round" opacity="0.5"/>
-
-                  {/* Right handle */}
                   <path d="M124 38 Q144 38 144 58 Q144 76 124 76" stroke="url(#trophyGrad)" strokeWidth="12" fill="none" strokeLinecap="round" filter="url(#glow)"/>
                   <path d="M124 44 Q138 44 138 58 Q138 72 124 70" stroke="url(#trophyShine)" strokeWidth="4" fill="none" strokeLinecap="round" opacity="0.5"/>
-
-                  {/* Stars on cup */}
                   <text x="80" y="82" textAnchor="middle" fontSize="28" fill="#FFF8DC" opacity="0.9">★</text>
-
-                  {/* NXTBET text on cup */}
-                  <text x="80" y="58" textAnchor="middle" fontSize="9" fontWeight="900" fill="#7C4A00" letterSpacing="1" opacity="0.7">NXT</text>
-                  <text x="80" y="70" textAnchor="middle" fontSize="9" fontWeight="900" fill="#7C4A00" letterSpacing="1" opacity="0.7">BET</text>
-
-                  {/* WINNER ribbon */}
-                  <rect x="48" y="120" width="64" height="16" rx="3" fill="#E6192E"/>
+                  {/* OddsKing crown shape on cup */}
+                  <text x="80" y="58" textAnchor="middle" fontSize="8" fontWeight="900" fill="#7C4A00" letterSpacing="1" opacity="0.7">ODDS</text>
+                  <text x="80" y="70" textAnchor="middle" fontSize="8" fontWeight="900" fill="#7C4A00" letterSpacing="1" opacity="0.7">KING</text>
+                  <rect x="48" y="120" width="64" height="16" rx="3" fill="#b91c1c"/>
                   <text x="80" y="131" textAnchor="middle" fontSize="8" fontWeight="900" fill="#FFD700" letterSpacing="2">WINNER</text>
                 </svg>
               </div>
@@ -609,7 +646,7 @@ function WinModal({ bet, currency, onClose }: { bet: Bet; currency: CurrencyInfo
             {/* Ticket meta row */}
             <div className="grid grid-cols-3 gap-0 mx-4 mt-4 rounded-xl overflow-hidden border" style={{ borderColor: 'rgba(255,215,0,0.15)' }}>
               {[
-                { icon: '🎫', label: 'TICKET ID', value: `NXT${bet.id.slice(-8).toUpperCase()}` },
+                { icon: '🎫', label: 'TICKET ID', value: `OK${bet.id.slice(-8).toUpperCase()}` },
                 { icon: '📅', label: 'DATE', value: placedDate },
                 { icon: '🏆', label: 'BET TYPE', value: bet.selections.length > 1 ? 'MULTIPLE' : 'SINGLE' },
               ].map((item, i) => (
@@ -631,14 +668,12 @@ function WinModal({ bet, currency, onClose }: { bet: Bet; currency: CurrencyInfo
 
             {/* Selections table */}
             <div className="mx-4 mt-4 rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,215,0,0.15)' }}>
-              {/* Table header */}
-              <div className="grid gap-0 px-3 py-2" style={{ gridTemplateColumns: '20px 1fr 50px 56px', background: 'rgba(230,25,46,0.5)' }}>
+              <div className="grid gap-0 px-3 py-2" style={{ gridTemplateColumns: '20px 1fr 50px 56px', background: 'rgba(180,20,40,0.5)' }}>
                 {['#', 'SELECTION', 'ODDS', 'RESULT'].map(h => (
                   <span key={h} style={{ fontSize: '9px', fontWeight: 800, color: '#FFD700', letterSpacing: '1px', textTransform: 'uppercase' }}>{h}</span>
                 ))}
               </div>
 
-              {/* Rows */}
               {bet.selections.map((sel, i) => {
                 const isWon = sel.result === 'WON';
                 const isLost = sel.result === 'LOST';
@@ -687,7 +722,7 @@ function WinModal({ bet, currency, onClose }: { bet: Bet; currency: CurrencyInfo
             {/* Dashed separator */}
             <div className="mx-4 my-3 relative flex items-center">
               <div style={{ flex: 1, borderTop: '1.5px dashed rgba(255,215,0,0.2)' }} />
-              <div className="mx-2" style={{ fontSize: '12px', color: 'rgba(255,215,0,0.4)' }}>✗</div>
+              <div className="mx-2"><OddsKingCrownSvg size={14} /></div>
               <div style={{ flex: 1, borderTop: '1.5px dashed rgba(255,215,0,0.2)' }} />
             </div>
 
@@ -699,9 +734,7 @@ function WinModal({ bet, currency, onClose }: { bet: Bet; currency: CurrencyInfo
                 ...(hasBonus ? [{ label: 'BONUS:', value: formatLocal(bonusGhs, currency), sub: currency.code !== 'GHS' ? `GH₵${bonusGhs.toFixed(2)}` : undefined, valueColor: '#22c55e' }] : []),
               ].map(row => (
                 <div key={row.label} className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.5px' }}>{row.label}</span>
-                  </div>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.5px' }}>{row.label}</span>
                   <div className="text-right">
                     <span style={{ fontSize: '14px', fontWeight: 800, color: row.valueColor }}>{row.value}</span>
                     {(row as any).sub && <p style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginTop: '1px' }}>{(row as any).sub}</p>}
@@ -836,11 +869,17 @@ function LossModal({ bet, currency, onClose }: { bet: Bet; currency: CurrencyInf
                 </div>
               );
             })}
+
+            {/* OddsKing divider */}
             <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
               <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
-              <div className="flex items-center gap-1.5"><SportsSoccerIcon sx={{ fontSize: 14 }} className="text-primary" /><span className="text-sm font-black text-white tracking-wide">NXTBET</span></div>
+              <div className="flex items-center gap-1.5">
+                <OddsKingCrownSvg size={14} />
+                <OddsKingWordmarkDark size={13} />
+              </div>
               <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
             </div>
+
             <div className="px-4 py-3 space-y-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
               <div className="flex items-center justify-between"><span className="text-sm text-slate-400">Odds</span><span className="text-sm font-bold" style={{ color: '#3b82f6' }}>{bet.totalOdds.toFixed(2)}</span></div>
               <div className="flex items-center justify-between">
@@ -853,7 +892,7 @@ function LossModal({ bet, currency, onClose }: { bet: Bet; currency: CurrencyInf
               <div className="flex items-center justify-between"><span className="text-sm text-slate-400">Payout</span><span className="text-base font-black" style={{ color: '#ef4444' }}>{formatLocal(0, currency)}</span></div>
             </div>
             <div className="px-4 py-4 flex gap-3">
-              <button onClick={onClose} className="flex-1 py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97]" style={{ background: '#E6192E', color: '#fff' }}>Try Again</button>
+              <button onClick={onClose} className="flex-1 py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97]" style={{ background: '#b91c1c', color: '#fff' }}>Try Again</button>
               <button onClick={handleShowOff} disabled={generatingImage} className="flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.97] disabled:opacity-60" style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)' }}>
                 {generatingImage ? <CircularProgress fontSize="small" className="animate-spin" /> : <><ShareIcon fontSize="small" /> Share</>}
               </button>
@@ -1543,6 +1582,7 @@ function MyBetsTab() {
     </div>
   );
 }
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export default function BetSlipPage() {

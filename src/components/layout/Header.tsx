@@ -12,8 +12,6 @@ import LoginIcon from '@mui/icons-material/Login';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import HomeIcon from '@mui/icons-material/Home';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
-import CasinoIcon from '@mui/icons-material/Casino';
-import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
@@ -152,8 +150,7 @@ const navLinks = [
     label: 'Live',
     icon: <FiberManualRecordIcon className="text-green-500 animate-pulse-green" sx={{ fontSize: 16 }} />,
   },
-  { to: '/casino',    label: 'Casino',    icon: <CasinoIcon sx={{ fontSize: 16 }} /> },
-  { to: '/affiliate', label: 'Affiliate', icon: <GroupAddIcon sx={{ fontSize: 16 }} /> },
+
 ];
 
 // ---------------------------------------------------------------------------
@@ -167,32 +164,71 @@ function getUserInitials(fullName: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// NxtBetLogo
+// OddsKingLogo
 // ---------------------------------------------------------------------------
-function NxtBetLogo() {
+function OddsKingLogo() {
   return (
-    <div className="flex items-center gap-2 select-none" aria-label="NxtBet">
-      <div style={{ position: 'relative', width: 36, height: 36, flexShrink: 0 }}>
-        <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <defs>
-            <linearGradient id="nxtbet-bg" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#1565C0" />
-              <stop offset="100%" stopColor="#42A5F5" />
-            </linearGradient>
-          </defs>
-          <circle cx="18" cy="18" r="17" fill="url(#nxtbet-bg)" />
-          <circle cx="18" cy="18" r="12" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1.2" strokeDasharray="4 2.5" />
-          <circle cx="18" cy="18" r="8" fill="rgba(255,255,255,0.12)" />
-          <text x="18" y="23" textAnchor="middle" fontFamily="Inter, system-ui, sans-serif" fontWeight="900" fontSize="14" fill="#ffffff">N</text>
-          <circle cx="30" cy="18" r="2.8" fill="#ffffff" />
-          <circle cx="6"  cy="18" r="1.8" fill="rgba(255,255,255,0.45)" />
-        </svg>
+    <div className="flex items-center gap-0 select-none" aria-label="OddsKing">
+      {/* Crown icon */}
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 56 56"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+        style={{ marginRight: 6, flexShrink: 0 }}
+      >
+        <defs>
+          <linearGradient id="ok-crown-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#FFD740" />
+            <stop offset="100%" stopColor="#D4900A" />
+          </linearGradient>
+        </defs>
+        {/* Crown band base */}
+        <rect x="8" y="34" width="40" height="8" rx="2" fill="url(#ok-crown-grad)" />
+        {/* Crown M-shape body */}
+        <polygon
+          points="8,34 14,12 22,22 28,10 34,22 42,12 48,34"
+          fill="url(#ok-crown-grad)"
+        />
+        {/* Diamond gem at top */}
+        <polygon points="28,2 34,10 28,16 22,10" fill="#FFE57A" />
+        {/* Peak dots */}
+        <circle cx="14" cy="12" r="3.5" fill="#FFD740" />
+        <circle cx="42" cy="12" r="3.5" fill="#FFD740" />
+      </svg>
+
+      {/* Wordmark */}
+      <div style={{ display: 'flex', alignItems: 'baseline', lineHeight: 1 }}>
+        <span
+          style={{
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontWeight: 900,
+            fontStyle: 'italic',
+            fontSize: '1.25rem',
+            letterSpacing: '-0.02em',
+            color: 'var(--text-main)',
+          }}
+        >
+          Odds
+        </span>
+        <span
+          style={{
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontWeight: 900,
+            fontStyle: 'italic',
+            fontSize: '1.25rem',
+            letterSpacing: '-0.02em',
+            background: 'linear-gradient(135deg, #FFD740 0%, #D4900A 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}
+        >
+          King
+        </span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 0, lineHeight: 1 }}>
-        <span style={{ fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 900, fontSize: '1.15rem', letterSpacing: '-0.02em', background: 'linear-gradient(90deg, #1565C0 0%, #42A5F5 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Nxt</span>
-        <span style={{ fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 900, fontSize: '1.15rem', letterSpacing: '-0.02em', color: 'var(--text-main)' }}>Bet</span>
-      </div>
-      <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'linear-gradient(135deg, #1565C0, #42A5F5)', marginBottom: 8, flexShrink: 0 }} aria-hidden="true" />
     </div>
   );
 }
@@ -279,7 +315,7 @@ export default function Header() {
 
         {/* LOGO */}
         <Link to="/" className="flex items-center shrink-0">
-          <NxtBetLogo />
+          <OddsKingLogo />
         </Link>
 
         {/* DESKTOP NAV */}
@@ -292,8 +328,8 @@ export default function Header() {
                 to={l.to}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors"
                 style={{
-                  backgroundColor: active ? 'color-mix(in srgb, #1565C0 12%, transparent)' : undefined,
-                  color: active ? '#1565C0' : 'var(--text-muted)',
+                  backgroundColor: active ? 'color-mix(in srgb, #D4900A 12%, transparent)' : undefined,
+                  color: active ? '#D4900A' : 'var(--text-muted)',
                 }}
                 onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--card-alt)'; }}
                 onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.backgroundColor = ''; }}
@@ -394,7 +430,7 @@ export default function Header() {
               >
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 select-none"
-                  style={{ background: 'linear-gradient(135deg, #1565C0 0%, #42A5F5 100%)' }}
+                  style={{ background: 'linear-gradient(135deg, #D4900A 0%, #FFD740 100%)' }}
                 >
                   {getUserInitials(user.fullName)}
                 </div>
@@ -421,19 +457,19 @@ export default function Header() {
                 to="/register"
                 className="flex items-center gap-1.5 text-sm py-2 px-4 rounded-full touch-manipulation font-bold whitespace-nowrap"
                 style={{
-                  background: 'linear-gradient(90deg, #1565C0 0%, #42A5F5 100%)',
-                  color: '#ffffff',
-                  boxShadow: '0 2px 8px rgba(21, 101, 192, 0.4)',
+                  background: 'linear-gradient(90deg, #D4900A 0%, #FFD740 100%)',
+                  color: '#1a1a1a',
+                  boxShadow: '0 2px 8px rgba(212, 144, 10, 0.45)',
                   border: 'none',
                   textDecoration: 'none',
                 }}
                 onMouseEnter={e => {
                   (e.currentTarget as HTMLElement).style.opacity = '0.9';
-                  (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(21, 101, 192, 0.55)';
+                  (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(212, 144, 10, 0.6)';
                 }}
                 onMouseLeave={e => {
                   (e.currentTarget as HTMLElement).style.opacity = '1';
-                  (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(21, 101, 192, 0.4)';
+                  (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(212, 144, 10, 0.45)';
                 }}
               >
                 <PersonAddIcon fontSize="small" />
@@ -477,8 +513,8 @@ export default function Header() {
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center gap-3 px-4 py-3 rounded-lg transition-colors min-h-[48px] touch-manipulation"
                   style={{
-                    backgroundColor: active ? 'color-mix(in srgb, #1565C0 12%, transparent)' : undefined,
-                    color: active ? '#1565C0' : 'var(--text-muted)',
+                    backgroundColor: active ? 'color-mix(in srgb, #D4900A 12%, transparent)' : undefined,
+                    color: active ? '#D4900A' : 'var(--text-muted)',
                   }}
                 >
                   {l.icon}
@@ -540,8 +576,11 @@ export default function Header() {
                     onMouseLeave={e => (e.currentTarget as HTMLElement).style.backgroundColor = ''}
                   >
                     <div
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                      style={{ background: 'linear-gradient(135deg, #1565C0 0%, #42A5F5 100%)' }}
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                      style={{
+                        background: 'linear-gradient(135deg, #D4900A 0%, #FFD740 100%)',
+                        color: '#1a1a1a',
+                      }}
                     >
                       {getUserInitials(user.fullName)}
                     </div>
@@ -565,9 +604,9 @@ export default function Header() {
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center justify-center gap-2 text-sm min-h-[48px] rounded-full touch-manipulation font-bold"
                     style={{
-                      background: 'linear-gradient(90deg, #1565C0 0%, #42A5F5 100%)',
-                      color: '#ffffff',
-                      boxShadow: '0 2px 10px rgba(21, 101, 192, 0.4)',
+                      background: 'linear-gradient(90deg, #D4900A 0%, #FFD740 100%)',
+                      color: '#1a1a1a',
+                      boxShadow: '0 2px 10px rgba(212, 144, 10, 0.45)',
                       textDecoration: 'none',
                     }}
                   >
