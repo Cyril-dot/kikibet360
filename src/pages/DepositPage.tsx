@@ -1,405 +1,396 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAppStore } from '../store';
-import { wallet as walletApi } from '../utils/api';
+import { useState, useEffect, useRef } from "react";
 
-// ── Types ──────────────────────────────────────────────────────────────────────
+// ── Constants ──────────────────────────────────────────────────────────────────
+const MIN_GHS         = 1;
+const QUICK_AMOUNTS   = [1, 500, 1000, 2000, 5000, 10000];
+const TX_SUCCESS      = 1;
+const TX_FAILED       = 2;
+const API_BASE        = "https://futballbackend-production-aefb.up.railway.app";
+const POLL_INTERVAL   = 5000;
 
-type Step    = 'amount' | 'awaiting' | 'success' | 'error';
-type Network = 'MTN' | 'VODAFONE' | 'AIRTELTIGO';
+// ── Network Logos (real SVG-based brand logos) ─────────────────────────────────
+const MTNLogo = () => (
+  <svg viewBox="0 0 40 40" width="36" height="36" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="20" cy="20" r="20" fill="#FFCC00"/>
+    <text x="20" y="15" textAnchor="middle" fontSize="7" fontWeight="900" fontFamily="Arial Black, Arial" fill="#000" letterSpacing="0.5">MTN</text>
+    <text x="20" y="25" textAnchor="middle" fontSize="5.5" fontWeight="700" fontFamily="Arial, sans-serif" fill="#000" letterSpacing="0.3">MOMO</text>
+    <rect x="8" y="27" width="24" height="2.5" rx="1.2" fill="#000" opacity="0.15"/>
+  </svg>
+);
 
-const MIN_GHS       = 1;
-const QUICK_AMOUNTS = [1, 500, 1000, 2000, 5000, 10000];
-const TX_SUCCESS    = 1;
-const TX_FAILED     = 2;
-const API_BASE      = 'https://futballbackend-production-aefb.up.railway.app';
+const TelecelLogo = () => (
+  <svg viewBox="0 0 40 40" width="36" height="36" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="20" cy="20" r="20" fill="#E2001A"/>
+    <text x="20" y="17" textAnchor="middle" fontSize="6" fontWeight="900" fontFamily="Arial Black, Arial" fill="#fff" letterSpacing="0.3">TELE</text>
+    <text x="20" y="26" textAnchor="middle" fontSize="6" fontWeight="900" fontFamily="Arial Black, Arial" fill="#fff" letterSpacing="0.3">CEL</text>
+  </svg>
+);
 
-// Poll every 5 s while on the awaiting screen
-const POLL_INTERVAL_MS = 5000;
+const AirtelTigoLogo = () => (
+  <svg viewBox="0 0 40 40" width="36" height="36" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="20" cy="20" r="20" fill="#EF3E23"/>
+    <text x="20" y="16" textAnchor="middle" fontSize="5.5" fontWeight="900" fontFamily="Arial Black, Arial" fill="#fff" letterSpacing="0.2">AIRTEL</text>
+    <text x="20" y="25" textAnchor="middle" fontSize="5.5" fontWeight="900" fontFamily="Arial Black, Arial" fill="#fff" letterSpacing="0.2">TIGO</text>
+  </svg>
+);
+
+const NETWORKS = [
+  { id: "MTN",        label: "MTN",        sub: "MoMo",  color: "#c89a00", bg: "#fff8dc", border: "#ffe066", Logo: MTNLogo },
+  { id: "VODAFONE",   label: "Telecel",    sub: "Cash",  color: "#b30015", bg: "#fff0f0", border: "#f4a0a8", Logo: TelecelLogo },
+  { id: "AIRTELTIGO", label: "AirtelTigo", sub: "Money", color: "#0058a3", bg: "#eaf3ff", border: "#7ab8f5", Logo: AirtelTigoLogo },
+];
 
 // ── API helpers ────────────────────────────────────────────────────────────────
-
-function getAuthHeader(): Record<string, string> {
-  if (typeof window === 'undefined') return {};
-  const token = localStorage.getItem('accessToken');
+function getAuthHeader() {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("accessToken");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-/**
- * Initiates a Moolre USSD direct charge.
- * No hosted page — USSD prompt goes straight to the customer's phone.
- */
-async function moolreInit(
-  amount: string,
-  phone: string,
-  network: Network,
-): Promise<{ externalref: string; message: string }> {
+async function moolreInit(amount, phone, network) {
   const res = await fetch(`${API_BASE}/api/wallet/deposit/moolre/init`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
-    credentials: 'include',
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeader() },
+    credentials: "include",
     body: JSON.stringify({ amount, phone, network }),
   });
   const json = await res.json();
   if (!res.ok) throw new Error(json?.message ?? `HTTP ${res.status}`);
-  const inner       = (json?.data ?? json) as Record<string, unknown>;
-  const externalref = (inner?.externalref ?? '') as string;
-  if (!externalref) throw new Error('No transaction reference returned. Please try again.');
-  return {
-    externalref,
-    message: (inner?.message as string) ?? 'Please approve the USSD prompt on your phone.',
-  };
+  const inner = json?.data ?? json;
+  const externalref = inner?.externalref ?? "";
+  if (!externalref) throw new Error("No transaction reference returned. Please try again.");
+  return { externalref, message: inner?.message ?? "Please approve the USSD prompt on your phone." };
 }
 
-async function moolreVerify(externalref: string): Promise<{
-  credited: boolean; txstatus: number; message: string;
-}> {
+async function moolreVerify(externalref) {
   const res = await fetch(`${API_BASE}/api/wallet/deposit/moolre/verify`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
-    credentials: 'include',
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeader() },
+    credentials: "include",
     body: JSON.stringify({ externalref }),
   });
   const json = await res.json();
   if (!res.ok) throw new Error(json?.message ?? `HTTP ${res.status}`);
-  const inner = (json?.data ?? json) as Record<string, unknown>;
+  const inner = json?.data ?? json;
   return {
     credited: Boolean(inner?.credited),
     txstatus: Number(inner?.txstatus ?? -1),
-    message:  String(inner?.message  ?? ''),
+    message:  String(inner?.message  ?? ""),
   };
 }
 
 // ── Formatters ─────────────────────────────────────────────────────────────────
-
-function fmtGHS(n: number): string {
+function fmtGHS(n) {
   try {
-    return new Intl.NumberFormat('en-GH', {
-      style: 'currency', currency: 'GHS', maximumFractionDigits: 2,
-    }).format(n);
-  } catch { return `GHS ${n.toFixed(2)}`; }
+    return new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 }).format(n);
+  } catch { return `GHS ${Number(n).toFixed(2)}`; }
 }
+function fmtQuick(n) { return n >= 1000 ? `${n / 1000}k` : String(n); }
 
-function fmtQuick(n: number): string {
-  return n >= 1000 ? `${n / 1000}k` : String(n);
-}
-
-// ── CSS ────────────────────────────────────────────────────────────────────────
-
+// ── Global CSS ─────────────────────────────────────────────────────────────────
 const GLOBAL_CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
 
-  @keyframes spin     { to { transform: rotate(360deg); } }
-  @keyframes fadeUp   { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
-  @keyframes popIn    { 0% { transform: scale(0.9); opacity: 0; } 60% { transform: scale(1.03); } 100% { transform: scale(1); opacity: 1; } }
-  @keyframes breathe  { 0%,100% { box-shadow: 0 0 0 0 rgba(34,211,116,0.3); } 50% { box-shadow: 0 0 0 12px rgba(34,211,116,0); } }
-  @keyframes pulse-ring { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(1.6); opacity: 0; } }
+  @keyframes spin    { to { transform: rotate(360deg); } }
+  @keyframes fadeUp  { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes popIn   { 0% { transform: scale(0.94); opacity: 0; } 65% { transform: scale(1.02); } 100% { transform: scale(1); opacity: 1; } }
+  @keyframes breathe { 0%,100% { box-shadow: 0 0 0 0 rgba(24,95,165,0.2); } 50% { box-shadow: 0 0 0 8px rgba(24,95,165,0); } }
+  @keyframes pulse-ring { 0% { transform: scale(1); opacity: 0.55; } 100% { transform: scale(1.65); opacity: 0; } }
+  @keyframes blink   { 0%,100% { opacity: 0.25; } 50% { opacity: 1; } }
 
-  .dr * { box-sizing: border-box; font-family: 'Sora', sans-serif; }
-  .dr input[type=number]::-webkit-inner-spin-button,
-  .dr input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
-  .dr input[type=number] { -moz-appearance: textfield; }
+  .dp * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+  .dp input[type=number]::-webkit-inner-spin-button,
+  .dp input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .dp input[type=number] { -moz-appearance: textfield; }
 
-  .dr .screen { animation: fadeUp 0.26s ease both; }
-
-  /* ── Layout ── */
-  .dr .page-inner {
-    max-width: 420px; margin: 0 auto; padding: 0 16px 60px;
+  /* Page */
+  .dp .page {
+    min-height: 100vh;
+    background: #f0f6ff;
+    display: flex; align-items: center; justify-content: center;
+    padding: 1.5rem 1rem;
   }
 
-  /* ── Top bar ── */
-  .dr .topbar {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 20px 0 24px;
+  /* Card */
+  .dp .card {
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 4px 32px rgba(24,95,165,0.10), 0 1px 4px rgba(24,95,165,0.06);
+    padding: 1.75rem 1.5rem;
+    width: 100%; max-width: 440px;
+    animation: fadeUp 0.28s ease both;
   }
-  .dr .topbar-title {
-    font-size: 20px; font-weight: 800; letter-spacing: -0.03em; color: #fff;
-  }
-  .dr .balance-pill {
-    display: flex; align-items: center; gap: 6px;
-    padding: 6px 14px; border-radius: 100px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.09);
-    font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.55);
-  }
-  .dr .balance-dot { width: 6px; height: 6px; border-radius: 50%; background: #22d374; }
 
-  /* ── Progress bar ── */
-  .dr .progress-track {
-    height: 2px; border-radius: 1px; background: rgba(255,255,255,0.07);
-    margin-bottom: 28px; overflow: hidden;
+  /* Header */
+  .dp .card-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 1.25rem;
   }
-  .dr .progress-fill {
-    height: 100%; border-radius: 1px;
-    background: linear-gradient(90deg, #1a56ff, #22d374);
+  .dp .header-icon {
+    width: 38px; height: 38px; border-radius: 11px;
+    background: #185FA5;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .dp .header-title {
+    font-size: 16px; font-weight: 800; color: #0c447c;
+    margin: 0; letter-spacing: -0.02em;
+  }
+  .dp .header-sub {
+    font-size: 10px; font-weight: 600; color: #378ADD; margin: 1px 0 0;
+  }
+
+  /* Balance pill */
+  .dp .balance-pill {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 100px;
+    background: #e6f1fb; border: 1px solid #b5d4f4;
+    font-size: 10px; font-weight: 700; color: #185FA5;
+  }
+  .dp .balance-dot { width: 5px; height: 5px; border-radius: 50%; background: #22c55e; }
+
+  /* Progress */
+  .dp .progress-track {
+    height: 3px; border-radius: 2px; background: #e6f1fb;
+    margin-bottom: 1.25rem; overflow: hidden;
+  }
+  .dp .progress-fill {
+    height: 100%; border-radius: 2px;
+    background: linear-gradient(90deg, #185FA5, #378ADD);
     transition: width 0.4s cubic-bezier(0.4,0,0.2,1);
   }
 
-  /* ── Section label ── */
-  .dr .section-label {
-    font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
-    text-transform: uppercase; color: rgba(255,255,255,0.28);
-    margin-bottom: 8px;
+  /* Step indicator */
+  .dp .step-row    { display: flex; align-items: center; gap: 0; margin-bottom: 3px; }
+  .dp .step-dot    {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 800; flex-shrink: 0; transition: all 0.25s;
+  }
+  .dp .step-dot.done   { background: #185FA5; color: #fff; }
+  .dp .step-dot.active { background: #0c447c; color: #fff; }
+  .dp .step-dot.idle   { background: #e6f1fb; color: #378ADD; }
+  .dp .step-line       { flex: 1; height: 2px; background: #e6f1fb; transition: background 0.25s; }
+  .dp .step-line.done  { background: #185FA5; }
+  .dp .step-labels     { display: flex; justify-content: space-between; margin-top: 3px; margin-bottom: 1.25rem; }
+  .dp .step-lbl        { font-size: 8px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; flex: 1; text-align: center; }
+
+  /* Section label */
+  .dp .sec-label {
+    display: block; font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: #378ADD; margin-bottom: 6px;
   }
 
-  /* ── Amount display ── */
-  .dr .amount-display-wrap {
-    border-radius: 20px; padding: 20px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.07);
-    margin-bottom: 10px;
+  /* Divider */
+  .dp .divider { border: none; border-top: 1px solid #e6f1fb; margin: 0 0 1.25rem; }
+
+  /* Amount card */
+  .dp .field-card {
+    border: 1.5px solid #b5d4f4; border-radius: 13px;
+    padding: 12px; background: #f7fbff; margin-bottom: 10px;
   }
-  .dr .amount-row {
+
+  /* Amount input */
+  .dp .amount-row {
     display: flex; align-items: center;
-    border-radius: 12px;
-    background: rgba(255,255,255,0.04);
-    border: 1.5px solid rgba(255,255,255,0.08);
-    overflow: hidden; transition: border-color 0.15s;
+    border: 1.5px solid #b5d4f4; border-radius: 10px;
+    background: #fff; overflow: hidden; transition: border-color 0.15s;
   }
-  .dr .amount-row:focus-within { border-color: rgba(26,86,255,0.6); }
-  .dr .amount-row.err { border-color: rgba(239,68,68,0.5); }
-  .dr .amount-currency {
-    padding: 0 14px; height: 64px;
+  .dp .amount-row:focus-within { border-color: #185FA5; box-shadow: 0 0 0 3px rgba(24,95,165,0.1); }
+  .dp .amount-row.err { border-color: #f87171; }
+  .dp .amount-prefix {
+    padding: 0 12px; height: 50px;
     display: flex; align-items: center;
-    border-right: 1px solid rgba(255,255,255,0.07);
-    font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
-    color: rgba(255,255,255,0.3); flex-shrink: 0;
+    border-right: 1.5px solid #e6f1fb;
+    font-size: 9px; font-weight: 800; letter-spacing: 0.08em;
+    color: #185FA5; background: #e6f1fb; flex-shrink: 0;
   }
-  .dr .amount-input {
-    flex: 1; height: 64px; padding: 0 16px;
+  .dp .amount-input {
+    flex: 1; height: 50px; padding: 0 14px;
     background: transparent; border: none; outline: none;
-    font-size: 30px; font-weight: 800; color: #fff;
+    font-size: 24px; font-weight: 800; color: #0c447c;
     font-family: 'JetBrains Mono', monospace; letter-spacing: -0.02em;
   }
-  .dr .amount-input::placeholder { color: rgba(255,255,255,0.15); }
-  .dr .amount-hint {
-    font-size: 11px; font-weight: 500; margin-top: 8px;
-    transition: color 0.15s;
-  }
+  .dp .amount-input::placeholder { color: #b5d4f4; }
+  .dp .amount-hint { font-size: 10px; font-weight: 600; margin-top: 5px; }
 
-  /* ── Quick amounts ── */
-  .dr .quick-grid {
-    display: grid; grid-template-columns: repeat(6,1fr); gap: 6px; margin-top: 14px;
-  }
-  .dr .quick-chip {
-    padding: 7px 4px; border-radius: 8px; text-align: center;
-    border: 1px solid rgba(255,255,255,0.07);
-    background: rgba(255,255,255,0.025);
-    font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5);
+  /* Quick chips */
+  .dp .quick-grid { display: grid; grid-template-columns: repeat(6,1fr); gap: 5px; margin-top: 10px; }
+  .dp .quick-chip {
+    padding: 6px 3px; border-radius: 7px; text-align: center;
+    border: 1.5px solid #b5d4f4; background: #fff;
+    font-size: 10px; font-weight: 700; color: #378ADD;
     cursor: pointer; transition: all 0.12s;
   }
-  .dr .quick-chip:hover { border-color: rgba(26,86,255,0.35); color: rgba(255,255,255,0.8); }
-  .dr .quick-chip.on {
-    border-color: rgba(26,86,255,0.6); background: rgba(26,86,255,0.12); color: #fff;
-  }
+  .dp .quick-chip:hover { border-color: #185FA5; color: #0c447c; background: #e6f1fb; }
+  .dp .quick-chip.on { border-color: #185FA5; background: #185FA5; color: #fff; }
 
-  /* ── Phone input ── */
-  .dr .phone-wrap {
-    border-radius: 20px; padding: 20px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.07);
-    margin-bottom: 10px;
-  }
-  .dr .phone-row {
+  /* Phone input */
+  .dp .phone-row {
     display: flex; align-items: center;
-    border-radius: 12px;
-    background: rgba(255,255,255,0.04);
-    border: 1.5px solid rgba(255,255,255,0.08);
-    overflow: hidden; transition: border-color 0.15s;
+    border: 1.5px solid #b5d4f4; border-radius: 10px;
+    background: #fff; overflow: hidden; transition: border-color 0.15s;
   }
-  .dr .phone-row:focus-within { border-color: rgba(26,86,255,0.6); }
-  .dr .phone-row.err { border-color: rgba(239,68,68,0.5); }
-  .dr .phone-prefix {
-    padding: 0 14px; height: 54px;
+  .dp .phone-row:focus-within { border-color: #185FA5; box-shadow: 0 0 0 3px rgba(24,95,165,0.1); }
+  .dp .phone-row.err { border-color: #f87171; }
+  .dp .phone-prefix {
+    padding: 0 12px; height: 44px;
     display: flex; align-items: center;
-    border-right: 1px solid rgba(255,255,255,0.07);
-    font-size: 13px; font-weight: 700;
-    color: rgba(255,255,255,0.4); flex-shrink: 0;
+    border-right: 1.5px solid #e6f1fb;
+    font-size: 12px; font-weight: 700;
+    color: #185FA5; background: #e6f1fb; flex-shrink: 0;
     font-family: 'JetBrains Mono', monospace;
   }
-  .dr .phone-input {
-    flex: 1; height: 54px; padding: 0 16px;
+  .dp .phone-input {
+    flex: 1; height: 44px; padding: 0 12px;
     background: transparent; border: none; outline: none;
-    font-size: 18px; font-weight: 700; color: #fff;
-    font-family: 'JetBrains Mono', monospace; letter-spacing: 0.04em;
+    font-size: 15px; font-weight: 700; color: #0c447c;
+    font-family: 'JetBrains Mono', monospace; letter-spacing: 0.05em;
   }
-  .dr .phone-input::placeholder { color: rgba(255,255,255,0.15); }
+  .dp .phone-input::placeholder { color: #b5d4f4; }
 
-  /* ── Network selector ── */
-  .dr .net-grid {
-    display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 14px;
+  /* Network cards */
+  .dp .net-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; margin-top: 10px; }
+  .dp .net-card {
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+    padding: 11px 6px; border-radius: 12px;
+    border: 1.5px solid #b5d4f4; background: #fff;
+    cursor: pointer; transition: all 0.15s; position: relative;
   }
-  .dr .net-card {
-    display: flex; flex-direction: column; align-items: center; gap: 7px;
-    padding: 14px 8px; border-radius: 14px;
-    border: 1.5px solid rgba(255,255,255,0.07);
-    background: rgba(255,255,255,0.025);
+  .dp .net-card:hover { border-color: #185FA5; background: #f0f6ff; }
+  .dp .net-name {
+    font-size: 9px; font-weight: 800; letter-spacing: 0.02em;
+    text-align: center; line-height: 1.3; color: #378ADD;
+  }
+  .dp .net-check {
+    position: absolute; top: 5px; right: 5px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #185FA5; display: flex; align-items: center;
+    justify-content: center; font-size: 8px; color: #fff; font-weight: 800;
+  }
+
+  /* Tip */
+  .dp .tip {
+    display: flex; gap: 8px; align-items: flex-start;
+    padding: 9px 11px; border-radius: 10px;
+    background: #e6f1fb; border: 1px solid #b5d4f4;
+    font-size: 11px; color: #378ADD; line-height: 1.6; margin-bottom: 10px;
+  }
+
+  /* Alert boxes */
+  .dp .box-err  { padding: 9px 12px; border-radius: 10px; background: #fff0f0; border: 1.5px solid #f4a0a8; font-size: 11px; color: #9b1c1c; line-height: 1.55; font-weight: 500; margin-bottom: 8px; }
+  .dp .box-info { padding: 9px 12px; border-radius: 10px; background: #e6f1fb; border: 1.5px solid #b5d4f4; font-size: 11px; color: #0c447c; line-height: 1.55; font-weight: 500; margin-bottom: 8px; }
+  .dp .box-ok   { padding: 9px 12px; border-radius: 10px; background: #ecfdf5; border: 1.5px solid #6ee7b7; font-size: 11px; color: #065f46; line-height: 1.55; font-weight: 500; margin-bottom: 8px; }
+
+  /* Buttons */
+  .dp .btn-primary {
+    width: 100%; display: flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 12px 18px; border-radius: 10px; border: none;
+    background: #185FA5; color: #fff;
+    font-size: 13px; font-weight: 700; letter-spacing: 0.01em;
     cursor: pointer; transition: all 0.15s;
+    box-shadow: 0 4px 12px rgba(24,95,165,0.25);
+    font-family: 'Plus Jakarta Sans', sans-serif;
   }
-  .dr .net-card:hover { border-color: rgba(255,255,255,0.15); }
-  .dr .net-card.on { border-color: var(--net-color); background: rgba(var(--net-rgb),0.08); }
-  .dr .net-logo {
-    width: 36px; height: 36px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 16px; font-weight: 800;
-  }
-  .dr .net-name {
-    font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
-    text-align: center; line-height: 1.3;
-  }
+  .dp .btn-primary:hover:not(:disabled) { background: #0c447c; transform: translateY(-1px); box-shadow: 0 6px 16px rgba(24,95,165,0.3); }
+  .dp .btn-primary:active:not(:disabled) { transform: translateY(0); }
+  .dp .btn-primary:disabled { background: #b5d4f4; cursor: not-allowed; box-shadow: none; }
 
-  /* ── Tip box ── */
-  .dr .tip {
-    display: flex; gap: 10px; align-items: flex-start;
-    padding: 11px 13px; border-radius: 12px;
-    background: rgba(255,255,255,0.025);
-    border: 1px solid rgba(255,255,255,0.06);
-    font-size: 11.5px; color: rgba(255,255,255,0.38); line-height: 1.7;
-    margin-bottom: 10px;
+  .dp .btn-ghost {
+    width: 100%; display: flex; align-items: center; justify-content: center; gap: 5px;
+    padding: 10px 18px; border-radius: 10px;
+    border: 1.5px solid #b5d4f4; background: #e6f1fb;
+    color: #185FA5; font-size: 12px; font-weight: 700;
+    cursor: pointer; transition: all 0.15s; margin-top: 7px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
   }
+  .dp .btn-ghost:hover { border-color: #185FA5; background: #d0e8f9; }
 
-  /* ── Error / info boxes ── */
-  .dr .box-err  { padding: 11px 14px; border-radius: 12px; background: rgba(239,68,68,0.07);  border: 1px solid rgba(239,68,68,0.2);  font-size: 12px; color: #f87171; line-height: 1.55; }
-  .dr .box-info { padding: 11px 14px; border-radius: 12px; background: rgba(26,86,255,0.07);  border: 1px solid rgba(26,86,255,0.18); font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.55; }
-  .dr .box-ok   { padding: 11px 14px; border-radius: 12px; background: rgba(34,211,116,0.07); border: 1px solid rgba(34,211,116,0.2); font-size: 12px; color: #22d374; line-height: 1.55; }
-
-  /* ── Buttons ── */
-  .dr .btn-primary {
-    width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
-    padding: 15px 20px; border-radius: 14px; border: none;
-    background: linear-gradient(135deg, #1a56ff 0%, #0f3fd6 100%);
-    color: #fff; font-size: 14px; font-weight: 800; letter-spacing: 0.01em;
-    cursor: pointer; transition: opacity 0.15s, transform 0.12s;
-    box-shadow: 0 6px 20px rgba(26,86,255,0.3);
-  }
-  .dr .btn-primary:hover:not(:disabled) { opacity: 0.91; transform: translateY(-1px); }
-  .dr .btn-primary:active:not(:disabled) { transform: translateY(0); }
-  .dr .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
-
-  .dr .btn-ghost {
-    width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
-    padding: 13px 20px; border-radius: 14px;
-    border: 1px solid rgba(255,255,255,0.08);
-    background: transparent; color: rgba(255,255,255,0.35);
-    font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s;
-  }
-  .dr .btn-ghost:hover { border-color: rgba(255,255,255,0.15); color: rgba(255,255,255,0.6); }
-
-  .dr .spinner {
-    width: 17px; height: 17px; border-radius: 50%;
-    border: 2px solid rgba(255,255,255,0.2); border-top-color: #fff;
+  .dp .spinner {
+    width: 15px; height: 15px; border-radius: 50%;
+    border: 2.5px solid rgba(255,255,255,0.3); border-top-color: #fff;
     animation: spin 0.65s linear infinite; flex-shrink: 0;
   }
 
-  /* ── Awaiting card ── */
-  .dr .await-card {
-    border-radius: 24px; padding: 32px 24px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
-    display: flex; flex-direction: column; align-items: center; gap: 22px;
+  /* Awaiting card */
+  .dp .await-card {
+    border-radius: 16px; padding: 22px 16px;
+    background: #f7fbff; border: 1.5px solid #b5d4f4;
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
     animation: popIn 0.3s ease both;
   }
-  .dr .pulse-wrap { position: relative; width: 80px; height: 80px; }
-  .dr .pulse-ring {
+  .dp .pulse-wrap { position: relative; width: 68px; height: 68px; }
+  .dp .pulse-ring {
     position: absolute; inset: 0; border-radius: 50%;
-    border: 2px solid rgba(34,211,116,0.4);
+    border: 2px solid rgba(24,95,165,0.3);
     animation: pulse-ring 1.8s ease-out infinite;
   }
-  .dr .pulse-ring2 {
+  .dp .pulse-ring2 {
     position: absolute; inset: 0; border-radius: 50%;
-    border: 2px solid rgba(34,211,116,0.25);
+    border: 2px solid rgba(24,95,165,0.18);
     animation: pulse-ring 1.8s ease-out 0.6s infinite;
   }
-  .dr .await-icon {
-    position: relative;
-    width: 80px; height: 80px; border-radius: 50%;
-    background: rgba(34,211,116,0.08);
-    border: 2px solid rgba(34,211,116,0.25);
+  .dp .await-icon {
+    position: relative; z-index: 1;
+    width: 68px; height: 68px; border-radius: 50%;
+    background: #e6f1fb; border: 2px solid #b5d4f4;
     display: flex; align-items: center; justify-content: center;
-    font-size: 32px; z-index: 1;
+    font-size: 26px;
     animation: breathe 2.4s ease-in-out infinite;
   }
 
-  /* ── Poll dots ── */
-  .dr .poll-dots { display: flex; gap: 5px; align-items: center; }
-  .dr .poll-dot {
-    width: 5px; height: 5px; border-radius: 50%;
-    background: rgba(255,255,255,0.25);
+  /* Poll dots */
+  .dp .poll-dots { display: flex; gap: 4px; align-items: center; }
+  .dp .poll-dot  {
+    width: 4px; height: 4px; border-radius: 50%; background: #378ADD;
     animation: blink 1.4s ease-in-out infinite;
   }
-  .dr .poll-dot:nth-child(2) { animation-delay: 0.2s; }
-  .dr .poll-dot:nth-child(3) { animation-delay: 0.4s; }
-  @keyframes blink { 0%,100% { opacity: 0.25; } 50% { opacity: 1; } }
+  .dp .poll-dot:nth-child(2) { animation-delay: 0.2s; }
+  .dp .poll-dot:nth-child(3) { animation-delay: 0.4s; }
 
-  /* ── Result cards ── */
-  .dr .result-card {
-    border-radius: 24px; padding: 32px 24px;
-    display: flex; flex-direction: column; align-items: center; gap: 20px;
+  /* Result cards */
+  .dp .result-card {
+    border-radius: 16px; padding: 22px 16px;
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
     animation: popIn 0.3s ease both;
   }
-  .dr .result-icon {
-    width: 68px; height: 68px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center; font-size: 30px;
+  .dp .result-icon {
+    width: 58px; height: 58px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 26px;
   }
 
-  .dr .security-note {
-    text-align: center; font-size: 11px; color: rgba(255,255,255,0.18);
+  /* Ref box */
+  .dp .ref-box {
+    background: #e6f1fb; border-radius: 8px;
+    padding: 8px 12px; width: 100%;
+    font-size: 10px; font-family: 'JetBrains Mono', monospace;
+    color: #0c447c; word-break: break-all; line-height: 1.6;
   }
+  .dp .ref-label { font-size: 8px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #378ADD; display: block; margin-bottom: 2px; }
 
-  /* ── Step indicator ── */
-  .dr .step-indicator {
-    display: flex; align-items: center; gap: 0; margin-bottom: 6px;
-  }
-  .dr .step-dot {
-    width: 28px; height: 28px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 11px; font-weight: 800; flex-shrink: 0; transition: all 0.25s;
-  }
-  .dr .step-dot.done   { background: #1a56ff; color: #fff; }
-  .dr .step-dot.active { background: #fff; color: #0d1325; }
-  .dr .step-dot.idle   { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.3); }
-  .dr .step-line {
-    flex: 1; height: 2px; background: rgba(255,255,255,0.07); transition: background 0.25s;
-  }
-  .dr .step-line.done { background: #1a56ff; }
-  .dr .step-label-row {
-    display: flex; justify-content: space-between; margin-top: 6px; margin-bottom: 24px;
-  }
-  .dr .step-label {
-    font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
-    text-align: center; flex: 1;
-  }
+  .dp .security-note { text-align: center; font-size: 10px; color: #b5d4f4; font-weight: 500; margin-top: 4px; }
 `;
 
-// ── Networks ───────────────────────────────────────────────────────────────────
-
-const NETWORKS: { id: Network; label: string; sub: string; color: string; rgb: string; emoji: string }[] = [
-  { id: 'MTN',        label: 'MTN',        sub: 'MoMo',   color: '#FFCC00', rgb: '255,204,0',   emoji: '🟡' },
-  { id: 'VODAFONE',   label: 'Telecel',    sub: 'Cash',   color: '#E2001A', rgb: '226,0,26',    emoji: '🔴' },
-  { id: 'AIRTELTIGO', label: 'AirtelTigo', sub: 'Money',  color: '#0072BC', rgb: '0,114,188',   emoji: '🔵' },
-];
-
-// ── Step indicator ─────────────────────────────────────────────────────────────
-
-function StepIndicator({ step }: { step: Step }) {
+// ── Step Indicator ─────────────────────────────────────────────────────────────
+function StepIndicator({ step }) {
   const idx    = { amount: 0, awaiting: 1, success: 2, error: 2 }[step];
-  const labels = ['Details', 'Approve', 'Done'];
+  const labels = ["Details", "Approve", "Done"];
   return (
     <>
-      <div className="step-indicator">
-        {[0, 1, 2].map(i => (
-          <>
-            <div key={`dot-${i}`} className={`step-dot ${i < idx ? 'done' : i === idx ? 'active' : 'idle'}`}>
-              {i < idx ? '✓' : i + 1}
+      <div className="step-row">
+        {[0, 1, 2].map((i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", flex: i < 2 ? "1" : "0" }}>
+            <div className={`step-dot ${i < idx ? "done" : i === idx ? "active" : "idle"}`}>
+              {i < idx ? "✓" : i + 1}
             </div>
-            {i < 2 && <div key={`line-${i}`} className={`step-line ${i < idx ? 'done' : ''}`} />}
-          </>
+            {i < 2 && <div className={`step-line ${i < idx ? "done" : ""}`} />}
+          </div>
         ))}
       </div>
-      <div className="step-label-row">
+      <div className="step-labels">
         {labels.map((l, i) => (
-          <div key={l} className="step-label" style={{
-            color: i === idx ? '#fff' : i < idx ? '#1a56ff' : 'rgba(255,255,255,0.25)',
+          <div key={l} className="step-lbl" style={{
+            color: i === idx ? "#0c447c" : i < idx ? "#185FA5" : "#b5d4f4",
           }}>{l}</div>
         ))}
       </div>
@@ -408,320 +399,259 @@ function StepIndicator({ step }: { step: Step }) {
 }
 
 // ── Shell ──────────────────────────────────────────────────────────────────────
-
-function Shell({ children, step }: { children: React.ReactNode; step: Step }) {
+function Shell({ children, step, walletBalance }) {
   const progress = { amount: 33, awaiting: 66, success: 100, error: 100 }[step];
   return (
-    <div className="dr" style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(155deg, #090c18 0%, #0c1122 55%, #080d1c 100%)',
-      color: '#fff',
-    }}>
+    <div className="dp">
       <style>{GLOBAL_CSS}</style>
-      <div className="page-inner">
-        <div className="progress-track">
-          <div className="progress-fill" style={{ width: `${progress}%` }} />
+      <div className="page">
+        <div className="card">
+          {/* Header */}
+          <div className="card-header">
+            <div className="header-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="3" />
+                <line x1="2" y1="10" x2="22" y2="10" />
+                <line x1="6" y1="15" x2="10" y2="15" />
+              </svg>
+            </div>
+            <div>
+              <p className="header-title">Deposit Funds</p>
+              <p className="header-sub">Mobile Money · GHS</p>
+            </div>
+            {walletBalance !== null && (
+              <div className="balance-pill">
+                <div className="balance-dot" />
+                {fmtGHS(walletBalance)}
+              </div>
+            )}
+          </div>
+
+          {/* Progress bar */}
+          <div className="progress-track">
+            <div className="progress-fill" style={{ width: `${progress}%` }} />
+          </div>
+
+          {/* Step indicator */}
+          <StepIndicator step={step} />
+
+          <hr className="divider" />
+
+          {children}
         </div>
-        {children}
       </div>
     </div>
   );
 }
 
 // ── Buttons ────────────────────────────────────────────────────────────────────
-
-function PrimaryBtn({ children, onClick, disabled = false, loading = false }: {
-  children: React.ReactNode; onClick?: () => void; disabled?: boolean; loading?: boolean;
-}) {
+function PrimaryBtn({ children, onClick, disabled = false, loading = false }) {
   return (
     <button className="btn-primary" onClick={onClick} disabled={disabled || loading}>
       {loading ? <span className="spinner" /> : children}
     </button>
   );
 }
-
-function GhostBtn({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
+function GhostBtn({ children, onClick }) {
   return <button className="btn-ghost" onClick={onClick}>{children}</button>;
 }
 
-// ── STEP 1: Amount + Phone + Network ──────────────────────────────────────────
-
-function AmountStep({ amount, setAmount, phone, setPhone, network, setNetwork,
-  onPay, loading, error, walletBalance, step }: {
-  amount: string; setAmount: (v: string) => void;
-  phone: string; setPhone: (v: string) => void;
-  network: Network | ''; setNetwork: (v: Network) => void;
-  onPay: () => void; loading: boolean; error: string;
-  walletBalance: number | null; step: Step;
-}) {
+// ── Step 1: Amount + Phone + Network ──────────────────────────────────────────
+function AmountStep({ amount, setAmount, phone, setPhone, network, setNetwork, onPay, loading, error }) {
   const parsed      = parseFloat(amount);
   const amountValid = !isNaN(parsed) && parsed >= MIN_GHS;
-
-  // Basic phone validation: 9–12 digits
-  const phoneClean = phone.replace(/\D/g, '');
-  const phoneValid = phoneClean.length >= 9 && phoneClean.length <= 12;
-
-  const canPay = amountValid && phoneValid && network !== '';
+  const phoneClean  = phone.replace(/\D/g, "");
+  const phoneValid  = phoneClean.length >= 9 && phoneClean.length <= 12;
+  const canPay      = amountValid && phoneValid && network !== "";
 
   return (
-    <div className="screen" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-      {/* Top bar */}
-      <div className="topbar">
-        <div className="topbar-title">Add Funds</div>
-        {walletBalance !== null && (
-          <div className="balance-pill">
-            <div className="balance-dot" />
-            {fmtGHS(walletBalance)}
-          </div>
-        )}
-      </div>
-
-      <StepIndicator step={step} />
-
-      {/* Amount card */}
-      <div className="amount-display-wrap">
-        <div className="section-label">Enter Amount</div>
-        <div className={`amount-row${amount && !amountValid ? ' err' : ''}`}>
-          <div className="amount-currency">GHS</div>
+    <div>
+      {/* Amount */}
+      <div className="field-card">
+        <span className="sec-label">Amount</span>
+        <div className={`amount-row${amount && !amountValid ? " err" : ""}`}>
+          <div className="amount-prefix">GHS</div>
           <input
             className="amount-input"
             type="number"
             value={amount}
-            onChange={e => setAmount(e.target.value)}
+            onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
             min={MIN_GHS}
             autoFocus
           />
         </div>
-        <div className="amount-hint" style={{
-          color: amount && !amountValid ? '#f87171' : 'rgba(255,255,255,0.25)',
-        }}>
-          {amount && !amountValid
-            ? `Minimum deposit is ${fmtGHS(MIN_GHS)}`
-            : `Minimum: ${fmtGHS(MIN_GHS)}`}
+        <div className="amount-hint" style={{ color: amount && !amountValid ? "#e53e3e" : "#378ADD" }}>
+          {amount && !amountValid ? `Minimum deposit is ${fmtGHS(MIN_GHS)}` : `Minimum: ${fmtGHS(MIN_GHS)}`}
         </div>
-
-        {/* Quick amounts */}
         <div className="quick-grid">
-          {QUICK_AMOUNTS.map(qa => (
-            <button
-              key={qa}
-              className={`quick-chip${amount === qa.toString() ? ' on' : ''}`}
-              onClick={() => setAmount(qa.toString())}
-            >
+          {QUICK_AMOUNTS.map((qa) => (
+            <button key={qa} className={`quick-chip${amount === qa.toString() ? " on" : ""}`} onClick={() => setAmount(qa.toString())}>
               {fmtQuick(qa)}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Phone */}
-      <div className="phone-wrap">
-        <div className="section-label">MoMo Phone Number</div>
-        <div className={`phone-row${phone && !phoneValid ? ' err' : ''}`}>
+      {/* Phone + Network */}
+      <div className="field-card">
+        <span className="sec-label">MoMo Phone Number</span>
+        <div className={`phone-row${phone && !phoneValid ? " err" : ""}`}>
           <div className="phone-prefix">+233</div>
           <input
             className="phone-input"
             type="tel"
             value={phone}
-            onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 12))}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 12))}
             placeholder="244 123 456"
             inputMode="numeric"
           />
         </div>
-        <div style={{ fontSize: 11, color: phone && !phoneValid ? '#f87171' : 'rgba(255,255,255,0.22)', marginTop: 8, fontWeight: 500 }}>
-          {phone && !phoneValid ? 'Enter a valid MoMo number' : 'Include country code digits, e.g. 0244123456'}
+        <div style={{ fontSize: 10, fontWeight: 600, marginTop: 5, color: phone && !phoneValid ? "#e53e3e" : "#378ADD" }}>
+          {phone && !phoneValid ? "Enter a valid MoMo number" : "e.g. 0244123456"}
         </div>
 
-        {/* Network selector */}
-        <div className="section-label" style={{ marginTop: 16 }}>Select Network</div>
+        <span className="sec-label" style={{ marginTop: 12 }}>Select Network</span>
         <div className="net-grid">
-          {NETWORKS.map(n => (
-            <div
-              key={n.id}
-              className={`net-card${network === n.id ? ' on' : ''}`}
-              style={{ ['--net-color' as string]: n.color, ['--net-rgb' as string]: n.rgb }}
-              onClick={() => setNetwork(n.id)}
-            >
-              <div className="net-logo" style={{
-                background: `${n.color}18`,
-                border: `1.5px solid ${n.color}35`,
-              }}>
-                {n.emoji}
+          {NETWORKS.map((n) => {
+            const { Logo } = n;
+            return (
+              <div
+                key={n.id}
+                className="net-card"
+                style={network === n.id ? { border: `1.5px solid ${n.color}`, background: n.bg } : {}}
+                onClick={() => setNetwork(n.id)}
+              >
+                <Logo />
+                <div className="net-name" style={{ color: network === n.id ? n.color : "#378ADD" }}>
+                  {n.label}<br />{n.sub}
+                </div>
+                {network === n.id && <div className="net-check" style={{ background: n.color }}>✓</div>}
               </div>
-              <div className="net-name" style={{ color: network === n.id ? n.color : 'rgba(255,255,255,0.45)' }}>
-                {n.label}<br />{n.sub}
-              </div>
-              {network === n.id && (
-                <div style={{
-                  width: 16, height: 16, borderRadius: '50%',
-                  background: n.color, display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', fontSize: 9, color: '#000', fontWeight: 800,
-                }}>✓</div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
       {/* Tip */}
       <div className="tip">
-        <span style={{ fontSize: 14, flexShrink: 0 }}>📲</span>
+        <span style={{ fontSize: 13, flexShrink: 0 }}>📲</span>
         <span>
-          A <strong style={{ color: 'rgba(255,255,255,0.7)' }}>USSD prompt</strong> will be
-          sent directly to your MoMo phone. Approve it to complete your deposit — no redirect needed.
+          A <strong style={{ color: "#0c447c" }}>USSD prompt</strong> will be sent to your MoMo phone. Approve it to complete your deposit.
         </span>
       </div>
 
-      {error && <div className="box-err">{error}</div>}
+      {error && <div className="box-err">⚠️ {error}</div>}
 
       <PrimaryBtn onClick={onPay} disabled={!canPay} loading={loading}>
-        {!loading && (canPay
-          ? `Send USSD Prompt · ${fmtGHS(parsed)}`
-          : 'Fill in amount, phone & network')}
+        {!loading && (canPay ? `Send USSD Prompt · ${fmtGHS(parsed)}` : "Fill in amount, phone & network")}
       </PrimaryBtn>
-
-      <div className="security-note">🔒 Secured by Moolre · USSD Direct Charge</div>
+      <p className="security-note" style={{ marginTop: 8 }}>🔒 Secured by Moolre · USSD Direct Charge</p>
     </div>
   );
 }
 
-// ── STEP 2: Awaiting USSD approval ────────────────────────────────────────────
-
-function AwaitingStep({ amount, phone, network, verifyMsg, verifyLoading,
-  pollCount, onVerify, onCancel, step }: {
-  amount: number; phone: string; network: Network | '';
-  verifyMsg: string; verifyLoading: boolean; pollCount: number;
-  onVerify: () => void; onCancel: () => void; step: Step;
-}) {
-  const net = NETWORKS.find(n => n.id === network);
+// ── Step 2: Awaiting ───────────────────────────────────────────────────────────
+function AwaitingStep({ amount, phone, network, externalRef, verifyMsg, verifyLoading, pollCount, onVerify, onCancel }) {
+  const net = NETWORKS.find((n) => n.id === network);
+  const Logo = net?.Logo;
   return (
-    <div className="screen" style={{ display: 'flex', flexDirection: 'column' }}>
-
-      <div className="topbar">
-        <div className="topbar-title">Add Funds</div>
-        <div style={{
-          padding: '5px 12px', borderRadius: 100,
-          background: 'rgba(26,86,255,0.1)', border: '1px solid rgba(26,86,255,0.25)',
-          fontSize: 12, fontWeight: 700, color: '#6b9aff',
-          fontFamily: 'JetBrains Mono, monospace',
-        }}>{fmtGHS(amount)}</div>
+    <div className="await-card">
+      <div className="pulse-wrap">
+        <div className="pulse-ring" />
+        <div className="pulse-ring2" />
+        <div className="await-icon">📲</div>
       </div>
 
-      <StepIndicator step={step} />
-
-      <div className="await-card">
-
-        {/* Pulsing icon */}
-        <div className="pulse-wrap">
-          <div className="pulse-ring" />
-          <div className="pulse-ring2" />
-          <div className="await-icon">📲</div>
+      <div style={{ textAlign: "center", width: "100%" }}>
+        <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#378ADD", marginBottom: 5 }}>
+          Awaiting Approval
         </div>
-
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.28)', marginBottom: 8 }}>
-            Awaiting Approval
-          </div>
-          <div style={{ fontSize: 34, fontWeight: 800, letterSpacing: '-0.03em', fontFamily: 'JetBrains Mono, monospace' }}>
-            {fmtGHS(amount)}
-          </div>
-
-          {/* Phone + network summary */}
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            marginTop: 12, padding: '8px 16px', borderRadius: 100,
-            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-            fontSize: 13, fontWeight: 700, fontFamily: 'JetBrains Mono, monospace',
-          }}>
-            {net && <span style={{ color: net.color }}>{net.emoji}</span>}
-            <span style={{ color: 'rgba(255,255,255,0.7)' }}>+233 {phone.replace(/^0/, '')}</span>
-          </div>
-
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)', marginTop: 12, lineHeight: 1.65 }}>
-            Check your phone for a <strong style={{ color: 'rgba(255,255,255,0.65)' }}>USSD prompt</strong> and
-            approve the payment.
-          </div>
+        <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", fontFamily: "JetBrains Mono, monospace", color: "#0c447c" }}>
+          {fmtGHS(amount)}
         </div>
-
-        {/* Auto-polling indicator */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>
-          <div className="poll-dots">
-            <div className="poll-dot" /><div className="poll-dot" /><div className="poll-dot" />
-          </div>
-          Checking automatically ({pollCount})
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 7, marginTop: 8,
+          padding: "5px 14px", borderRadius: 100,
+          background: "#e6f1fb", border: "1.5px solid #b5d4f4",
+          fontSize: 12, fontWeight: 700, fontFamily: "JetBrains Mono, monospace", color: "#0c447c",
+        }}>
+          {Logo && <Logo />}
+          +233 {phone.replace(/^0/, "")}
         </div>
+        <div style={{ fontSize: 11, color: "#378ADD", marginTop: 10, lineHeight: 1.65 }}>
+          Check your phone for a <strong style={{ color: "#0c447c" }}>USSD prompt</strong> and approve the payment.
+        </div>
+      </div>
 
-        {verifyMsg && (
-          <div className={`${verifyMsg.toLowerCase().includes('fail') || verifyMsg.toLowerCase().includes('cancel') ? 'box-err' : 'box-info'}`}
-            style={{ width: '100%' }}>
-            {verifyMsg}
+      {externalRef && (
+        <div className="ref-box">
+          <span className="ref-label">Transaction Reference</span>
+          {externalRef}
+        </div>
+      )}
+
+      <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 10, color: "#378ADD", fontWeight: 600 }}>
+        <div className="poll-dots">
+          <div className="poll-dot" /><div className="poll-dot" /><div className="poll-dot" />
+        </div>
+        Checking automatically ({pollCount})
+      </div>
+
+      {verifyMsg && (
+        <div className={verifyMsg.toLowerCase().includes("fail") || verifyMsg.toLowerCase().includes("cancel") ? "box-err" : "box-info"}
+          style={{ width: "100%", margin: 0 }}>
+          {verifyMsg}
+        </div>
+      )}
+
+      <div style={{ width: "100%" }}>
+        <PrimaryBtn onClick={onVerify} loading={verifyLoading}>
+          {!verifyLoading && "I've Approved — Verify Payment"}
+        </PrimaryBtn>
+        <GhostBtn onClick={onCancel}>← Cancel & Start Over</GhostBtn>
+      </div>
+    </div>
+  );
+}
+
+// ── Step 3a: Success ───────────────────────────────────────────────────────────
+function SuccessStep({ amount, externalRef, onWallet, onAgain }) {
+  return (
+    <div className="result-card" style={{ background: "#ecfdf5", border: "1.5px solid #6ee7b7" }}>
+      <div className="result-icon" style={{ background: "#d1fae5" }}>✅</div>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#065f46", marginBottom: 5 }}>Payment Confirmed</div>
+        <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em", fontFamily: "JetBrains Mono, monospace", color: "#0c447c" }}>
+          {fmtGHS(amount)}
+        </div>
+        <div style={{ fontSize: 11, color: "#059669", marginTop: 5, fontWeight: 600 }}>Your wallet has been credited.</div>
+        {externalRef && (
+          <div style={{ fontSize: 9, color: "#378ADD", fontFamily: "JetBrains Mono, monospace", marginTop: 8, wordBreak: "break-all" }}>
+            Ref: {externalRef}
           </div>
         )}
-
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <PrimaryBtn onClick={onVerify} loading={verifyLoading}>
-            {!verifyLoading && '🔄 Check Now'}
-          </PrimaryBtn>
-          <GhostBtn onClick={onCancel}>Cancel</GhostBtn>
-        </div>
+      </div>
+      <div style={{ width: "100%" }}>
+        <PrimaryBtn onClick={onWallet}>💳 Go to Wallet</PrimaryBtn>
+        <GhostBtn onClick={onAgain}>Make Another Deposit</GhostBtn>
       </div>
     </div>
   );
 }
 
-// ── STEP 3a: Success ───────────────────────────────────────────────────────────
-
-function SuccessStep({ amount, externalRef, onWallet, onAgain, step }: {
-  amount: number; externalRef: string; onWallet: () => void; onAgain: () => void; step: Step;
-}) {
+// ── Step 3b: Error ─────────────────────────────────────────────────────────────
+function ErrorStep({ msg, onRetry }) {
   return (
-    <div className="screen" style={{ display: 'flex', flexDirection: 'column' }}>
-      <div className="topbar"><div className="topbar-title">Add Funds</div></div>
-      <StepIndicator step={step} />
-
-      <div className="result-card" style={{ background: 'rgba(34,211,116,0.04)', border: '1px solid rgba(34,211,116,0.18)' }}>
-        <div className="result-icon" style={{ background: 'rgba(34,211,116,0.1)' }}>✅</div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#22d374', marginBottom: 6 }}>Payment Confirmed</div>
-          <div style={{ fontSize: 34, fontWeight: 800, letterSpacing: '-0.03em', fontFamily: 'JetBrains Mono, monospace' }}>
-            {fmtGHS(amount)}
-          </div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)', marginTop: 6 }}>
-            Your wallet has been credited.
-          </div>
-          {externalRef && (
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontFamily: 'JetBrains Mono, monospace', marginTop: 10, wordBreak: 'break-all' }}>
-              Ref: {externalRef}
-            </div>
-          )}
-        </div>
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <PrimaryBtn onClick={onWallet}>💳 Go to Wallet</PrimaryBtn>
-          <GhostBtn onClick={onAgain}>Make Another Deposit</GhostBtn>
+    <div className="result-card" style={{ background: "#fff0f0", border: "1.5px solid #f4a0a8" }}>
+      <div className="result-icon" style={{ background: "#fee2e2", fontSize: 24 }}>❌</div>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#9b1c1c", marginBottom: 5 }}>Payment Failed</div>
+        <div style={{ fontSize: 12, color: "#c53030", lineHeight: 1.65 }}>
+          {msg || "Something went wrong. Please try again."}
         </div>
       </div>
-    </div>
-  );
-}
-
-// ── STEP 3b: Error ─────────────────────────────────────────────────────────────
-
-function ErrorStep({ msg, onRetry, step }: { msg: string; onRetry: () => void; step: Step }) {
-  return (
-    <div className="screen" style={{ display: 'flex', flexDirection: 'column' }}>
-      <div className="topbar"><div className="topbar-title">Add Funds</div></div>
-      <StepIndicator step={step} />
-
-      <div className="result-card" style={{ background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.18)' }}>
-        <div className="result-icon" style={{ background: 'rgba(239,68,68,0.1)', fontSize: 26 }}>✕</div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#f87171', marginBottom: 6 }}>Payment Failed</div>
-          <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.42)', lineHeight: 1.65 }}>
-            {msg || 'Something went wrong. Please try again.'}
-          </div>
-        </div>
+      <div style={{ width: "100%" }}>
         <PrimaryBtn onClick={onRetry}>Try Again</PrimaryBtn>
       </div>
     </div>
@@ -729,112 +659,73 @@ function ErrorStep({ msg, onRetry, step }: { msg: string; onRetry: () => void; s
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────────
-
 export default function DepositPage() {
-  const navigate = useNavigate();
-  const { user: currentUser } = useAppStore();
-
-  const [step,          setStep]          = useState<Step>('amount');
-  const [amount,        setAmount]        = useState('');
-  const [phone,         setPhone]         = useState('');
-  const [network,       setNetwork]       = useState<Network | ''>('');
-  const [externalRef,   setExternalRef]   = useState('');
-  const [errorMsg,      setErrorMsg]      = useState('');
+  const [step,          setStep]          = useState("amount");
+  const [amount,        setAmount]        = useState("");
+  const [phone,         setPhone]         = useState("");
+  const [network,       setNetwork]       = useState("");
+  const [externalRef,   setExternalRef]   = useState("");
+  const [errorMsg,      setErrorMsg]      = useState("");
   const [initLoading,   setInitLoading]   = useState(false);
-  const [initError,     setInitError]     = useState('');
-  const [verifyMsg,     setVerifyMsg]     = useState('');
+  const [initError,     setInitError]     = useState("");
+  const [verifyMsg,     setVerifyMsg]     = useState("");
   const [verifyLoading, setVerifyLoading] = useState(false);
-  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [walletBalance, setWalletBalance] = useState(null);
   const [pollCount,     setPollCount]     = useState(0);
 
-  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (!currentUser) navigate('/login', { replace: true, state: { from: '/deposit' } });
-  }, [currentUser, navigate]);
-
-  useEffect(() => {
-    if (!currentUser) return;
-    walletApi.getWallet()
-      .then(res => {
-        const bal = (res.data as { balance?: number }).balance ?? null;
-        if (bal !== null) setWalletBalance(bal);
-      })
-      .catch(() => {});
-  }, [currentUser]);
+  const pollTimer = useRef(null);
 
   // Resume in-progress payment on page reload
   useEffect(() => {
-    const savedRef     = localStorage.getItem('moolre_externalref');
-    const savedAmount  = localStorage.getItem('moolre_amount');
-    const savedPhone   = localStorage.getItem('moolre_phone');
-    const savedNetwork = localStorage.getItem('moolre_network') as Network | null;
+    const savedRef     = localStorage.getItem("moolre_externalref");
+    const savedAmount  = localStorage.getItem("moolre_amount");
+    const savedPhone   = localStorage.getItem("moolre_phone");
+    const savedNetwork = localStorage.getItem("moolre_network");
     if (savedRef && savedAmount) {
       setExternalRef(savedRef);
       setAmount(savedAmount);
       if (savedPhone)   setPhone(savedPhone);
       if (savedNetwork) setNetwork(savedNetwork);
-      setStep('awaiting');
+      setStep("awaiting");
     }
   }, []);
 
   // Auto-poll while on awaiting screen
   useEffect(() => {
-    if (step !== 'awaiting' || !externalRef) return;
-
+    if (step !== "awaiting" || !externalRef) return;
     const poll = async () => {
-      setPollCount(c => c + 1);
+      setPollCount((c) => c + 1);
       try {
-        const { credited, txstatus, message } = await moolreVerify(externalRef);
-        if (credited || txstatus === TX_SUCCESS) {
-          clearLocalStorage();
-          setStep('success');
-        } else if (txstatus === TX_FAILED) {
-          clearLocalStorage();
-          setErrorMsg('Payment failed or was cancelled.');
-          setStep('error');
-        } else {
-          // still pending — schedule next poll
-          pollTimer.current = setTimeout(poll, POLL_INTERVAL_MS);
-        }
-      } catch {
-        // network error — still retry
-        pollTimer.current = setTimeout(poll, POLL_INTERVAL_MS);
-      }
+        const { credited, txstatus } = await moolreVerify(externalRef);
+        if (credited || txstatus === TX_SUCCESS) { clearSavedRef(); setStep("success"); }
+        else if (txstatus === TX_FAILED) { clearSavedRef(); setErrorMsg("Payment failed or was cancelled."); setStep("error"); }
+        else { pollTimer.current = setTimeout(poll, POLL_INTERVAL); }
+      } catch { pollTimer.current = setTimeout(poll, POLL_INTERVAL); }
     };
-
-    pollTimer.current = setTimeout(poll, POLL_INTERVAL_MS);
-
-    return () => {
-      if (pollTimer.current) clearTimeout(pollTimer.current);
-    };
+    pollTimer.current = setTimeout(poll, POLL_INTERVAL);
+    return () => { if (pollTimer.current) clearTimeout(pollTimer.current); };
   }, [step, externalRef]);
 
-  const parsedAmount = parseFloat(amount);
-
-  const clearLocalStorage = () => {
-    localStorage.removeItem('moolre_externalref');
-    localStorage.removeItem('moolre_amount');
-    localStorage.removeItem('moolre_phone');
-    localStorage.removeItem('moolre_network');
+  const clearSavedRef = () => {
+    ["moolre_externalref", "moolre_amount", "moolre_phone", "moolre_network"].forEach((k) => localStorage.removeItem(k));
   };
 
   const handlePay = async () => {
     const parsed = parseFloat(amount);
     if (isNaN(parsed) || parsed < MIN_GHS || !phone || !network) return;
     setInitLoading(true);
-    setInitError('');
+    setInitError("");
     try {
-      const { externalref, message } = await moolreInit(amount, phone, network as Network);
-      localStorage.setItem('moolre_externalref', externalref);
-      localStorage.setItem('moolre_amount',      amount);
-      localStorage.setItem('moolre_phone',       phone);
-      localStorage.setItem('moolre_network',     network);
+      const { externalref, message } = await moolreInit(amount, phone, network);
+      localStorage.setItem("moolre_externalref", externalref);
+      localStorage.setItem("moolre_amount",      amount);
+      localStorage.setItem("moolre_phone",       phone);
+      localStorage.setItem("moolre_network",     network);
       setExternalRef(externalref);
       setVerifyMsg(message);
-      setStep('awaiting');
-    } catch (e: unknown) {
-      setInitError(e instanceof Error ? e.message : 'Could not start payment. Please try again.');
+      setStep("awaiting");
+    } catch (e) {
+      setInitError(e instanceof Error ? e.message : "Could not start payment. Please try again.");
     } finally {
       setInitLoading(false);
     }
@@ -842,27 +733,20 @@ export default function DepositPage() {
 
   const handleVerify = async () => {
     if (!externalRef) return;
-    // Stop auto-poll so we don't double-fire
     if (pollTimer.current) clearTimeout(pollTimer.current);
     setVerifyLoading(true);
-    setVerifyMsg('');
+    setVerifyMsg("");
     try {
       const { credited, txstatus, message } = await moolreVerify(externalRef);
-      if (credited || txstatus === TX_SUCCESS) {
-        clearLocalStorage();
-        setStep('success');
-      } else if (txstatus === TX_FAILED) {
-        clearLocalStorage();
-        setErrorMsg('Payment failed or was cancelled.');
-        setStep('error');
-      } else {
-        setVerifyMsg(message || 'Payment still pending. Please approve the USSD prompt on your phone.');
-        // Resume auto-poll
-        pollTimer.current = setTimeout(handleAutoPoll, POLL_INTERVAL_MS);
+      if (credited || txstatus === TX_SUCCESS) { clearSavedRef(); setStep("success"); }
+      else if (txstatus === TX_FAILED) { clearSavedRef(); setErrorMsg("Payment failed or was cancelled."); setStep("error"); }
+      else {
+        setVerifyMsg(message || "Payment still pending. Please approve the USSD prompt on your phone.");
+        pollTimer.current = setTimeout(handleAutoPoll, POLL_INTERVAL);
       }
-    } catch (e: unknown) {
-      setVerifyMsg(e instanceof Error ? e.message : 'Could not verify. Please try again.');
-      pollTimer.current = setTimeout(handleAutoPoll, POLL_INTERVAL_MS);
+    } catch (e) {
+      setVerifyMsg(e instanceof Error ? e.message : "Could not verify. Please try again.");
+      pollTimer.current = setTimeout(handleAutoPoll, POLL_INTERVAL);
     } finally {
       setVerifyLoading(false);
     }
@@ -870,61 +754,54 @@ export default function DepositPage() {
 
   const handleAutoPoll = async () => {
     if (!externalRef) return;
-    setPollCount(c => c + 1);
+    setPollCount((c) => c + 1);
     try {
       const { credited, txstatus } = await moolreVerify(externalRef);
-      if (credited || txstatus === TX_SUCCESS) {
-        clearLocalStorage();
-        setStep('success');
-      } else if (txstatus === TX_FAILED) {
-        clearLocalStorage();
-        setErrorMsg('Payment failed or was cancelled.');
-        setStep('error');
-      } else {
-        pollTimer.current = setTimeout(handleAutoPoll, POLL_INTERVAL_MS);
-      }
-    } catch {
-      pollTimer.current = setTimeout(handleAutoPoll, POLL_INTERVAL_MS);
-    }
+      if (credited || txstatus === TX_SUCCESS) { clearSavedRef(); setStep("success"); }
+      else if (txstatus === TX_FAILED) { clearSavedRef(); setErrorMsg("Payment failed or was cancelled."); setStep("error"); }
+      else { pollTimer.current = setTimeout(handleAutoPoll, POLL_INTERVAL); }
+    } catch { pollTimer.current = setTimeout(handleAutoPoll, POLL_INTERVAL); }
   };
 
   const resetAll = () => {
     if (pollTimer.current) clearTimeout(pollTimer.current);
-    clearLocalStorage();
-    setStep('amount'); setAmount(''); setPhone(''); setNetwork('');
-    setExternalRef(''); setErrorMsg(''); setVerifyMsg(''); setInitError('');
+    clearSavedRef();
+    setStep("amount"); setAmount(""); setPhone(""); setNetwork("");
+    setExternalRef(""); setErrorMsg(""); setVerifyMsg(""); setInitError("");
     setPollCount(0);
   };
 
+  const parsedAmount = parseFloat(amount) || parseFloat(localStorage.getItem("moolre_amount") || "0");
+
   return (
-    <Shell step={step}>
-      {step === 'amount' && (
+    <Shell step={step} walletBalance={walletBalance}>
+      {step === "amount" && (
         <AmountStep
           amount={amount} setAmount={setAmount}
-          phone={phone} setPhone={setPhone}
+          phone={phone}   setPhone={setPhone}
           network={network} setNetwork={setNetwork}
           onPay={handlePay} loading={initLoading} error={initError}
-          walletBalance={walletBalance} step={step}
         />
       )}
-      {step === 'awaiting' && (
+      {step === "awaiting" && (
         <AwaitingStep
-          amount={parsedAmount || parseFloat(localStorage.getItem('moolre_amount') ?? '0')}
-          phone={phone || localStorage.getItem('moolre_phone') || ''}
-          network={(network || localStorage.getItem('moolre_network') || '') as Network | ''}
+          amount={parsedAmount}
+          phone={phone   || localStorage.getItem("moolre_phone")   || ""}
+          network={network || localStorage.getItem("moolre_network") || ""}
+          externalRef={externalRef}
           verifyMsg={verifyMsg} verifyLoading={verifyLoading}
           pollCount={pollCount}
-          onVerify={handleVerify} onCancel={resetAll} step={step}
+          onVerify={handleVerify} onCancel={resetAll}
         />
       )}
-      {step === 'success' && (
+      {step === "success" && (
         <SuccessStep
           amount={parsedAmount} externalRef={externalRef}
-          onWallet={() => navigate('/wallet')} onAgain={resetAll} step={step}
+          onWallet={() => window.location.href = "/wallet"} onAgain={resetAll}
         />
       )}
-      {step === 'error' && (
-        <ErrorStep msg={errorMsg} onRetry={resetAll} step={step} />
+      {step === "error" && (
+        <ErrorStep msg={errorMsg} onRetry={resetAll} />
       )}
     </Shell>
   );
