@@ -7,8 +7,8 @@ import { wallet as walletApi } from '../utils/api';
 
 type Step = 'amount' | 'awaiting' | 'success' | 'error';
 
-const MIN_GHS       = 300;
-const QUICK_AMOUNTS = [300, 500, 1000, 2000, 5000, 10000];
+const MIN_GHS       = 1;
+const QUICK_AMOUNTS = [1, 500, 1000, 2000, 5000, 10000];
 const TX_SUCCESS    = 1;
 const TX_FAILED     = 2;
 const API_BASE      = 'https://futballbackend-production-aefb.up.railway.app';
