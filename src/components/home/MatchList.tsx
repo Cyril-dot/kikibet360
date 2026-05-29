@@ -1,24 +1,18 @@
 // ---------------------------------------------------------------------------
 // updated match list — old logic + new UI from v2
-// FIX 1: blob: URLs for admin team logos are session-scoped and non-transferable.
-//         We detect them early and treat them as missing → pool logo or initials fallback.
-// FIX 2: All console.log / console.warn / console.error removed.
-// FIX 3: Games without odds are filtered out and never shown on site.
-// FIX 4: Admin games now cycle through hardcoded logo pools (5 home + 5 away).
-//         Each admin match gets a unique pair so no two games share the same logos.
-//         Admin can also set logos via the hardcodedHomeLogo / hardcodedAwayLogo fields.
-// FIX 5: Admin games are deduplicated by team name — if any admin game shares a home
-//         OR away team name (case-insensitive) with an already-seen admin game, only
-//         the first occurrence is kept. This prevents duplicate special games showing.
-// FIX 6: Regular matches that share a home+away team fingerprint with any admin match
-//         are suppressed from the main Live/Today/Upcoming/Results sections so the
-//         same game never appears in both "Special Games" and the regular list.
-// FIX 7: Odds are LOCKED (greyed out, disabled) while a match is actively live
-//         (LIVE, IN_PLAY, 1H, 2H, ET, PEN, etc.) and UNLOCKED only during HALFTIME.
-//         This prevents bettors from placing bets mid-game when odds are stale.
-// FIX 8: Live timer is fixed — uses minutePlayed from the API as primary source of
-//         truth. Wall-clock elapsed is only a last-resort fallback capped at 90/120.
-//         Timer increments once per minute visually but resets to API value on refresh.
+// CHANGES IN THIS VERSION:
+//   • Top-6 league tab: BOTH home and away team must belong to the league
+//   • Countdown timer: smaller, muted, subtle (not bold/visible)
+//   • RecentWinnersBar: no avatar icon, shows masked phone number + amount won
+//   • Carousel speed slowed from 55s → 90s
+//   • League tab fallback: if a specific league tab has no matches, falls back
+//     to showing all available matches (with a subtle notice)
+//   • RecentWinnersBar: now uses same CSS variables as match cards for
+//     full light/dark mode parity — no more hardcoded palette
+//   • FIX 6: Regular matches that share a home+away team fingerprint with any
+//     admin match are suppressed from the main Live/Today/Upcoming/Results
+//     sections so the same game never appears in both "Special Games" and the
+//     regular list.
 // ---------------------------------------------------------------------------
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -34,7 +28,7 @@ import SportsBaseballIcon from '@mui/icons-material/SportsBaseball';
 import SportsFootballIcon from '@mui/icons-material/SportsFootball';
 import SportsMmaIcon from '@mui/icons-material/SportsMma';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import LockIcon from '@mui/icons-material/Lock';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 
 // ---------------------------------------------------------------------------
 // ╔══════════════════════════════════════════════════════════════════════════╗
@@ -55,6 +49,211 @@ const AWAY_LOGO_POOL: string[] = [
   'https://static.vecteezy.com/system/resources/thumbnails/012/995/442/small/football-championship-or-football-club-logo-vector.jpg',
   'https://d1csarkz8obe9u.cloudfront.net/posterpreviews/logo-design-template-b588de7cc0b07e82392c3b2ea4ea7b73_screen.jpg?ts=1702915331',
 ];
+
+// ---------------------------------------------------------------------------
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║  RECENT WINNERS — 30 hardcoded entries                                  ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+interface Winner {
+  phone: string;
+  amount: string;
+  currency: 'GHS' | 'NGN' | 'USD';
+  timeAgo: string;
+}
+
+const RECENT_WINNERS: Winner[] = [
+  { phone: '0244****12', amount: '23,500',    currency: 'GHS', timeAgo: '2m'  },
+  { phone: '0557****78', amount: '47,200',    currency: 'GHS', timeAgo: '5m'  },
+  { phone: '0201****34', amount: '88,000',    currency: 'GHS', timeAgo: '9m'  },
+  { phone: '0302****56', amount: '31,750',    currency: 'GHS', timeAgo: '14m' },
+  { phone: '0249****90', amount: '65,400',    currency: 'GHS', timeAgo: '18m' },
+  { phone: '0540****23', amount: '99,000',    currency: 'GHS', timeAgo: '22m' },
+  { phone: '0268****67', amount: '54,800',    currency: 'GHS', timeAgo: '27m' },
+  { phone: '0598****11', amount: '20,500',    currency: 'GHS', timeAgo: '31m' },
+  { phone: '0241****45', amount: '76,300',    currency: 'GHS', timeAgo: '35m' },
+  { phone: '0277****88', amount: '43,100',    currency: 'GHS', timeAgo: '40m' },
+  { phone: '0803****21', amount: '4,200,000',  currency: 'NGN', timeAgo: '3m'  },
+  { phone: '0816****54', amount: '850,000',    currency: 'NGN', timeAgo: '7m'  },
+  { phone: '0705****77', amount: '22,500,000', currency: 'NGN', timeAgo: '11m' },
+  { phone: '0901****32', amount: '1,700,000',  currency: 'NGN', timeAgo: '16m' },
+  { phone: '0808****65', amount: '49,800,000', currency: 'NGN', timeAgo: '20m' },
+  { phone: '0703****98', amount: '380,000',    currency: 'NGN', timeAgo: '24m' },
+  { phone: '0812****43', amount: '7,600,000',  currency: 'NGN', timeAgo: '29m' },
+  { phone: '0907****76', amount: '14,300,000', currency: 'NGN', timeAgo: '33m' },
+  { phone: '0802****19', amount: '600,000',    currency: 'NGN', timeAgo: '37m' },
+  { phone: '0818****52', amount: '33,000,000', currency: 'NGN', timeAgo: '42m' },
+  { phone: '+1 (***) ***-3812', amount: '3,800',  currency: 'USD', timeAgo: '1m'  },
+  { phone: '+1 (***) ***-7491', amount: '47,500', currency: 'USD', timeAgo: '6m'  },
+  { phone: '+44 ****-***-220',  amount: '12,200', currency: 'USD', timeAgo: '10m' },
+  { phone: '+1 (***) ***-6603', amount: '28,750', currency: 'USD', timeAgo: '15m' },
+  { phone: '+1 (***) ***-5514', amount: '5,400',  currency: 'USD', timeAgo: '19m' },
+  { phone: '+49 ****-***-881',  amount: '49,000', currency: 'USD', timeAgo: '23m' },
+  { phone: '+1 (***) ***-9927', amount: '8,600',  currency: 'USD', timeAgo: '28m' },
+  { phone: '+91 ****-***-334',  amount: '2,300',  currency: 'USD', timeAgo: '32m' },
+  { phone: '+1 (***) ***-1158', amount: '19,900', currency: 'USD', timeAgo: '36m' },
+  { phone: '+81 ****-***-762',  amount: '36,500', currency: 'USD', timeAgo: '41m' },
+];
+
+const CURRENCY_SYMBOL: Record<Winner['currency'], string> = {
+  GHS: 'GHS',
+  NGN: '₦',
+  USD: '$',
+};
+
+// ---------------------------------------------------------------------------
+// RecentWinnersBar
+// ---------------------------------------------------------------------------
+function RecentWinnersBar() {
+  const doubled = useMemo(() => [...RECENT_WINNERS, ...RECENT_WINNERS], []);
+
+  return (
+    <div style={{ overflow: 'hidden', marginBottom: 14, position: 'relative' }}>
+      <div style={{ overflow: 'hidden', padding: '2px 0 6px' }}>
+        <div style={{
+          display: 'flex',
+          gap: 8,
+          animation: 'winnersScroll 90s linear infinite',
+          width: 'max-content',
+        }}>
+          {doubled.map((w, i) => (
+            <div key={i} className="wc-card">
+              <div className="wc-shimmer" />
+              <span className="wc-dot" />
+              <div style={{ lineHeight: 1 }}>
+                <div className="wc-phone">{w.phone}</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, whiteSpace: 'nowrap' }}>
+                  <span className="wc-symbol">{CURRENCY_SYMBOL[w.currency]}</span>
+                  <span className="wc-amount">{w.amount}</span>
+                </div>
+              </div>
+              <div className="wc-time">{w.timeAgo}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="wc-fade-left" />
+      <div className="wc-fade-right" />
+
+      <style>{`
+        .wc-card {
+          flex-shrink: 0;
+          background: var(--bg-card, rgba(255,255,255,0.6));
+          border-radius: 12px;
+          padding: 11px 16px;
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          border: 1px solid var(--border-card, rgba(0,0,0,0.08));
+          min-width: 0;
+          position: relative;
+          overflow: hidden;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+        .wc-shimmer {
+          position: absolute; top: 0; left: 0; right: 0; height: 1px;
+          background: linear-gradient(90deg, transparent 0%, var(--primary, #f5a623) 50%, transparent 100%);
+          opacity: 0.25;
+        }
+        .wc-dot {
+          width: 7px; height: 7px; border-radius: 50%;
+          background: var(--live-green, #22c55e);
+          box-shadow: 0 0 5px var(--live-green, #22c55e);
+          display: inline-block;
+          flex-shrink: 0;
+          animation: winnerPulse 1.6s ease-in-out infinite;
+        }
+        .wc-phone {
+          font-size: 12px; font-weight: 600;
+          color: var(--text-muted, #64748b);
+          white-space: nowrap; margin-bottom: 6px;
+          font-family: system-ui, sans-serif; letter-spacing: 0.03em;
+        }
+        .wc-symbol {
+          font-size: 10px; font-weight: 700;
+          color: var(--primary, #f5a623);
+          background: color-mix(in srgb, var(--primary, #f5a623) 12%, transparent);
+          border-radius: 4px; padding: 2px 6px; letter-spacing: 0.06em;
+          font-family: system-ui, sans-serif;
+        }
+        .wc-amount {
+          font-size: 15px; font-weight: 800;
+          color: var(--text-main, #0f172a);
+          letter-spacing: -0.01em; font-family: system-ui, sans-serif;
+        }
+        .wc-time {
+          font-size: 10px; font-weight: 600;
+          color: var(--text-faint, #94a3b8);
+          white-space: nowrap; align-self: flex-start; margin-top: 1px;
+          font-family: system-ui, sans-serif; letter-spacing: 0.04em;
+        }
+        .wc-fade-left {
+          position: absolute; top: 0; left: 0; bottom: 0; width: 28px;
+          background: linear-gradient(90deg, var(--bg-page, #ffffff) 0%, transparent 100%);
+          pointer-events: none; z-index: 2;
+        }
+        .wc-fade-right {
+          position: absolute; top: 0; right: 0; bottom: 0; width: 28px;
+          background: linear-gradient(270deg, var(--bg-page, #ffffff) 0%, transparent 100%);
+          pointer-events: none; z-index: 2;
+        }
+        @keyframes winnersScroll {
+          0%   { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        @keyframes winnerPulse {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0.35; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FloatingBetSlipButton
+// ---------------------------------------------------------------------------
+function FloatingBetSlipButton() {
+  const navigate = useNavigate();
+  const { betSlip } = useAppStore() as { betSlip: { matchId: string }[] };
+  const count = betSlip?.length ?? 0;
+
+  return (
+    <button
+      onClick={() => navigate('/betslip')}
+      aria-label="Open bet slip"
+      style={{
+        position: 'fixed', bottom: 80, right: 16, zIndex: 1000,
+        width: 52, height: 52, borderRadius: '50%',
+        background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
+        border: '1px solid rgba(96,165,250,0.3)', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 4px 18px rgba(37,99,235,0.5)',
+        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.08)';
+        (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 24px rgba(37,99,235,0.7)';
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
+        (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 18px rgba(37,99,235,0.5)';
+      }}
+    >
+      <ReceiptLongIcon sx={{ fontSize: 24, color: '#e2e8f0' }} />
+      {count > 0 && (
+        <span style={{
+          position: 'absolute', top: -2, right: -2,
+          background: '#1e3a5f', color: '#93c5fd', borderRadius: '50%',
+          width: 18, height: 18, fontSize: 10, fontWeight: 800,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: '2px solid #0d1117', lineHeight: 1,
+        }}>
+          {count > 9 ? '9+' : count}
+        </span>
+      )}
+    </button>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -79,29 +278,6 @@ interface BetSlipEntry {
 }
 
 // ---------------------------------------------------------------------------
-// FIX 7: Odds lock logic
-// Odds are LOCKED during active play and UNLOCKED only at halftime.
-// ---------------------------------------------------------------------------
-
-/**
- * Returns true when odds should be LOCKED (greyed out, unclickable).
- *
- * Locked states  : LIVE, IN_PLAY, 1H (first half active), 2H (second half active),
- *                  ET / EXTRA_TIME, PENALTIES / SHOOTOUT, BREAK, SUSPENDED, INTERRUPTED
- * Unlocked states: HALFTIME / HT (between halves — safe window to bet)
- * Finished states: treated separately (no odds buttons shown anyway)
- */
-function areOddsLocked(status: string): boolean {
-  const s = status ?? '';
-
-  // Explicitly unlocked at half-time
-  if (HALFTIME_STATUSES.has(s)) return false;
-
-  // Everything else that is "live" is locked
-  return LIVE_STATUSES.has(s);
-}
-
-// ---------------------------------------------------------------------------
 // BLOB URL GUARD
 // ---------------------------------------------------------------------------
 function sanitizeLogo(url: string | undefined | null): string {
@@ -111,9 +287,6 @@ function sanitizeLogo(url: string | undefined | null): string {
   return trimmed;
 }
 
-// ---------------------------------------------------------------------------
-// Admin logo pool assignment
-// ---------------------------------------------------------------------------
 function assignAdminLogos(matches: EnrichedMatch[]): EnrichedMatch[] {
   const poolSize = Math.max(HOME_LOGO_POOL.length, AWAY_LOGO_POOL.length, 1);
   return matches.map((m, idx) => {
@@ -126,24 +299,9 @@ function assignAdminLogos(matches: EnrichedMatch[]): EnrichedMatch[] {
 }
 
 // ---------------------------------------------------------------------------
-// dedupAdminMatches (FIX 5)
-// ---------------------------------------------------------------------------
-function dedupAdminMatches(matches: Match[]): Match[] {
-  const seenTeams = new Set<string>();
-  const result: Match[] = [];
-  for (const m of matches) {
-    const home = (m.homeTeam ?? '').toLowerCase().trim();
-    const away = (m.awayTeam ?? '').toLowerCase().trim();
-    if ((home && seenTeams.has(home)) || (away && seenTeams.has(away))) continue;
-    if (home) seenTeams.add(home);
-    if (away) seenTeams.add(away);
-    result.push(m);
-  }
-  return result;
-}
-
-// ---------------------------------------------------------------------------
-// FIX 6: Admin fingerprint helpers
+// FIX 6: Build + test admin team fingerprints
+// Fingerprint = `${homeTeamLower}|${awayTeamLower}` (no date — admin matches
+// may not share the exact kickoffAt of the live-feed entry for the same game).
 // ---------------------------------------------------------------------------
 function buildAdminTeamFingerprints(adminMatches: EnrichedMatch[]): Set<string> {
   const fps = new Set<string>();
@@ -162,10 +320,9 @@ function isMatchInAdminSet(match: EnrichedMatch, adminFps: Set<string>): boolean
 }
 
 // ---------------------------------------------------------------------------
-// localStorage helpers for permanently hidden admin match IDs
+// localStorage helpers
 // ---------------------------------------------------------------------------
 const HIDDEN_ADMIN_IDS_KEY = 'hidden_finished_admin_match_ids';
-
 function loadHiddenAdminIds(): Set<string> {
   try {
     const raw = localStorage.getItem(HIDDEN_ADMIN_IDS_KEY);
@@ -175,11 +332,9 @@ function loadHiddenAdminIds(): Set<string> {
   } catch { /* ignore */ }
   return new Set();
 }
-
 function saveHiddenAdminIds(ids: Set<string>): void {
   try { localStorage.setItem(HIDDEN_ADMIN_IDS_KEY, JSON.stringify([...ids])); } catch { /* ignore */ }
 }
-
 function addHiddenAdminId(id: string): void {
   const ids = loadHiddenAdminIds();
   ids.add(id);
@@ -187,7 +342,7 @@ function addHiddenAdminId(id: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// League → team mappings
+// Hardcoded league → teams mappings
 // ---------------------------------------------------------------------------
 const LEAGUE_TEAMS: Record<Exclude<FootballLeagueTab, 'all' | 'other'>, { leagueNames: string[]; teams: string[] }> = {
   premier_league: {
@@ -263,9 +418,9 @@ for (const [tab, { leagueNames, teams }] of Object.entries(LEAGUE_TEAMS) as [Exc
 
 function matchBelongsToLeagueTab(match: Match, tab: Exclude<FootballLeagueTab, 'all' | 'other'>): boolean {
   if (LEAGUE_NAME_TO_TAB.get((match.league ?? '').toLowerCase()) === tab) return true;
-  if (TEAM_TO_LEAGUE_TAB.get((match.homeTeam ?? '').toLowerCase()) === tab) return true;
-  if (TEAM_TO_LEAGUE_TAB.get((match.awayTeam ?? '').toLowerCase()) === tab) return true;
-  return false;
+  const homeTab = TEAM_TO_LEAGUE_TAB.get((match.homeTeam ?? '').toLowerCase());
+  const awayTab = TEAM_TO_LEAGUE_TAB.get((match.awayTeam ?? '').toLowerCase());
+  return homeTab === tab && awayTab === tab;
 }
 
 function inferLeagueFromTeams(homeTeam: string, awayTeam: string): string {
@@ -273,14 +428,11 @@ function inferLeagueFromTeams(homeTeam: string, awayTeam: string): string {
   const a = awayTeam.toLowerCase();
   for (const [, { leagueNames, teams }] of Object.entries(LEAGUE_TEAMS) as [Exclude<FootballLeagueTab, 'all' | 'other'>, typeof LEAGUE_TEAMS[keyof typeof LEAGUE_TEAMS]][]) {
     const teamSet = new Set(teams.map((t) => t.toLowerCase()));
-    if (teamSet.has(h) || teamSet.has(a)) return leagueNames[0];
+    if (teamSet.has(h) && teamSet.has(a)) return leagueNames[0];
   }
   return '';
 }
 
-// ---------------------------------------------------------------------------
-// Sport tab config
-// ---------------------------------------------------------------------------
 const SPORT_TABS: { key: SportTab; label: string; icon: React.ReactNode }[] = [
   { key: 'football',   label: 'Football',   icon: <SportsSoccerIcon sx={{ fontSize: 15 }} /> },
   { key: 'basketball', label: 'Basketball', icon: <SportsBasketballIcon sx={{ fontSize: 15 }} /> },
@@ -302,9 +454,6 @@ const FOOTBALL_LEAGUE_TABS: { key: FootballLeagueTab; label: string }[] = [
 
 const TWO_WAY_ODDS_SPORTS = new Set<SportTab>(['baseball','basketball','nfl','mma']);
 
-// ---------------------------------------------------------------------------
-// Status sets
-// ---------------------------------------------------------------------------
 const LIVE_STATUSES = new Set([
   'LIVE','live','IN_PLAY','in_play','inplay',
   'FIRST_HALF','first_half','1H','1h',
@@ -335,19 +484,6 @@ const HALFTIME_STATUSES  = new Set(['HALFTIME','halftime','HALF_TIME','half_time
 const EXTRA_TIME_STATUSES = new Set(['EXTRA_TIME','extra_time','ET','et','ET1','et1','ET2','et2','STATUS_OVERTIME']);
 const PENALTY_STATUSES   = new Set(['PENALTIES','penalties','PEN','pen','SHOOTOUT','shootout']);
 
-// First-half active statuses (lock during these)
-const FIRST_HALF_STATUSES = new Set([
-  'LIVE','live','IN_PLAY','in_play','inplay',
-  'FIRST_HALF','first_half','1H','1h',
-  'STATUS_IN_PROGRESS','STATUS_FIRST_HALF',
-]);
-
-// Second-half active statuses (lock during these)
-const SECOND_HALF_STATUSES = new Set([
-  'SECOND_HALF','second_half','2H','2h',
-  'STATUS_SECOND_HALF','STATUS_END_PERIOD',
-]);
-
 function finishedLabel(status?: string): string {
   const s = status ?? '';
   if (['FINISHED','finished','FULL_TIME','full_time','FT','ft','AWARDED','awarded','ENDED','ended',
@@ -363,9 +499,6 @@ function finishedLabel(status?: string): string {
   return 'FT';
 }
 
-// ---------------------------------------------------------------------------
-// League classification
-// ---------------------------------------------------------------------------
 const TOP_6_LEAGUE_DISPLAY_NAMES = ['Premier League','La Liga','Bundesliga','Serie A','Ligue 1'];
 const TOP_6_LABELS  = new Set<string>(TOP_6_LEAGUE_DISPLAY_NAMES);
 const CUPS_LABELS   = new Set<string>([
@@ -386,9 +519,6 @@ function leagueSortKey(league: string): string {
   return `02_${league.toLowerCase()}`;
 }
 
-// ---------------------------------------------------------------------------
-// Categorise
-// ---------------------------------------------------------------------------
 function categorise(match: Match): MatchCategory {
   const status = match.status ?? '';
   if (FINISHED_STATUSES.has(status)) return 'finished';
@@ -403,9 +533,6 @@ function categorise(match: Match): MatchCategory {
   return 'upcoming';
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 function formatKickoff(kickoffAt?: string): string {
   if (!kickoffAt) return '--:--';
   return new Date(kickoffAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -423,14 +550,11 @@ function formatCountdown(kickoffAt?: string): string {
   const days  = Math.floor(diff / 86_400_000);
   const hours = Math.floor((diff % 86_400_000) / 3_600_000);
   const mins  = Math.floor((diff % 3_600_000) / 60_000);
-  if (days > 0) return `in ${days}d ${hours}h`;
-  if (hours > 0) return `in ${hours}h ${mins}m`;
-  return `in ${mins}m`;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
 }
 
-// ---------------------------------------------------------------------------
-// Team initials helper
-// ---------------------------------------------------------------------------
 function getTeamInitials(name: string): string {
   if (!name) return '?';
   const words = name.trim().split(/\s+/);
@@ -451,93 +575,52 @@ function teamColour(name: string): string {
   return PALETTE[hash % PALETTE.length];
 }
 
-// ---------------------------------------------------------------------------
-// TeamLogo
-// ---------------------------------------------------------------------------
 function TeamLogo({ logo, name, size = 32 }: { logo?: string; name?: string; size?: number }) {
   const cleanLogo = sanitizeLogo(logo);
   const [failed, setFailed] = useState(false);
   useEffect(() => { setFailed(false); }, [cleanLogo]);
   const teamName = name ?? '';
-
   if (cleanLogo && !failed) {
     return (
-      <img
-        src={cleanLogo}
-        alt={teamName}
+      <img src={cleanLogo} alt={teamName}
         style={{ width: size, height: size, borderRadius: '50%', objectFit: 'contain', flexShrink: 0 }}
-        onError={() => setFailed(true)}
-      />
+        onError={() => setFailed(true)} />
     );
   }
-
   const initials = getTeamInitials(teamName);
   const bg = teamColour(teamName);
   return (
-    <div
-      style={{
-        width: size, height: size, background: bg,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        borderRadius: '50%', flexShrink: 0,
-        fontSize: size * 0.28, fontWeight: 700, color: '#fff',
-        letterSpacing: '0.02em', userSelect: 'none',
-      }}
-      aria-label={teamName}
-    >
+    <div style={{ width: size, height: size, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      borderRadius: '50%', flexShrink: 0, fontSize: size * 0.28, fontWeight: 700, color: '#fff',
+      letterSpacing: '0.02em', userSelect: 'none' }} aria-label={teamName}>
       {initials}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// TeamLogoAdmin
-// ---------------------------------------------------------------------------
-function TeamLogoAdmin({
-  poolUrl,
-  name,
-  size = 32,
-}: {
-  poolUrl?: string;
-  name?: string;
-  size?: number;
-}) {
+function TeamLogoAdmin({ poolUrl, name, size = 32 }: { poolUrl?: string; name?: string; size?: number }) {
   const cleanUrl = sanitizeLogo(poolUrl);
   const [failed, setFailed] = useState(false);
   useEffect(() => { setFailed(false); }, [cleanUrl]);
   const teamName = name ?? '';
-
   if (cleanUrl && !failed) {
     return (
-      <img
-        src={cleanUrl}
-        alt={teamName}
+      <img src={cleanUrl} alt={teamName}
         style={{ width: size, height: size, borderRadius: '50%', objectFit: 'contain', flexShrink: 0 }}
-        onError={() => setFailed(true)}
-      />
+        onError={() => setFailed(true)} />
     );
   }
-
   const initials = getTeamInitials(teamName);
   const bg = teamColour(teamName);
   return (
-    <div
-      style={{
-        width: size, height: size, background: bg,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        borderRadius: '50%', flexShrink: 0,
-        fontSize: size * 0.28, fontWeight: 700, color: '#fff',
-        letterSpacing: '0.02em', userSelect: 'none',
-      }}
-      aria-label={teamName}
-    >
+    <div style={{ width: size, height: size, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      borderRadius: '50%', flexShrink: 0, fontSize: size * 0.28, fontWeight: 700, color: '#fff',
+      letterSpacing: '0.02em', userSelect: 'none' }} aria-label={teamName}>
       {initials}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Odds extraction
-// ---------------------------------------------------------------------------
 function extractOddsMap(oddsArray: unknown[], homeTeam: string, awayTeam: string): OddsMap | undefined {
   if (!Array.isArray(oddsArray) || oddsArray.length === 0) return undefined;
   const pool = oddsArray as Array<Record<string, unknown>>;
@@ -600,6 +683,8 @@ function extractAdminOdds(raw: Record<string, unknown>, homeTeam: string, awayTe
   return undefined;
 }
 
+void extractAdminOdds;
+
 function unwrapWithAllOdds(raw: unknown): Array<{ match: Match; odds: unknown[] }> {
   if (!raw) return [];
   const obj = raw as Record<string, unknown>;
@@ -636,6 +721,7 @@ function normalizeMatch(raw: unknown): Match | null {
   const r = raw as Record<string, unknown>;
   const id = String(r.id ?? r.matchId ?? r.match_id ?? r.fixtureId ?? r.fixture_id ?? '');
   if (!id || id === 'undefined') return null;
+
   let competitorHome: Record<string, unknown> | null = null;
   let competitorAway: Record<string, unknown> | null = null;
   const competitorsArr = Array.isArray(r.competitors) ? r.competitors as Record<string, unknown>[] : null;
@@ -643,6 +729,7 @@ function normalizeMatch(raw: unknown): Match | null {
   const firstComp = competitionsArr?.[0] as Record<string, unknown> | undefined;
   const nestedCompetitors = Array.isArray(firstComp?.competitors)
     ? firstComp!.competitors as Record<string, unknown>[] : null;
+
   const resolveCompetitors = (arr: Record<string, unknown>[]) => {
     for (const c of arr) {
       const side = String(c.homeAway ?? c.type ?? '').toLowerCase();
@@ -656,10 +743,13 @@ function normalizeMatch(raw: unknown): Match | null {
       competitorAway = (t1.team && typeof t1.team === 'object') ? t1.team as Record<string, unknown> : t1;
     }
   };
+
   if (competitorsArr) resolveCompetitors(competitorsArr);
   if (!competitorHome && !competitorAway && nestedCompetitors) resolveCompetitors(nestedCompetitors);
+
   const homeObj = competitorHome ?? ((r.home && typeof r.home === 'object') ? r.home as Record<string, unknown> : null);
   const awayObj = competitorAway ?? ((r.away && typeof r.away === 'object') ? r.away as Record<string, unknown> : null);
+
   const getLogoFromObj = (obj: Record<string, unknown> | null): string => {
     if (!obj) return '';
     if (Array.isArray(obj.logos) && obj.logos.length > 0) {
@@ -668,8 +758,16 @@ function normalizeMatch(raw: unknown): Match | null {
     }
     return String(obj.logo ?? obj.logoUrl ?? obj.crest ?? obj.image ?? obj.photo ?? obj.img ?? '');
   };
-  let homeTeam = String(r.homeTeam ?? r.home_team ?? r.homeName ?? r.home_name ?? homeObj?.name ?? homeObj?.displayName ?? homeObj?.teamName ?? '').trim();
-  let awayTeam = String(r.awayTeam ?? r.away_team ?? r.awayName ?? r.away_name ?? awayObj?.name ?? awayObj?.displayName ?? awayObj?.teamName ?? '').trim();
+
+  let homeTeam = String(
+    r.homeTeam ?? r.home_team ?? r.homeName ?? r.home_name ??
+    homeObj?.name ?? homeObj?.displayName ?? homeObj?.teamName ?? ''
+  ).trim();
+  let awayTeam = String(
+    r.awayTeam ?? r.away_team ?? r.awayName ?? r.away_name ??
+    awayObj?.name ?? awayObj?.displayName ?? awayObj?.teamName ?? ''
+  ).trim();
+
   if ((!homeTeam || !awayTeam) && typeof r.name === 'string') {
     const name = r.name as string;
     const atMatch = name.match(/^(.+?)\s+at\s+(.+)$/i);
@@ -678,6 +776,7 @@ function normalizeMatch(raw: unknown): Match | null {
     else if (vsMatch) { if (!homeTeam) homeTeam = vsMatch[1].trim(); if (!awayTeam) awayTeam = vsMatch[2].trim(); }
   }
   if (!homeTeam && !awayTeam) return null;
+
   let leagueName = '';
   let leagueLogo = '';
   if (firstComp) {
@@ -708,6 +807,7 @@ function normalizeMatch(raw: unknown): Match | null {
   }
   if (!leagueLogo) leagueLogo = String(r.leagueLogo ?? r.league_logo ?? r.competitionLogo ?? r.competition_logo ?? '');
   if (!leagueName && homeTeam && awayTeam) leagueName = inferLeagueFromTeams(homeTeam, awayTeam);
+
   let status = '';
   const rawStatus = (firstComp?.status) ?? r.status ?? r.matchStatus ?? r.match_status ?? r.state;
   if (rawStatus && typeof rawStatus === 'object') {
@@ -715,6 +815,7 @@ function normalizeMatch(raw: unknown): Match | null {
     const typeObj = so.type as Record<string, unknown> | undefined;
     status = String(typeObj?.name ?? typeObj?.description ?? so.name ?? so.description ?? so.state ?? '');
   } else { status = String(rawStatus ?? ''); }
+
   let scoreHome: number | undefined;
   let scoreAway: number | undefined;
   const rawScoreHome = r.scoreHome ?? r.score_home ?? r.homeScore ?? r.home_score;
@@ -723,6 +824,7 @@ function normalizeMatch(raw: unknown): Match | null {
   else if (homeObj?.score != null) scoreHome = Number(homeObj.score);
   if (rawScoreAway != null) scoreAway = Number(rawScoreAway);
   else if (awayObj?.score != null) scoreAway = Number(awayObj.score);
+
   const scoreCompetitors = competitorsArr ?? nestedCompetitors ?? [];
   if (scoreHome == null || scoreAway == null) {
     for (const c of scoreCompetitors) {
@@ -732,11 +834,25 @@ function normalizeMatch(raw: unknown): Match | null {
       if (side === 'away' && s != null && scoreAway == null) scoreAway = s;
     }
   }
-  const kickoffAt = String(r.kickoffAt ?? r.kickoff_at ?? r.startTime ?? r.start_time ?? r.date ?? r.scheduledAt ?? r.datetime ?? firstComp?.date ?? '');
-  const rawHomeLogo = String(r.homeLogo ?? r.home_logo ?? r.homeCrest ?? r.homeTeamLogo ?? r.home_team_logo ?? r.homeImage ?? r.home_image ?? r.homePhoto ?? r.home_photo ?? homeObj?.logo ?? homeObj?.logoUrl ?? homeObj?.crest ?? homeObj?.image ?? homeObj?.photo ?? '').trim() || getLogoFromObj(homeObj);
-  const rawAwayLogo = String(r.awayLogo ?? r.away_logo ?? r.awayCrest ?? r.awayTeamLogo ?? r.away_team_logo ?? r.awayImage ?? r.away_image ?? r.awayPhoto ?? r.away_photo ?? awayObj?.logo ?? awayObj?.logoUrl ?? awayObj?.crest ?? awayObj?.image ?? awayObj?.photo ?? '').trim() || getLogoFromObj(awayObj);
+
+  const kickoffAt = String(
+    r.kickoffAt ?? r.kickoff_at ?? r.startTime ?? r.start_time ?? r.date ?? r.scheduledAt ?? r.datetime ??
+    firstComp?.date ?? ''
+  );
+  const rawHomeLogo = String(
+    r.homeLogo ?? r.home_logo ?? r.homeCrest ?? r.homeTeamLogo ?? r.home_team_logo ??
+    r.homeImage ?? r.home_image ?? r.homePhoto ?? r.home_photo ??
+    homeObj?.logo ?? homeObj?.logoUrl ?? homeObj?.crest ?? homeObj?.image ?? homeObj?.photo ?? ''
+  ).trim() || getLogoFromObj(homeObj);
+  const rawAwayLogo = String(
+    r.awayLogo ?? r.away_logo ?? r.awayCrest ?? r.awayTeamLogo ?? r.away_team_logo ??
+    r.awayImage ?? r.away_image ?? r.awayPhoto ?? r.away_photo ??
+    awayObj?.logo ?? awayObj?.logoUrl ?? awayObj?.crest ?? awayObj?.image ?? awayObj?.photo ?? ''
+  ).trim() || getLogoFromObj(awayObj);
+
   const homeLogo = sanitizeLogo(rawHomeLogo);
   const awayLogo = sanitizeLogo(rawAwayLogo);
+
   let minutePlayed: number | undefined;
   if (r.minutePlayed != null) minutePlayed = Number(r.minutePlayed);
   else if (r.minute_played != null) minutePlayed = Number(r.minute_played);
@@ -745,6 +861,7 @@ function normalizeMatch(raw: unknown): Match | null {
     const clock = so.displayClock ?? so.clock;
     if (clock) { const mins = parseInt(String(clock), 10); if (!isNaN(mins)) minutePlayed = mins; }
   }
+
   return {
     id, source: (r.source as Match['source']) ?? 'ESPN',
     homeTeam, awayTeam, league: leagueName, status, kickoffAt,
@@ -754,19 +871,13 @@ function normalizeMatch(raw: unknown): Match | null {
   } as Match;
 }
 
-// ---------------------------------------------------------------------------
-// normalizeAdminMatch
-// ---------------------------------------------------------------------------
 function normalizeAdminMatch(raw: unknown): Match | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
-
   const id = String(r.id ?? r.matchId ?? r.match_id ?? '');
   if (!id || id === 'undefined') return null;
-
   const homeTeam = String(r.homeTeam ?? r.home_team ?? r.homeName ?? r.home_name ?? '').trim();
   const awayTeam = String(r.awayTeam ?? r.away_team ?? r.awayName ?? r.away_name ?? '').trim();
-
   let leagueName = '';
   let leagueLogo = '';
   const rawLeague = r.league ?? r.leagueName ?? r.league_name ?? r.competition ?? r.competitionName;
@@ -780,7 +891,6 @@ function normalizeAdminMatch(raw: unknown): Match | null {
   if (!leagueLogo) leagueLogo = String(r.leagueLogo ?? r.league_logo ?? r.competitionLogo ?? r.competition_logo ?? '');
   leagueLogo = sanitizeLogo(leagueLogo);
   if (!leagueName && homeTeam && awayTeam) leagueName = inferLeagueFromTeams(homeTeam, awayTeam);
-
   const status = String(r.status ?? r.matchStatus ?? r.match_status ?? '');
   const scoreHome = r.scoreHome != null ? Number(r.scoreHome)
     : r.score_home != null ? Number(r.score_home)
@@ -792,28 +902,14 @@ function normalizeAdminMatch(raw: unknown): Match | null {
     : undefined;
   const kickoffAt = String(r.kickoffAt ?? r.kickoff_at ?? r.startTime ?? r.start_time ?? r.date ?? r.scheduledAt ?? '');
   const minutePlayed = r.minutePlayed != null ? Number(r.minutePlayed) : r.minute_played != null ? Number(r.minute_played) : undefined;
-
-  const hardcodedHomeLogo = sanitizeLogo(
-    String(r.hardcodedHomeLogo ?? r.hardcoded_home_logo ?? r.homeLogo ?? r.home_logo ?? '').trim()
-  );
-  const hardcodedAwayLogo = sanitizeLogo(
-    String(r.hardcodedAwayLogo ?? r.hardcoded_away_logo ?? r.awayLogo ?? r.away_logo ?? '').trim()
-  );
-
+  const hardcodedHomeLogo = sanitizeLogo(String(r.hardcodedHomeLogo ?? r.hardcoded_home_logo ?? r.homeLogo ?? r.home_logo ?? '').trim());
+  const hardcodedAwayLogo = sanitizeLogo(String(r.hardcodedAwayLogo ?? r.hardcoded_away_logo ?? r.awayLogo ?? r.away_logo ?? '').trim());
   return {
-    id,
-    source: 'ADMIN_CREATED' as Match['source'],
+    id, source: 'ADMIN_CREATED' as Match['source'],
     homeTeam: homeTeam || 'Home Team',
     awayTeam: awayTeam || 'Away Team',
-    league: leagueName,
-    status,
-    kickoffAt,
-    scoreHome,
-    scoreAway,
-    homeLogo: hardcodedHomeLogo,
-    awayLogo: hardcodedAwayLogo,
-    leagueLogo,
-    minutePlayed,
+    league: leagueName, status, kickoffAt, scoreHome, scoreAway,
+    homeLogo: hardcodedHomeLogo, awayLogo: hardcodedAwayLogo, leagueLogo, minutePlayed,
     sport: String(r.sport ?? 'FOOTBALL'),
     createdAt: String(r.createdAt ?? r.created_at ?? ''),
   } as Match;
@@ -862,14 +958,11 @@ function unwrapAdminMatches(raw: unknown): Match[] {
   if (!obj.success) return [];
   const data = obj.data;
   if (!Array.isArray(data)) return [];
-
-  const normalized = (data as unknown[]).reduce<Match[]>((acc, item) => {
+  return (data as unknown[]).reduce<Match[]>((acc, item) => {
     const match = normalizeAdminMatch(item);
     if (match?.id) acc.push(match);
     return acc;
   }, []);
-
-  return dedupAdminMatches(normalized);
 }
 
 async function fetchAdminMatchOdds(matchId: string): Promise<unknown[]> {
@@ -889,9 +982,6 @@ function mergeOddsById(oddsById: Map<string, unknown[]>, entries: Array<{ match:
   }
 }
 
-// ---------------------------------------------------------------------------
-// hasValidOdds
-// ---------------------------------------------------------------------------
 function hasValidOdds(match: EnrichedMatch): boolean {
   if (FINISHED_STATUSES.has(match.status ?? '')) return true;
   const o = match.oddsMap;
@@ -899,9 +989,6 @@ function hasValidOdds(match: EnrichedMatch): boolean {
   return o.home > 0 && o.away > 0;
 }
 
-// ---------------------------------------------------------------------------
-// Football data fetch
-// ---------------------------------------------------------------------------
 async function fetchAllFootballMatches(): Promise<EnrichedMatch[]> {
   const [
     withOddsRes, liveRes, upcomingRes, todayRes, resultsRes,
@@ -918,17 +1005,21 @@ async function fetchAllFootballMatches(): Promise<EnrichedMatch[]> {
     api.publicFootball.allCupsToday(),
     api.publicFootball.allCupsLive(),
   ]);
+
   const oddsById = new Map<string, unknown[]>();
   const withOddsItems     = withOddsRes.status  === 'fulfilled' ? unwrapWithAllOdds(withOddsRes.value)   : [];
   const fromUpcomingItems = upcomingRes.status   === 'fulfilled' ? unwrapWithAllOdds(upcomingRes.value)   : [];
   const fromTodayItems    = todayRes.status      === 'fulfilled' ? unwrapWithAllOdds(todayRes.value)      : [];
+
   mergeOddsById(oddsById, withOddsItems);
   mergeOddsById(oddsById, fromUpcomingItems);
   mergeOddsById(oddsById, fromTodayItems);
   if (liveRes.status === 'fulfilled') mergeOddsById(oddsById, unwrapWithAllOdds(liveRes.value));
+
   const oddsByFingerprint = new Map<string, unknown[]>();
   const makeFingerprint = (home: string, away: string, kickoff: string) =>
     `${home.toLowerCase().trim()}|${away.toLowerCase().trim()}|${kickoff.slice(0, 10)}`;
+
   for (const [matchId, odds] of oddsById.entries()) {
     const sourceMatch = [...withOddsItems, ...fromUpcomingItems, ...fromTodayItems].find(({ match }) => match.id === matchId)?.match;
     if (sourceMatch?.homeTeam && sourceMatch?.awayTeam && sourceMatch?.kickoffAt) {
@@ -936,6 +1027,7 @@ async function fetchAllFootballMatches(): Promise<EnrichedMatch[]> {
       if (!oddsByFingerprint.has(fp)) oddsByFingerprint.set(fp, odds);
     }
   }
+
   const fromWithOdds = withOddsItems.map(({ match }) => match);
   const fromLive     = liveRes.status === 'fulfilled' ? safeUnwrapList(liveRes.value) : [];
   const fromUpcoming = fromUpcomingItems.map(({ match }) => match);
@@ -946,11 +1038,13 @@ async function fetchAllFootballMatches(): Promise<EnrichedMatch[]> {
   const fromAllCupsUpcoming = allCupsUpcomingRes.status === 'fulfilled' ? safeUnwrapList(allCupsUpcomingRes.value) : [];
   const fromAllCupsToday    = allCupsTodayRes.status    === 'fulfilled' ? safeUnwrapList(allCupsTodayRes.value)    : [];
   const fromAllCupsLive     = allCupsLive.status        === 'fulfilled' ? safeUnwrapList(allCupsLive.value)        : [];
+
   const allMatches: Match[] = [
     ...fromWithOdds, ...fromLive, ...fromUpcoming, ...fromToday, ...fromResults,
     ...fromAllCupsUpcoming, ...fromAllCupsToday, ...fromAllCupsLive,
     ...fromLsLive, ...fromLsToday,
   ];
+
   const seenIds = new Set<string>();
   const seenFps = new Set<string>();
   const dedupedMatches = allMatches.filter((m) => {
@@ -961,6 +1055,7 @@ async function fetchAllFootballMatches(): Promise<EnrichedMatch[]> {
     if (fp !== '||') seenFps.add(fp);
     return true;
   });
+
   const enrichedPass1 = dedupedMatches.map((match) => {
     let odds = oddsById.get(match.id) ?? [];
     if (odds.length === 0 && match.homeTeam && match.awayTeam && match.kickoffAt) {
@@ -971,12 +1066,14 @@ async function fetchAllFootballMatches(): Promise<EnrichedMatch[]> {
     const oddsMap = extractOddsMap(odds, match.homeTeam ?? '', match.awayTeam ?? '');
     return { ...match, oddsMap, _needsOdds: !oddsMap && !FINISHED_STATUSES.has(match.status ?? '') };
   });
+
   const needsIndividualOdds = enrichedPass1.filter((m) => m._needsOdds).slice(0, 30);
   const individualOddsResults = await Promise.allSettled(
     needsIndividualOdds.map((m) =>
       api.publicFootball.odds(m.id).then((r) => ({ matchId: m.id, data: r })).catch(() => ({ matchId: m.id, data: null }))
     )
   );
+
   const individualOddsMap = new Map<string, unknown[]>();
   individualOddsResults.forEach((result) => {
     if (result.status === 'fulfilled' && result.value.data) {
@@ -984,6 +1081,7 @@ async function fetchAllFootballMatches(): Promise<EnrichedMatch[]> {
       if (arr.length > 0) individualOddsMap.set(result.value.matchId, arr);
     }
   });
+
   const enriched = enrichedPass1.map(({ _needsOdds, ...match }) => {
     if (!_needsOdds || match.oddsMap) return match as EnrichedMatch;
     const indOdds = individualOddsMap.get(match.id) ?? [];
@@ -995,22 +1093,28 @@ async function fetchAllFootballMatches(): Promise<EnrichedMatch[]> {
   return enriched.filter(hasValidOdds);
 }
 
-function filterByLeagueTab(matches: EnrichedMatch[], tab: FootballLeagueTab): EnrichedMatch[] {
-  if (tab === 'all') return matches;
+function filterByLeagueTab(
+  matches: EnrichedMatch[],
+  tab: FootballLeagueTab,
+): { matches: EnrichedMatch[]; isFallback: boolean } {
+  if (tab === 'all') return { matches, isFallback: false };
+
   if (tab === 'other') {
-    return matches.filter((m) => {
+    const filtered = matches.filter((m) => {
       for (const leagueTab of Object.keys(LEAGUE_TEAMS) as Exclude<FootballLeagueTab, 'all' | 'other'>[]) {
         if (matchBelongsToLeagueTab(m, leagueTab)) return false;
       }
       return true;
     });
+    if (filtered.length === 0) return { matches, isFallback: true };
+    return { matches: filtered, isFallback: false };
   }
-  return matches.filter((m) => matchBelongsToLeagueTab(m, tab));
+
+  const filtered = matches.filter((m) => matchBelongsToLeagueTab(m, tab));
+  if (filtered.length === 0) return { matches, isFallback: true };
+  return { matches: filtered, isFallback: false };
 }
 
-// ---------------------------------------------------------------------------
-// Other sport fetchers
-// ---------------------------------------------------------------------------
 async function fetchBasketballMatches(): Promise<EnrichedMatch[]> {
   const [live, upcoming, results] = await Promise.allSettled([
     api.publicBasketball.live(), api.publicBasketball.upcoming(), api.publicBasketball.results(),
@@ -1098,456 +1202,183 @@ async function fetchMmaMatches(): Promise<EnrichedMatch[]> {
   return enriched.filter(hasValidOdds);
 }
 
-// ---------------------------------------------------------------------------
-// FIX 9: Admin match auto-timer
-//
-// When an admin match is LIVE but has no minutePlayed and no kickoffAt, we
-// simulate a full 90-minute match from the moment we first detect it as live.
-//
-// Timeline (wall-clock from liveStartedAt):
-//   0 – 45 min  → 1st half, minute display 0′ → 45′
-//   45 – 60 min → halftime (display "HT"), odds unlocked
-//   60 – 105 min → 2nd half, minute display 45′ → 90′
-//   105+ min     → display "90′" (stopped — admin should change status)
-//
-// This Map is module-level so it survives re-renders and across poll cycles.
-// ---------------------------------------------------------------------------
-const adminLiveStartTimes = new Map<string, number>(); // matchId → Date.now() when first seen LIVE
-
-/** Call this whenever an admin match is loaded so we record its live start. */
-function registerAdminLiveStart(matchId: string, status: string): void {
-  const isLive = LIVE_STATUSES.has(status) && !FINISHED_STATUSES.has(status);
-  if (isLive && !adminLiveStartTimes.has(matchId)) {
-    adminLiveStartTimes.set(matchId, Date.now());
-  }
-  if (FINISHED_STATUSES.has(status)) {
-    adminLiveStartTimes.delete(matchId);
-  }
-}
-
-// Durations in milliseconds
-const FIRST_HALF_DURATION_MS  = 45 * 60_000;  // 45 real minutes
-const HALFTIME_DURATION_MS    = 15 * 60_000;  // 15 real minutes for HT window
-const SECOND_HALF_DURATION_MS = 45 * 60_000;  // 45 real minutes
-
-interface AdminAutoTimer {
-  /** The minute string to display, e.g. "23'" or "HT" or "78'" */
-  displayStr: string;
-  /** Whether we're currently in the HT window (odds unlocked) */
-  isHalftimeWindow: boolean;
-  /** Whether the simulated 90 mins is fully elapsed */
-  isOver: boolean;
-}
-
-function computeAdminAutoTimer(matchId: string): AdminAutoTimer {
-  const startedAt = adminLiveStartTimes.get(matchId);
-  if (!startedAt) {
-    return { displayStr: 'LIVE', isHalftimeWindow: false, isOver: false };
-  }
-
-  const elapsed = Date.now() - startedAt; // ms since we first saw it live
-
-  if (elapsed < FIRST_HALF_DURATION_MS) {
-    // First half: 0 → 45
-    const mins = Math.floor(elapsed / 60_000);
-    return { displayStr: `${Math.min(mins, 45)}'`, isHalftimeWindow: false, isOver: false };
-  }
-
-  const afterFirstHalf = elapsed - FIRST_HALF_DURATION_MS;
-  if (afterFirstHalf < HALFTIME_DURATION_MS) {
-    // Half-time window
-    return { displayStr: 'HT', isHalftimeWindow: true, isOver: false };
-  }
-
-  const afterHalftime = afterFirstHalf - HALFTIME_DURATION_MS;
-  if (afterHalftime < SECOND_HALF_DURATION_MS) {
-    // Second half: 45 → 90
-    const mins = 45 + Math.floor(afterHalftime / 60_000);
-    return { displayStr: `${Math.min(mins, 90)}'`, isHalftimeWindow: false, isOver: false };
-  }
-
-  // Full 90 minutes elapsed — show 90' until admin changes status
-  return { displayStr: "90'", isHalftimeWindow: false, isOver: true };
-}
-
-// ---------------------------------------------------------------------------
-// FIX 8 + FIX 9: Live Timer Hook — corrected
-//
-// Priority for minute source:
-//   1. API minutePlayed (most accurate — refreshed every 30s by poll)
-//   2. kickoffAt wall-clock elapsed (when API gives kickoff but no minutePlayed)
-//   3. Admin auto-timer (for admin matches with neither minutePlayed nor kickoffAt)
-//
-// The timer ticks every 30 seconds visually; capped per half.
-// ---------------------------------------------------------------------------
-function useLiveTimer(match: EnrichedMatch): { timerStr: string; adminHalftimeOverride: boolean } {
-  const status    = match.status ?? '';
-  const isLive    = LIVE_STATUSES.has(status);
-  const isAdmin   = match.source === 'ADMIN_CREATED';
-
-  // Register admin match in the live-start registry
-  useEffect(() => {
-    if (isAdmin) registerAdminLiveStart(match.id, status);
-  }, [isAdmin, match.id, status]);
-
-  // Primary API minute
-  const apiMinute = match.minutePlayed ?? null;
-
-  // Ref tracks last API-reported minute so visual tick only adds ≤1 min between polls
-  const baseRef = useRef<{ minute: number; receivedAt: number } | null>(null);
-  useEffect(() => {
-    if (apiMinute != null) {
-      baseRef.current = { minute: apiMinute, receivedAt: Date.now() };
-    }
-  }, [apiMinute]);
-
-  const computeDisplay = useCallback((): { timerStr: string; adminHalftimeOverride: boolean } => {
-    if (!isLive) return { timerStr: '', adminHalftimeOverride: false };
-
-    // ── Explicit special statuses ─────────────────────────────────────────
-    if (HALFTIME_STATUSES.has(status))  return { timerStr: 'HT',  adminHalftimeOverride: false };
-    if (PENALTY_STATUSES.has(status))   return { timerStr: 'PEN', adminHalftimeOverride: false };
-
-    if (EXTRA_TIME_STATUSES.has(status)) {
-      if (baseRef.current) {
-        const ticked = Math.floor((Date.now() - baseRef.current.receivedAt) / 60_000);
-        return { timerStr: `${Math.min(baseRef.current.minute + ticked, 120)}' ET`, adminHalftimeOverride: false };
-      }
-      if (match.kickoffAt) {
-        const elapsed = Math.floor((Date.now() - new Date(match.kickoffAt).getTime()) / 60_000);
-        return { timerStr: `${Math.min(Math.max(elapsed, 90), 120)}' ET`, adminHalftimeOverride: false };
-      }
-      return { timerStr: "90' ET", adminHalftimeOverride: false };
-    }
-
-    // ── API minutePlayed available (most accurate) ────────────────────────
-    if (baseRef.current) {
-      const ticked = Math.floor((Date.now() - baseRef.current.receivedAt) / 60_000);
-      const cap = SECOND_HALF_STATUSES.has(status) ? 90 : 45;
-      const mins = Math.min(baseRef.current.minute + ticked, cap);
-      return { timerStr: `${mins}'`, adminHalftimeOverride: false };
-    }
-
-    // ── kickoffAt available — use wall-clock elapsed ──────────────────────
+function useLiveTimer(match: EnrichedMatch): string {
+  const status = match.status ?? '';
+  const isLive = LIVE_STATUSES.has(status);
+  const getElapsedMins = useCallback((): number => {
     if (match.kickoffAt) {
-      const elapsed = Math.floor((Date.now() - new Date(match.kickoffAt).getTime()) / 60_000);
-      const cap = SECOND_HALF_STATUSES.has(status) ? 90 : 45;
-      return { timerStr: `${Math.min(Math.max(elapsed, 0), cap)}'`, adminHalftimeOverride: false };
+      const elapsed = Date.now() - new Date(match.kickoffAt).getTime();
+      if (elapsed >= 0) return Math.floor(elapsed / 60_000);
     }
-
-    // ── Admin auto-timer: no minutePlayed, no kickoffAt ───────────────────
-    if (isAdmin) {
-      const auto = computeAdminAutoTimer(match.id);
-      return { timerStr: auto.displayStr, adminHalftimeOverride: auto.isHalftimeWindow };
-    }
-
-    return { timerStr: 'LIVE', adminHalftimeOverride: false };
-  }, [isLive, status, match.kickoffAt, match.id, isAdmin]);
-
-  const [result, setResult] = useState<{ timerStr: string; adminHalftimeOverride: boolean }>(computeDisplay);
-
+    return match.minutePlayed ?? 0;
+  }, [match.kickoffAt, match.minutePlayed]);
+  const [elapsed, setElapsed] = useState<number>(getElapsedMins);
   useEffect(() => {
     if (!isLive) return;
-    setResult(computeDisplay());
-    // Tick every 30s for snappy display; admin auto-timer needs this granularity
-    const id = setInterval(() => setResult(computeDisplay()), 30_000);
+    setElapsed(getElapsedMins());
+    const id = setInterval(() => setElapsed(getElapsedMins()), 30_000);
     return () => clearInterval(id);
-  }, [isLive, computeDisplay]);
-
-  return result;
+  }, [isLive, getElapsedMins]);
+  if (!isLive) return '';
+  if (HALFTIME_STATUSES.has(status)) return 'HT';
+  if (PENALTY_STATUSES.has(status)) return 'PEN';
+  if (EXTRA_TIME_STATUSES.has(status)) return `${Math.min(elapsed, 120)}' ET`;
+  return `${match.minutePlayed != null ? match.minutePlayed : Math.min(elapsed, 90)}'`;
 }
 
 const ADMIN_FINISHED_LINGER_MS = 10_000;
 
-// ---------------------------------------------------------------------------
-// MatchCard
-// ---------------------------------------------------------------------------
 function MatchCard({
-  match,
-  hasDraw = true,
-  onClick,
-  isAdmin = false,
+  match, hasDraw = true, onClick, isAdmin = false,
 }: {
-  match: EnrichedMatch;
-  hasDraw?: boolean;
-  onClick?: () => void;
-  isAdmin?: boolean;
+  match: EnrichedMatch; hasDraw?: boolean; onClick?: () => void; isAdmin?: boolean;
 }) {
   const { betSlip, addToBetSlip, showToast } = useAppStore() as {
     betSlip: BetSlipEntry[];
     addToBetSlip: (entry: BetSlipEntry) => void;
     showToast: (message: string, type: string) => void;
   };
-
   const status     = match.status ?? '';
   const isLive     = LIVE_STATUSES.has(status);
   const isFinished = FINISHED_STATUSES.has(status);
-
-  // FIX 7 + 9: determine if odds are locked for this match right now.
-  // adminHalftimeOverride is true during the simulated HT window for admin
-  // matches that use the auto-timer (no minutePlayed / kickoffAt from admin).
-  const { timerStr, adminHalftimeOverride } = useLiveTimer(match);
-  const isHalftime = HALFTIME_STATUSES.has(status) || adminHalftimeOverride;
-  // Odds locked whenever live AND not in a halftime window
-  const oddsLocked = isLive && !isHalftime;
+  const isUpcoming = !isLive && !isFinished;
+  const timerStr  = useLiveTimer(match);
   const homeScore = match.scoreHome ?? 0;
   const awayScore = match.scoreAway ?? 0;
   const homeWon   = isFinished && homeScore > awayScore;
   const awayWon   = isFinished && awayScore > homeScore;
-
   const odds = match.oddsMap;
-
   const isSel = (sel: string) =>
     (betSlip as BetSlipEntry[]).some((s) => s.matchId === match.id && s.market === '1X2' && s.selection === sel);
-
   const pick = (sel: string, odd: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    // FIX 7: prevent picking while odds are locked
-    if (isFinished || oddsLocked || !odd || odd <= 0) return;
-    addToBetSlip({
-      matchId:   match.id,
-      matchName: `${match.homeTeam} vs ${match.awayTeam}`,
-      market:    '1X2',
-      selection: sel,
-      odd,
-    });
+    if (isFinished || !odd || odd <= 0) return;
+    addToBetSlip({ matchId: match.id, matchName: `${match.homeTeam} vs ${match.awayTeam}`, market: '1X2', selection: sel, odd });
     showToast('Added to bet slip', 'success');
   };
-
+  const stateClass = isLive ? 'live' : isFinished ? 'finished' : 'upcoming';
   const oddsSlots = hasDraw
     ? [
-        { key: '1', label: '1',   val: odds?.home ?? 0 },
-        { key: 'X', label: 'X',   val: odds?.draw ?? 0 },
-        { key: '2', label: '2',   val: odds?.away ?? 0 },
+        { key: '1', label: 'Home', val: odds?.home ?? 0 },
+        { key: 'X', label: 'Draw', val: odds?.draw ?? 0 },
+        { key: '2', label: 'Away', val: odds?.away ?? 0 },
       ]
     : [
         { key: '1', label: 'Home', val: odds?.home ?? 0 },
         { key: '2', label: 'Away', val: odds?.away ?? 0 },
       ];
+  const renderHomeLogo = (size: number) => isAdmin
+    ? <TeamLogoAdmin poolUrl={match.adminHomeLogo} name={match.homeTeam} size={size} />
+    : <TeamLogo logo={match.homeLogo} name={match.homeTeam} size={size} />;
+  const renderAwayLogo = (size: number) => isAdmin
+    ? <TeamLogoAdmin poolUrl={match.adminAwayLogo} name={match.awayTeam} size={size} />
+    : <TeamLogo logo={match.awayLogo} name={match.awayTeam} size={size} />;
 
-  const HomeLogo = isAdmin
-    ? <TeamLogoAdmin poolUrl={match.adminHomeLogo} name={match.homeTeam} size={30} />
-    : <TeamLogo logo={match.homeLogo} name={match.homeTeam} size={30} />;
-  const AwayLogo = isAdmin
-    ? <TeamLogoAdmin poolUrl={match.adminAwayLogo} name={match.awayTeam} size={30} />
-    : <TeamLogo logo={match.awayLogo} name={match.awayTeam} size={30} />;
-  const HomeLogo28 = isAdmin
-    ? <TeamLogoAdmin poolUrl={match.adminHomeLogo} name={match.homeTeam} size={28} />
-    : <TeamLogo logo={match.homeLogo} name={match.homeTeam} size={28} />;
-  const AwayLogo28 = isAdmin
-    ? <TeamLogoAdmin poolUrl={match.adminAwayLogo} name={match.awayTeam} size={28} />
-    : <TeamLogo logo={match.awayLogo} name={match.awayTeam} size={28} />;
-
-  // ── LIVE CARD ────────────────────────────────────────────────────────────
-  if (isLive) {
-    return (
-      <div className="mc mc--live" onClick={onClick} role="button" tabIndex={0}
-           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.(); }}>
-        <div className="mc__header">
-          <div className="mc__league-row">
-            {match.leagueLogo && (
-              <img src={match.leagueLogo} alt="" className="mc__league-logo"
-                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
-            )}
-            <span className="mc__league-name">
-              {match.league || (match.source === 'ADMIN_CREATED' ? 'Special Game' : '')}
-            </span>
-          </div>
-          <div className="mc__header-right">
-            {oddsLocked && !isHalftime && (
-              <span className="mc__odds-locked-badge" title="Odds locked during live play">
-                <LockIcon sx={{ fontSize: 9 }} />
-                <span>Locked</span>
-              </span>
-            )}
-            {isHalftime && (
-              <span className="mc__odds-unlocked-badge" title="Odds available at half-time">
-                <span>HT – Bet Now</span>
-              </span>
-            )}
-            <span className="mc__live-badge">
-              <FiberManualRecordIcon sx={{ fontSize: 7 }} className="live-dot" />
-              {timerStr || 'LIVE'}
-            </span>
-          </div>
-        </div>
-        <div className="mc__teams">
-          <div className="mc__team-row">
-            {HomeLogo}
-            <span className="mc__team-name">{match.homeTeam}</span>
-            <span className="mc__score mc__score--live">{homeScore}</span>
-          </div>
-          <div className="mc__team-row">
-            {AwayLogo}
-            <span className="mc__team-name">{match.awayTeam}</span>
-            <span className="mc__score mc__score--live">{awayScore}</span>
-          </div>
-        </div>
-
-        {/* FIX 7: Odds row — visually locked or unlocked based on phase */}
-        <div className={`mc__odds-row${oddsLocked ? ' mc__odds-row--locked' : ''}`}>
-          {oddsLocked ? (
-            // Locked state: show ghosted odds with a lock overlay
-            <>
-              {oddsSlots.map(({ key, label, val }) => (
-                <div
-                  key={key}
-                  className="mc__odd-btn mc__odd-btn--locked"
-                  title="Odds locked during live play — available at half-time"
-                >
-                  <span className="mc__odd-label">{label}</span>
-                  <span className="mc__odd-value mc__odd-value--locked">
-                    {val > 0 ? val.toFixed(2) : '—'}
-                  </span>
-                </div>
-              ))}
-              <div className="mc__odds-lock-overlay">
-                <LockIcon sx={{ fontSize: 12 }} />
-                <span>Locked</span>
-              </div>
-            </>
-          ) : (
-            // Unlocked (halftime) — fully interactive
-            <>
-              {oddsSlots.map(({ key, label, val }) => (
-                <button
-                  key={key}
-                  className={`mc__odd-btn${val <= 0 ? ' mc__odd-btn--empty' : isSel(key) ? ' mc__odd-btn--selected' : ''}`}
-                  onClick={(e) => val > 0 && pick(key, val, e)}
-                  disabled={val <= 0}
-                >
-                  <span className="mc__odd-label">{label}</span>
-                  <span className="mc__odd-value">{val > 0 ? val.toFixed(2) : '—'}</span>
-                </button>
-              ))}
-            </>
-          )}
-          <button className="mc__more-btn" onClick={onClick}>
-            +More <ChevronRightIcon sx={{ fontSize: 12 }} />
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── FINISHED CARD ────────────────────────────────────────────────────────
-  if (isFinished) {
-    return (
-      <div className="mc mc--finished" onClick={onClick} role="button" tabIndex={0}
-           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.(); }}>
-        <div className="mc__header">
-          <div className="mc__league-row">
-            {match.leagueLogo && (
-              <img src={match.leagueLogo} alt="" className="mc__league-logo"
-                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
-            )}
-            <span className="mc__league-name">
-              {match.league || (match.source === 'ADMIN_CREATED' ? 'Special Game' : '')}
-            </span>
-          </div>
-          <span className="mc__finished-badge">{finishedLabel(status)}</span>
-        </div>
-        <div className="mc__finished-body">
-          <div className="mc__finished-team">
-            {HomeLogo28}
-            <span className={`mc__team-name${homeWon ? ' mc__team-name--winner' : ' mc__team-name--dim'}`}>
-              {match.homeTeam}
-            </span>
-          </div>
-          <div className="mc__finished-scoreboard">
-            <span className={`mc__finished-score${homeWon ? ' mc__finished-score--winner' : ''}`}>{homeScore}</span>
-            <span className="mc__finished-sep">–</span>
-            <span className={`mc__finished-score${awayWon ? ' mc__finished-score--winner' : ''}`}>{awayScore}</span>
-          </div>
-          <div className="mc__finished-team mc__finished-team--away">
-            <span className={`mc__team-name${awayWon ? ' mc__team-name--winner' : ' mc__team-name--dim'}`}>
-              {match.awayTeam}
-            </span>
-            {AwayLogo28}
-          </div>
-        </div>
-        <div className="mc__finished-footer">
-          <span>Match details</span>
-          <ChevronRightIcon sx={{ fontSize: 13 }} />
-        </div>
-      </div>
-    );
-  }
-
-  // ── UPCOMING CARD ────────────────────────────────────────────────────────
   return (
-    <div className="mc mc--upcoming" onClick={onClick} role="button" tabIndex={0}
-         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.(); }}>
-      <div className="mc__header">
-        <div className="mc__league-row">
-          {match.leagueLogo && (
-            <img src={match.leagueLogo} alt="" className="mc__league-logo"
-                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+    <div className={`match-card ${stateClass}`} onClick={onClick} role="button" tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick?.(); }}>
+      <div className="match-card-topbar">
+        {match.leagueLogo && (
+          <img src={match.leagueLogo} alt="" className="match-card-league-logo"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+        )}
+        <span className="match-card-league">
+          {match.league || (match.source === 'ADMIN_CREATED' ? 'Special Game' : '')}
+        </span>
+        {isLive && (
+          <span className="match-status-badge live">
+            <FiberManualRecordIcon sx={{ fontSize: 7 }} className="live-dot" />
+            {timerStr || 'LIVE'}
+          </span>
+        )}
+        {isFinished && (
+          <span className="match-status-badge finished">{finishedLabel(status)}</span>
+        )}
+        {isUpcoming && match.kickoffAt && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 3,
+            fontSize: 10, fontWeight: 400, color: 'var(--text-faint, #475569)', letterSpacing: '0.02em',
+          }}>
+            <ScheduleIcon sx={{ fontSize: 10, opacity: 0.5 }} />
+            {`${formatDate(match.kickoffAt)} · ${formatKickoff(match.kickoffAt)}`}
+            <span style={{ opacity: 0.55, marginLeft: 2 }}>({formatCountdown(match.kickoffAt)})</span>
+          </span>
+        )}
+      </div>
+      <div className="match-card-body">
+        <div className="match-team-row">
+          {renderHomeLogo(32)}
+          <span className={`match-team-name${isFinished ? (homeWon ? ' winner' : ' loser') : ''}`}>{match.homeTeam}</span>
+          {(isLive || isFinished) && (
+            <span className={`match-score${isFinished ? (homeWon ? ' winner' : ' loser') : ''}`}>{homeScore}</span>
           )}
-          <span className="mc__league-name">
-            {match.league || (match.source === 'ADMIN_CREATED' ? 'Special Game' : '')}
+          {isUpcoming && match.kickoffAt && (
+            <span style={{
+              marginLeft: 'auto', fontSize: 9, fontWeight: 400,
+              color: 'var(--text-faint, #475569)', opacity: 0.7, whiteSpace: 'nowrap',
+            }}>
+              {formatCountdown(match.kickoffAt)}
+            </span>
+          )}
+        </div>
+        <div className="match-vs-separator" />
+        <div className="match-team-row">
+          {renderAwayLogo(32)}
+          <span className={`match-team-name${isFinished ? (awayWon ? ' winner' : ' loser') : ''}`}>{match.awayTeam}</span>
+          {(isLive || isFinished) && (
+            <span className={`match-score${isFinished ? (awayWon ? ' winner' : ' loser') : ''}`}>{awayScore}</span>
+          )}
+        </div>
+      </div>
+      {isFinished && (
+        <div className="match-result-strip">
+          <span className="match-result-label">Full time</span>
+          <div className="match-result-score-block">
+            <span style={{ color: homeWon ? 'var(--text-main)' : 'var(--text-muted)' }}>{homeScore}</span>
+            <span className="sep">–</span>
+            <span style={{ color: awayWon ? 'var(--text-main)' : 'var(--text-muted)' }}>{awayScore}</span>
+          </div>
+          <span className="flex items-center gap-0.5 text-xs" style={{ color: 'var(--text-faint)' }}>
+            Details <ChevronRightIcon sx={{ fontSize: 13 }} />
           </span>
         </div>
-        <span className="mc__upcoming-badge">
-          <ScheduleIcon sx={{ fontSize: 11 }} />
-          <span>{formatDate(match.kickoffAt)}</span>
-          <span className="mc__upcoming-time">{formatKickoff(match.kickoffAt)}</span>
-        </span>
-      </div>
-      <div className="mc__teams">
-        <div className="mc__team-row">
-          {HomeLogo}
-          <span className="mc__team-name">{match.homeTeam}</span>
-          <span className="mc__countdown">{formatCountdown(match.kickoffAt)}</span>
-        </div>
-        <div className="mc__team-row">
-          {AwayLogo}
-          <span className="mc__team-name">{match.awayTeam}</span>
-        </div>
-      </div>
-      <div className="mc__odds-row">
-        {oddsSlots.map(({ key, label, val }) => (
-          <button
-            key={key}
-            className={`mc__odd-btn${val <= 0 ? ' mc__odd-btn--empty' : isSel(key) ? ' mc__odd-btn--selected' : ''}`}
-            onClick={(e) => val > 0 && pick(key, val, e)}
-            disabled={val <= 0}
-          >
-            <span className="mc__odd-label">{label}</span>
-            <span className="mc__odd-value">{val > 0 ? val.toFixed(2) : '—'}</span>
-          </button>
-        ))}
-        <button className="mc__more-btn" onClick={onClick}>
-          +More <ChevronRightIcon sx={{ fontSize: 12 }} />
-        </button>
-      </div>
+      )}
+      {(isLive || isUpcoming) && (
+        <>
+          <div className="match-odds-row">
+            {oddsSlots.map(({ key, label, val }) => (
+              <button key={key}
+                className={`match-odds-btn${val <= 0 ? ' empty' : isSel(key) ? ' selected' : ''}`}
+                onClick={(e) => val > 0 && pick(key, val, e)}
+                disabled={val <= 0}>
+                <span className="match-odds-label" style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', opacity: 1, color: 'var(--text-main, #ffffff)' }}>
+                  {label}
+                </span>
+                <span className="match-odds-value" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--primary, #f5a623)' }}>
+                  {val > 0 ? val.toFixed(2) : '—'}
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="match-more-odds" onClick={onClick}>
+            More markets <ChevronRightIcon sx={{ fontSize: 12 }} />
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// LeagueCard
-// ---------------------------------------------------------------------------
-function LeagueCard({
-  league,
-  matches,
-  leagueLogo,
-  showDraw,
-}: {
-  league: string;
-  matches: EnrichedMatch[];
-  leagueLogo?: string;
-  showDraw: boolean;
-}) {
+function LeagueCard({ league, matches, leagueLogo, showDraw }: { league: string; matches: EnrichedMatch[]; leagueLogo?: string; showDraw: boolean }) {
   const navigate = useNavigate();
-  const isTop6 = TOP_6_LABELS.has(league);
-  const isCup  = CUPS_LABELS.has(league);
+  const isTop6   = TOP_6_LABELS.has(league);
+  const isCup    = CUPS_LABELS.has(league);
   return (
     <div className="league-group">
       <div className="league-group-header">
         {(isTop6 || isCup) && leagueLogo && (
           <img src={leagueLogo} alt="" className="league-group-header-logo"
-               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
         )}
         <span className="league-group-name">{league || '—'}</span>
         <span className="league-group-count">{matches.length}</span>
@@ -1560,7 +1391,7 @@ function LeagueCard({
 }
 
 // ---------------------------------------------------------------------------
-// SpecialGamesSection
+// SpecialGamesSection — FIX 6: accepts onAdminFingerprintsChange callback
 // ---------------------------------------------------------------------------
 function SpecialGamesSection({
   onAdminFingerprintsChange,
@@ -1580,34 +1411,25 @@ function SpecialGamesSection({
     async function load() {
       try {
         const raw = await fetch(
-          'https://futballbackend-production-aefb.up.railway.app/api/public/admin-matches',
+          'https://futballbackend-production-aefb.up.railway.app/api/public/admin-matches?ngrok-skip-browser-warning=true',
         ).then((r) => r.json());
         if (!alive()) return;
-
         const matches = unwrapAdminMatches(raw);
         if (matches.length === 0) {
           setAdminMatches([]);
+          // FIX 6: clear fingerprints when there are no admin matches
           onAdminFingerprintsChange(new Set());
           return;
         }
-
         const oddsResults = await Promise.allSettled(matches.map((m) => fetchAdminMatchOdds(m.id)));
         if (!alive()) return;
-
         const enriched: EnrichedMatch[] = matches.map((match, idx) => {
           const oddsArr = oddsResults[idx].status === 'fulfilled' ? oddsResults[idx].value : [];
           const oddsMap = extractOddsMap(oddsArr, match.homeTeam ?? '', match.awayTeam ?? '');
           return { ...match, oddsMap };
         });
-
         const withOdds = enriched.filter(hasValidOdds);
         const withLogos = assignAdminLogos(withOdds);
-
-        // FIX 9: register any newly-live admin match in the auto-timer registry
-        for (const m of withLogos) {
-          registerAdminLiveStart(m.id, m.status ?? '');
-        }
-
         const now = Date.now();
         for (const m of withLogos) {
           const isFinished = FINISHED_STATUSES.has(m.status ?? '');
@@ -1616,10 +1438,10 @@ function SpecialGamesSection({
           }
         }
         setAdminMatches(withLogos);
+        // FIX 6: publish fingerprints of ALL admin matches (not just visible ones)
+        // so the regular list suppresses them immediately.
         onAdminFingerprintsChange(buildAdminTeamFingerprints(withLogos));
-      } catch {
-        // silently swallow fetch errors
-      }
+      } catch { /* silent */ }
     }
     load();
     const interval = setInterval(() => { if (document.visibilityState === 'visible') load(); }, 15_000);
@@ -1682,7 +1504,7 @@ function SpecialGamesSection({
               <div key={m.id} className="relative">
                 <MatchCard match={m} hasDraw isAdmin onClick={() => navigate(`/match/${m.id}`)} />
                 <div className="absolute bottom-0 left-0 h-0.5 transition-all duration-1000 ease-linear rounded-b"
-                     style={{ width: `${pct}%`, background: 'var(--accent)', opacity: 0.4 }} />
+                  style={{ width: `${pct}%`, background: 'var(--accent)', opacity: 0.4 }} />
               </div>
             );
           }
@@ -1693,41 +1515,32 @@ function SpecialGamesSection({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Skeleton
-// ---------------------------------------------------------------------------
 function SkeletonCard() {
   return (
-    <div className="mc mc--upcoming" style={{ cursor: 'default', pointerEvents: 'none', opacity: 0.6 }}>
-      <div className="mc__header">
+    <div className="match-card upcoming" style={{ cursor: 'default', pointerEvents: 'none' }}>
+      <div className="match-card-topbar">
         <div className="skeleton-block" style={{ width: 14, height: 14, borderRadius: 3 }} />
         <div className="skeleton-block" style={{ width: 80, height: 10, borderRadius: 4 }} />
       </div>
-      <div className="mc__teams">
-        <div className="mc__team-row">
-          <div className="skeleton-block" style={{ width: 30, height: 30, borderRadius: '50%' }} />
-          <div className="skeleton-block" style={{ flex: 1, height: 13, borderRadius: 4 }} />
+      <div className="match-card-body">
+        <div className="match-team-row">
+          <div className="match-team-logo-placeholder skeleton-block" />
+          <div className="skeleton-block flex-1" style={{ height: 14, borderRadius: 4 }} />
         </div>
-        <div className="mc__team-row">
-          <div className="skeleton-block" style={{ width: 30, height: 30, borderRadius: '50%' }} />
-          <div className="skeleton-block" style={{ width: '65%', height: 13, borderRadius: 4 }} />
+        <div className="match-vs-separator" />
+        <div className="match-team-row">
+          <div className="match-team-logo-placeholder skeleton-block" />
+          <div className="skeleton-block flex-1" style={{ height: 14, borderRadius: 4, width: '70%' }} />
         </div>
       </div>
-      <div className="mc__odds-row">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="mc__odd-btn mc__odd-btn--empty skeleton-block" style={{ flex: 1 }} />
-        ))}
+      <div className="match-odds-row">
+        {[0, 1, 2].map((i) => <div key={i} className="match-odds-btn empty skeleton-block" />)}
       </div>
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// SectionHeader
-// ---------------------------------------------------------------------------
-function SectionHeader({
-  title, count, isLive, isFinished, showToggle, expanded, onToggle,
-}: {
+function SectionHeader({ title, count, isLive, isFinished, showToggle, expanded, onToggle }: {
   title: string; count: number; isLive?: boolean; isFinished?: boolean;
   showToggle?: boolean; expanded?: boolean; onToggle?: () => void;
 }) {
@@ -1736,9 +1549,8 @@ function SectionHeader({
       <h2 className="section-title-text">
         {isLive && <FiberManualRecordIcon sx={{ fontSize: 8 }} className="text-green-500 live-dot" />}
         {isFinished && (
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-               stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-               style={{ color: 'var(--text-muted)' }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+               strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-muted)' }}>
             <circle cx="12" cy="12" r="10" /><polyline points="9 12 11 14 15 10" />
           </svg>
         )}
@@ -1746,8 +1558,7 @@ function SectionHeader({
         <span className="section-count">({count})</span>
       </h2>
       {showToggle && (
-        <button onClick={onToggle} className="ml-auto text-xs font-semibold hover:underline"
-                style={{ color: 'var(--primary)' }}>
+        <button onClick={onToggle} className="ml-auto text-xs font-semibold hover:underline" style={{ color: 'var(--primary)' }}>
           {expanded ? 'Hide' : 'Show'}
         </button>
       )}
@@ -1755,9 +1566,6 @@ function SectionHeader({
   );
 }
 
-// ---------------------------------------------------------------------------
-// SectionDivider
-// ---------------------------------------------------------------------------
 function SectionDivider({ label }: { label: string }) {
   return (
     <div className="league-divider">
@@ -1768,9 +1576,21 @@ function SectionDivider({ label }: { label: string }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// groupByLeague
-// ---------------------------------------------------------------------------
+function FallbackNotice({ tabLabel }: { tabLabel: string }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 7,
+      padding: '8px 12px', marginBottom: 12, borderRadius: 8,
+      background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.15)',
+    }}>
+      <span style={{ fontSize: 13 }}>ℹ️</span>
+      <span style={{ fontSize: 11, color: 'var(--text-muted, #64748b)', fontFamily: 'system-ui, sans-serif' }}>
+        No <strong style={{ color: 'var(--text-main, #cbd5e1)', fontWeight: 700 }}>{tabLabel}</strong> matches right now — showing all available games.
+      </span>
+    </div>
+  );
+}
+
 function groupByLeague(matches: EnrichedMatch[], sorted = false): Map<string, EnrichedMatch[]> {
   const map = new Map<string, EnrichedMatch[]>();
   for (const m of matches) {
@@ -1802,6 +1622,7 @@ export default function MatchList() {
 
   const [error, setError] = useState<string | null>(null);
 
+  // FIX 6: fingerprint set from admin matches — used to suppress duplicates
   const [adminFingerprints, setAdminFingerprints] = useState<Set<string>>(new Set());
 
   const footballGenRef = useRef(0);
@@ -1876,17 +1697,17 @@ export default function MatchList() {
     return () => { clearInterval(interval); document.removeEventListener('visibilitychange', refresh); };
   }, [activeSport, fetchFootball, fetchSport]);
 
-  const allMatches = useMemo((): EnrichedMatch[] => {
-    let base: EnrichedMatch[];
+  // FIX 6: strip admin-match games from the regular list before categorising
+  const { allMatches, isFallback } = useMemo((): { allMatches: EnrichedMatch[]; isFallback: boolean } => {
     if (activeSport === 'football') {
-      base = filterByLeagueTab(allFootballMatches, activeLeagueTab);
-    } else {
-      base = sportMatches[activeSport];
+      const result = filterByLeagueTab(allFootballMatches, activeLeagueTab);
+      // Remove any match whose team-pair fingerprint belongs to an admin game
+      const filtered = adminFingerprints.size > 0
+        ? result.matches.filter((m) => !isMatchInAdminSet(m, adminFingerprints))
+        : result.matches;
+      return { allMatches: filtered, isFallback: result.isFallback };
     }
-    if (activeSport === 'football' && adminFingerprints.size > 0) {
-      base = base.filter((m) => !isMatchInAdminSet(m, adminFingerprints));
-    }
-    return base;
+    return { allMatches: sportMatches[activeSport], isFallback: false };
   }, [activeSport, activeLeagueTab, allFootballMatches, sportMatches, adminFingerprints]);
 
   const grouped = useMemo(() => {
@@ -1905,9 +1726,17 @@ export default function MatchList() {
     return sportLoading[activeSport];
   }, [activeSport, footballLoading, sportLoading]);
 
-  const isSpecificLeagueTab = activeSport === 'football' && activeLeagueTab !== 'all' && activeLeagueTab !== 'other';
+  const isSpecificLeagueTab = activeSport === 'football'
+    && activeLeagueTab !== 'all'
+    && activeLeagueTab !== 'other'
+    && !isFallback;
 
   const navigate = useNavigate();
+
+  const activeLeagueTabLabel = useMemo(
+    () => FOOTBALL_LEAGUE_TABS.find((t) => t.key === activeLeagueTab)?.label ?? activeLeagueTab,
+    [activeLeagueTab],
+  );
 
   function renderLeagueGroups(matches: EnrichedMatch[], isFinishedSection: boolean) {
     if (isSpecificLeagueTab) {
@@ -1920,8 +1749,7 @@ export default function MatchList() {
         <MatchCard key={m.id} match={m} hasDraw={showDraw} onClick={() => navigate(`/match/${m.id}`)} />
       ));
     }
-
-    if (activeSport === 'football' && (activeLeagueTab === 'all' || activeLeagueTab === 'other')) {
+    if (activeSport === 'football' && (activeLeagueTab === 'all' || activeLeagueTab === 'other' || isFallback)) {
       const top6   = matches.filter((m) => TOP_6_LABELS.has(m.league ?? ''));
       const cups   = matches.filter((m) => !TOP_6_LABELS.has(m.league ?? '') && CUPS_LABELS.has(m.league ?? ''));
       const others = matches.filter((m) => !TOP_6_LABELS.has(m.league ?? '') && !CUPS_LABELS.has(m.league ?? ''));
@@ -1949,26 +1777,17 @@ export default function MatchList() {
         </>
       );
     }
-
     return [...groupByLeague(matches, true).entries()].map(([league, lm]) => (
       <LeagueCard key={league} league={league} matches={lm} leagueLogo={lm[0]?.leagueLogo} showDraw={showDraw} />
     ));
   }
 
-  function renderSection(
-    title: string,
-    matches: EnrichedMatch[],
-    opts: { isLive?: boolean; isFinished?: boolean } = {},
-  ) {
+  function renderSection(title: string, matches: EnrichedMatch[], opts: { isLive?: boolean; isFinished?: boolean } = {}) {
     if (matches.length === 0) return null;
     return (
       <section className="mb-6">
-        <SectionHeader
-          title={title} count={matches.length}
-          isLive={opts.isLive} isFinished={opts.isFinished}
-          showToggle={opts.isFinished} expanded={showFinished}
-          onToggle={() => setShowFinished((v) => !v)}
-        />
+        <SectionHeader title={title} count={matches.length} isLive={opts.isLive} isFinished={opts.isFinished}
+          showToggle={opts.isFinished} expanded={showFinished} onToggle={() => setShowFinished((v) => !v)} />
         {(!opts.isFinished || showFinished) && renderLeagueGroups(matches, !!opts.isFinished)}
       </section>
     );
@@ -1982,39 +1801,46 @@ export default function MatchList() {
   return (
     <div className="px-4 mt-4">
 
-      {/* Sport tabs */}
+      {/* ── Recent Winners Bar ── */}
+      <RecentWinnersBar />
+
+      {/* ── Sport tabs ── */}
       <div className="flex gap-1.5 overflow-x-auto pb-2 mb-3 no-scrollbar">
         {SPORT_TABS.map((tab) => (
           <button key={tab.key} onClick={() => setActiveSport(tab.key)}
-                  className={`sport-tab${activeSport === tab.key ? ' active' : ''}`}>
+            className={`sport-tab${activeSport === tab.key ? ' active' : ''}`}>
             {tab.icon}{tab.label}
           </button>
         ))}
       </div>
 
-      {/* Football league sub-tabs */}
+      {/* ── Football league sub-tabs ── */}
       {activeSport === 'football' && (
         <div className="flex gap-1.5 overflow-x-auto pb-2 mb-4 no-scrollbar">
           {FOOTBALL_LEAGUE_TABS.map((tab) => (
             <button key={tab.key} onClick={() => setActiveLeagueTab(tab.key)}
-                    className={`league-tab${activeLeagueTab === tab.key ? ' active' : ''}`}>
+              className={`league-tab${activeLeagueTab === tab.key ? ' active' : ''}`}>
               {tab.label}
             </button>
           ))}
         </div>
       )}
 
-      {/* Special Games */}
+      {/* ── Special Games — FIX 6: passes fingerprint updater ── */}
       {activeSport === 'football' && (
         <SpecialGamesSection onAdminFingerprintsChange={setAdminFingerprints} />
       )}
 
-      {/* Match list */}
+      {/* ── Fallback notice ── */}
+      {isFallback && !isLoading && (
+        <FallbackNotice tabLabel={activeLeagueTabLabel} />
+      )}
+
+      {/* ── Match list ── */}
       {error ? (
         <div className="text-center py-12">
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{error}</p>
-          <button onClick={handleRetry} className="mt-3 text-xs font-semibold hover:underline"
-                  style={{ color: 'var(--primary)' }}>
+          <button onClick={handleRetry} className="mt-3 text-xs font-semibold hover:underline" style={{ color: 'var(--primary)' }}>
             Try again
           </button>
         </div>
@@ -2044,6 +1870,9 @@ export default function MatchList() {
           )}
         </>
       )}
+
+      {/* ── Floating Bet Slip Button ── */}
+      <FloatingBetSlipButton />
     </div>
   );
 }
