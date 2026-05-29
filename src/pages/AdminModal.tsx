@@ -1035,7 +1035,7 @@ function MatchesSection() {
           <div style={{ fontSize: 40, marginBottom: 12 }}>🏟️</div>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)', fontWeight: 600, marginBottom: 16 }}>No {filter !== 'ALL' ? filter.toLowerCase() + ' ' : ''}matches{hiddenCount > 0 ? ' visible' : ' yet'}</p>
           {hiddenCount > 0 && <button onClick={() => setHiddenIds(new Set())} style={{ marginBottom: 10, padding: '8px 18px', borderRadius: 8, background: 'rgba(255,71,87,0.1)', border: '1px solid rgba(255,71,87,0.3)', color: '#ff4757', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>Restore {hiddenCount} hidden</button>}
-          {filter === 'ALL' && hiddenCount === 0 && <button onClick={() => setShowCreate(true)} style={{ padding: '10px 22px', borderRadius: 9, background: 'linear-gradient(135deg, #63d2ff, #3891ff)', border: 'none', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}>+ Create First Match</button>}
+          {filter === 'ALL' && hiddenCount === 0 && <button onClick={() => setShowCreate(true)} style={{ padding: '10px 22px', borderRadius: 9, background: 'linear-gradient(135deg, #63d2ff, #3891ff)', border: 'none', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}>+ Create your first match</button>}
         </div>
       )}
       {!loading && !fetchError && filtered.length > 0 && (
@@ -1466,7 +1466,8 @@ function BcSelectionPicker({ bookingType, onPick, onClose }: { bookingType: Book
 
         {/* ── Actions ── */}
         <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: '11px 0', borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+          <button onClick={onClose}
+            style={{ flex: 1, padding: '11px 0', borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
             Cancel
           </button>
           <button onClick={() => onPick(buildSelection())} disabled={!canSubmit()}
@@ -1476,6 +1477,127 @@ function BcSelectionPicker({ bookingType, onPick, onClose }: { bookingType: Book
         </div>
 
       </div>
+    </BcModalShell>
+  );
+}
+
+// ─── BcCreateModal — needs currency for stake label + potential payout ────────
+
+function BcCreateModal({ bookingType, onClose, onBack, onCreate }: { bookingType: BookingTypeId; onClose: () => void; onBack: () => void; onCreate: (code: BookingCode) => void }) {
+  const { showToast } = useAppStore();
+  const { currency } = useCurrency();
+  const typeCfg = bookingTypeConfig(bookingType);
+  const [form, setForm] = useState({ label: '', stake: 10, expires_in_hours: 24, selections: [] as any[] });
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError]           = useState('');
+
+  const totalOdds = useMemo(() => form.selections.reduce((p, s) => p * s.odds, 1), [form.selections]);
+  const potential = +(form.stake * totalOdds).toFixed(2);
+  const kind      = useMemo(() => deriveKind(form.selections), [form.selections]);
+
+  const addSelection = (sel: any) => {
+    if (form.selections.find((s) => s.fixture_id === sel.fixture_id)) { setError('That fixture is already in this slip.'); return; }
+    setError('');
+    setForm((f) => ({ ...f, selections: [...f.selections, sel] }));
+    setPickerOpen(false);
+  };
+
+  const validate = () => {
+    if (!form.label.trim())                          return 'Label is required';
+    if (!form.selections.length)                     return 'Add at least 1 selection';
+    if (form.selections.length > 20)                 return 'Max 20 selections';
+    if (form.stake < 1)                              return 'Min stake is 1';
+    if (form.selections.some((s) => s.odds < 1.10)) return 'Min odds per selection: 1.10';
+    if (totalOdds > 10000)                           return 'Max total odds: 10,000';
+    return null;
+  };
+
+  const submit = async () => {
+    const err = validate();
+    if (err) { setError(err); return; }
+    setError('');
+    setSubmitting(true);
+    try {
+      const expiresAt = new Date(Date.now() + form.expires_in_hours * 3_600_000).toISOString();
+      const payload: CreateBookingRequest = {
+        kind,
+        label:      form.label.trim(),
+        stake:      +form.stake,
+        currency:   currency.code,          // use detected currency
+        selections: form.selections,
+        expiresAt,
+        ...(bookingType !== 'STANDARD' ? { bookingType } : {}),
+      };
+      const method = typeCfg.apiMethod satisfies BookingApiMethod;
+      const raw    = await adminBooking[method](payload);
+      const res    = normalise<BookingCode>(raw);
+      if (res.success && res.data) { showToast('Code created!', 'success'); onCreate(res.data); }
+      else { setError('Server returned an unexpected response.'); }
+    } catch (err: unknown) {
+      setError('Failed to create code: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally { setSubmitting(false); }
+  };
+
+  return (
+    <BcModalShell title={typeCfg.label} subtitle={typeCfg.desc} onClose={onClose}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: typeCfg.accentBg, border: `1px solid ${typeCfg.accent}40` }}>
+          <span style={{ fontSize: 16 }}>{typeCfg.id === 'STANDARD' ? '🎟️' : typeCfg.id === 'ADMIN_ONLY' ? '⭐' : '🔀'}</span>
+          <span style={{ fontSize: 12, color: typeCfg.accent, fontWeight: 600 }}>{typeCfg.label}</span>
+          <button onClick={onBack} style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: typeCfg.accent, fontSize: 11, fontWeight: 600 }}>Change type ›</button>
+        </div>
+        <BcField label="Label"><input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} placeholder="e.g. Weekend Big 4" style={bcInputStyle} /></BcField>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {/* Stake label now shows the user's detected currency code */}
+          <BcField label={`Stake (${currency.code})`}>
+            <input type="number" min="1" value={form.stake} onChange={(e) => setForm((f) => ({ ...f, stake: +e.target.value || 0 }))} style={bcInputStyle} />
+          </BcField>
+          <BcField label="Expires in (hours)">
+            <input type="number" min="1" value={form.expires_in_hours} onChange={(e) => setForm((f) => ({ ...f, expires_in_hours: +e.target.value || 24 }))} style={bcInputStyle} />
+          </BcField>
+        </div>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <label style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Selections ({form.selections.length})</label>
+            <button onClick={() => setPickerOpen(true)} style={{ padding: '6px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${typeCfg.accent}60`, color: typeCfg.accent, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>+ Add Match</button>
+          </div>
+          {form.selections.length === 0 ? (
+            <div style={{ padding: '20px 16px', textAlign: 'center', borderRadius: 10, border: '2px dashed rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>
+              No selections yet — tap <strong>Add Match</strong> to build your slip.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {form.selections.map((s, i) => <BcSelectionRow key={i} sel={s} onRemove={() => setForm((f) => ({ ...f, selections: f.selections.filter((_, j) => j !== i) }))} />)}
+            </div>
+          )}
+        </div>
+        <div style={{ borderRadius: 12, padding: '14px 16px', background: typeCfg.accentBg, border: `1px solid ${typeCfg.accent}60`, display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', gap: 12, alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Kind</div>
+            <div style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13, color: typeCfg.accent }}>{kind}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Total Odds</div>
+            <div style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 22, color: typeCfg.accent, lineHeight: 1 }}>{totalOdds.toFixed(2)}x</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Potential Payout</div>
+            {/* fmt() now converts from GHS to user's local currency */}
+            <div style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 22, color: '#4ade80', lineHeight: 1 }}>{fmt(potential, currency)}</div>
+          </div>
+        </div>
+        {error && <div style={{ fontSize: 12, color: '#f87171', background: 'rgba(239,68,68,0.1)', borderRadius: 8, padding: '8px 12px' }}>{error}</div>}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: '11px 0', borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
+          <button onClick={submit} disabled={submitting} style={{ flex: 1, padding: '11px 0', borderRadius: 9, border: 'none', background: submitting ? 'rgba(255,255,255,0.1)' : typeCfg.accent, color: submitting ? 'rgba(255,255,255,0.4)' : '#fff', fontSize: 13, fontWeight: 800, cursor: submitting ? 'not-allowed' : 'pointer', letterSpacing: '0.04em' }}>
+            {submitting ? 'Creating…' : '⚡ Create Code'}
+          </button>
+        </div>
+      </div>
+      <AnimatePresence>
+        {pickerOpen && <BcSelectionPicker bookingType={bookingType} onPick={addSelection} onClose={() => setPickerOpen(false)} />}
+      </AnimatePresence>
     </BcModalShell>
   );
 }
@@ -1500,7 +1622,7 @@ function BcViewModal({ code, onClose }: { code: BookingCode; onClose: () => void
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, gap: 8 }}>
             <div style={{ fontWeight: 700, fontSize: 15, color: '#fff' }}>{code.label}</div>
             {(code as any).bookingType && (
-              <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', background: btCfg.accentBg, color: btCfg.accent }}>
+              <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', background: btCfg.accentBg, color: btCfg.accent, flexShrink: 0 }}>
                 {(code as any).bookingType === 'ADMIN_ONLY' ? 'Admin Only' : (code as any).bookingType === 'MIXED' ? 'Mixed' : 'Standard'}
               </span>
             )}
@@ -1771,11 +1893,9 @@ function UpgradeChatPanel({ chat, isSuperAdmin, onClose, onCommissionSet }: { ch
   const [commissionInput, setCommissionInput]       = useState('');
   const [settingCommission, setSettingCommission]   = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const COMMISSION_RATE = 70; // 70% commission rate
 
   const fetchMessages = useCallback(async () => {
     try {
-      // Determine API call based on user role
       const fn = isSuperAdmin ? () => superAdminUpgradeChats.getMessages(chat.id) : () => upgradeChats.getMessages(chat.id);
       const raw = await fn();
       const res = normalise<AdminUpgradeChatMessageDto[]>(raw);
@@ -1790,7 +1910,6 @@ function UpgradeChatPanel({ chat, isSuperAdmin, onClose, onCommissionSet }: { ch
     const content = msgInput.trim(); if (!content) return;
     setSending(true);
     try {
-      // Determine API call based on user role
       const fn = isSuperAdmin ? () => superAdminUpgradeChats.sendMessage(chat.id, { content }) : () => upgradeChats.sendMessage(chat.id, { content });
       const raw = await fn();
       const res = normalise<AdminUpgradeChatMessageDto>(raw);
@@ -1801,10 +1920,9 @@ function UpgradeChatPanel({ chat, isSuperAdmin, onClose, onCommissionSet }: { ch
 
   const handleSetCommission = async () => {
     const rate = parseFloat(commissionInput);
-    if (isNaN(rate) || rate < 1 || rate > 100) { showToast('Rate must be between 1 and 100.', 'error'); return; }
+    if (isNaN(rate) || rate < 0.1 || rate > 100) { showToast('Rate must be between 0.1 and 100.', 'error'); return; }
     setSettingCommission(true);
     try {
-      // Assumes superAdminUpgradeChats has a method to set commission
       const raw = await superAdminUpgradeChats.setCommission(chat.id, { commissionRate: rate });
       const res = normalise(raw);
       if (res.success) { showToast('Commission set!', 'success'); setCommissionInput(''); onCommissionSet(); fetchMessages(); }
@@ -1826,7 +1944,6 @@ function UpgradeChatPanel({ chat, isSuperAdmin, onClose, onCommissionSet }: { ch
         {loading ? <div className="flex justify-center py-8"><Spinner /></div>
           : messages.length === 0 ? <EmptyState icon={<ChatIcon sx={{ fontSize: 40 }} />} text="No messages yet." />
           : messages.map((msg) => {
-            // System messages styling
             if (msg.senderRole === 'SYSTEM') return (
               <div key={msg.id} className="flex justify-center">
                 <div className="bg-slate-700/60 border border-slate-600 rounded-xl px-4 py-2 max-w-[80%]">
@@ -1835,12 +1952,10 @@ function UpgradeChatPanel({ chat, isSuperAdmin, onClose, onCommissionSet }: { ch
                 </div>
               </div>
             );
-            // Determine if message is from the current side (user or admin)
             const isCurrentSide = isSuperAdmin ? msg.senderRole === 'SUPER_ADMIN' : msg.senderRole === 'USER';
             return (
               <div key={msg.id} className={`flex ${isCurrentSide ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${isCurrentSide ? 'bg-primary text-white rounded-br-sm' : 'bg-slate-700 text-slate-100 rounded-bl-sm'}`}>
-                  {/* Display sender name only if not current side and not system */}
                   {!isCurrentSide && <p className="text-[10px] font-bold mb-1 text-slate-400 uppercase tracking-wider">{msg.senderRole === 'SUPER_ADMIN' ? 'Support' : msg.senderName}</p>}
                   <p className="text-sm leading-relaxed">{msg.content}</p>
                   <p className={`text-[10px] mt-1 ${isCurrentSide ? 'text-white/60' : 'text-slate-500'}`}>{fmtDate(msg.sentAt)}</p>
@@ -1850,19 +1965,17 @@ function UpgradeChatPanel({ chat, isSuperAdmin, onClose, onCommissionSet }: { ch
           })}
         <div ref={bottomRef} />
       </div>
-      {/* Commission setting section - only for Super Admins when status is PENDING_COMMISSION */}
       {isSuperAdmin && chat.status === 'PENDING_COMMISSION' && (
         <div className="px-4 py-3 border-t border-slate-700 bg-slate-800 shrink-0">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Set Commission Rate</p>
           <div className="flex gap-2">
-            <input type="number" min={1} max={100} step={1} value={commissionInput} onChange={(e) => setCommissionInput(e.target.value)} placeholder={`e.g. ${COMMISSION_RATE}`} className="flex-1 bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-primary outline-none" />
+            <input type="number" min={0.1} max={100} step={0.1} value={commissionInput} onChange={(e) => setCommissionInput(e.target.value)} placeholder="e.g. 60" className="flex-1 bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-primary outline-none" />
             <button onClick={handleSetCommission} disabled={settingCommission || !commissionInput} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-sm font-bold flex items-center gap-1.5">
               {settingCommission ? <Spinner /> : <><CheckIcon fontSize="small" /> Set</>}
             </button>
           </div>
         </div>
       )}
-      {/* Message input section - only if chat is not closed */}
       {chat.status !== 'CLOSED' && (
         <div className="px-4 py-3 border-t border-slate-700 bg-slate-800 shrink-0 flex gap-2">
           <input type="text" value={msgInput} onChange={(e) => setMsgInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()} placeholder="Type a message…" maxLength={2000} className="flex-1 bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-primary outline-none" />
@@ -1888,10 +2001,7 @@ function DashboardSection({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [analyticsRaw, affRaw] = await Promise.all([
-        adminAnalytics.get(range),
-        adminAffiliate.getStats()
-      ]);
+      const [analyticsRaw, affRaw] = await Promise.all([adminAnalytics.get(range), adminAffiliate.getStats()]);
       const analyticsRes = normalise<Record<string, unknown>>(analyticsRaw);
       const affRes = normalise<AffiliateStatsDTO>(affRaw);
       if (analyticsRes.success) setAnalytics(analyticsRes.data);
@@ -1935,7 +2045,7 @@ function DashboardSection({ isSuperAdmin }: { isSuperAdmin: boolean }) {
           {['7d', '30d', '90d'].map((r) => (
             <button key={r} onClick={() => setRange(r)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${range === r ? 'bg-primary text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}>{r}</button>
           ))}
-          <button onClick={load} className="p-1.5 rounded-xl bg-slate-700 text-slate-400 hover:bg-slate-600"><RefreshIcon fontSize="small" /></button>
+          <button onClick={load} className="p-1.5 rounded-lg bg-slate-700 text-slate-400 hover:bg-slate-600"><RefreshIcon fontSize="small" /></button>
         </div>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -2012,7 +2122,7 @@ function AffiliateSection({ userEmail }: { userEmail?: string }) {
       const usersRes   = normalise<any[]>(usersRaw);
       if (statsRes.success)   setStats(statsRes.data);
       if (windowRes.success)  setPayoutWindow(!!(windowRes.data as { open?: boolean })?.open);
-      if (historyRes.success) setPayoutHistory(historyRes.data?.content ?? (Array.isArray(res.data) ? res.data as unknown as PayoutRequest[] : [])); // Corrected potential array type
+      if (historyRes.success) setPayoutHistory(historyRes.data?.content ?? (Array.isArray(historyRes.data) ? historyRes.data as unknown as PayoutRequest[] : []));
       if (linksRes.success)   setLinks(Array.isArray(linksRes.data) ? linksRes.data : []);
       if (usersRes.success)   setReferredUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
     } catch { /* silent */ } finally { setLoading(false); }
@@ -2075,7 +2185,7 @@ function AffiliateSection({ userEmail }: { userEmail?: string }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>Affiliate Dashboard</h2>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>DASHBOARD</h2>
           {userEmail && <p style={{ margin: '2px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Signed in as <span style={{ color: '#63d2ff', fontWeight: 600 }}>{userEmail}</span></p>}
         </div>
         <button onClick={load} style={{ padding: '8px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><RefreshIcon fontSize="small" /></button>
@@ -2287,7 +2397,7 @@ function WithdrawalsSection() {
       </div>
       <div className="flex gap-2 overflow-x-auto">
         {([undefined, 'PENDING', 'APPROVED', 'REJECTED'] as const).map((s) => (
-          <button key={String(s)} onClick={() => setStatusFilter(s)} className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-colors ${statusFilter === s ? 'bg-primary text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}>{s ?? 'All'}</button>
+          <button key={String(s)} onClick={() => setStatusFilter(s)} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors ${statusFilter === s ? 'bg-primary text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}>{s ?? 'All'}</button>
         ))}
       </div>
       {loading ? <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-16 bg-slate-800 rounded-2xl animate-pulse" />)}</div>
@@ -2334,7 +2444,6 @@ function UpgradeChatsSection({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // Determine API call based on user role
       const fn = filter === 'pending' ? superAdminUpgradeChats.getPending : superAdminUpgradeChats.getAll;
       const raw = await fn();
       const res = normalise<AdminUpgradeChatDto[]>(raw);
@@ -2344,7 +2453,6 @@ function UpgradeChatsSection({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 
   useEffect(() => { load(); }, [load]);
 
-  // If a chat is active, render the chat panel
   if (activeChat) {
     return (
       <div className="h-full -m-3 sm:-m-5 md:-m-6 flex flex-col">
@@ -2353,7 +2461,6 @@ function UpgradeChatsSection({ isSuperAdmin }: { isSuperAdmin: boolean }) {
     );
   }
 
-  // Otherwise, render the list of chats
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -2479,8 +2586,7 @@ function AuditSection({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const load = useCallback(async () => {
     setLoading(true); setFetchError(null);
     try {
-      // Determine API call based on user role
-      const fn = isSuperAdmin ? superAdmin.auditLog : adminAnalytics.auditLog; // Fallback to adminAnalytics if not super admin, though access is restricted in AdminModal
+      const fn = isSuperAdmin ? superAdmin.auditLog : adminAnalytics.auditLog;
       const raw = await fn();
       const res = normalise<{ content: AuditLog[] }>(raw);
       if (res.success) setList(res.data?.content ?? (Array.isArray(res.data) ? res.data as unknown as AuditLog[] : []));
@@ -2525,57 +2631,37 @@ export default function AdminModal() {
   const { isAdminModalOpen, setAdminModalOpen, user } = useAppStore();
   const [activeSection, setActiveSection] = useState<SectionKey>('affiliate');
 
-  // Ensure user and user.email are available
-  if (!isAdminModalOpen || !user || !user.email) return null;
+  if (!isAdminModalOpen || !user) return null;
 
   const role = user.role as string;
   const isSuperAdmin = role === 'SUPER_ADMIN' || role === 'super_admin';
 
-  // Define allowed emails for full access
-  const fullAccessEmails = ['kwadwoasiamah02@gmail.com', 'mr.asare2121@gmail.com'];
-  const hasFullAccess = fullAccessEmails.includes(user.email);
-
-  // Define sections and their visibility criteria
-  const sections: { key: SectionKey; label: string; icon: React.ReactNode; superAdminOnly?: boolean; requiresFullAccess?: boolean }[] = [
-    { key: 'affiliate',     label: 'Home',          icon: <GroupAddIcon fontSize="small" />         }, // Always visible
-    { key: 'dashboard',     label: 'Analytics',     icon: <BarChartIcon fontSize="small" />         }, // Always visible
-
-    // Sections visible to Super Admins OR specific full-access emails
-    { key: 'matches',       label: 'Matches',       icon: <SportsSoccerIcon fontSize="small" />     , requiresFullAccess: true },
-    { key: 'bookings',      label: 'Codes',         icon: <QrCodeIcon fontSize="small" />           , requiresFullAccess: true },
-    { key: 'withdrawals',   label: 'Withdrawals',   icon: <PaymentsIcon fontSize="small" />         , requiresFullAccess: true },
-
-    // Sections only for Super Admins
+  const sections: { key: SectionKey; label: string; icon: React.ReactNode; superAdminOnly?: boolean }[] = [
+    { key: 'affiliate',     label: 'Home',          icon: <GroupAddIcon fontSize="small" />         },
+    { key: 'dashboard',     label: 'Analytics',     icon: <BarChartIcon fontSize="small" />         },
+    { key: 'matches',       label: 'Matches',       icon: <SportsSoccerIcon fontSize="small" />     },
+    { key: 'bookings',      label: 'Codes',         icon: <QrCodeIcon fontSize="small" />           },
+    { key: 'withdrawals',   label: 'Withdrawals',   icon: <PaymentsIcon fontSize="small" />         },
     { key: 'upgrade-chats', label: 'Upgrade Chats', icon: <ChatIcon fontSize="small" />,       superAdminOnly: true },
     { key: 'payouts',       label: 'Payouts',       icon: <AttachMoneyIcon fontSize="small" />, superAdminOnly: true },
-
-    // Audit section - requires full access OR super admin
-    { key: 'audit',         label: 'Audit',         icon: <HistoryIcon fontSize="small" />,         requiresFullAccess: true },
+    { key: 'audit',         label: 'Audit',         icon: <HistoryIcon fontSize="small" />          },
   ];
 
-  // Filter sections based on user's role and full access
-  const visibleSections = sections.filter((s) => {
-    if (s.superAdminOnly && !isSuperAdmin) return false; // Super Admin only sections
-    if (s.requiresFullAccess && !isSuperAdmin && !hasFullAccess) return false; // Requires full access OR super admin
-    // Default case: Always visible sections (affiliate, dashboard)
-    // Or sections where the user meets the requirement
-    return true;
-  });
-
+  const visibleSections = sections.filter((s) => !s.superAdminOnly || isSuperAdmin);
 
   return (
     <div className="fixed inset-0 z-[70] bg-slate-900 flex flex-col">
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 shrink-0 bg-slate-900">
         <div className="flex items-center gap-2">
-          {isSuperAdmin || hasFullAccess
+          {isSuperAdmin
             ? <SupervisorAccountIcon className="text-purple-400" fontSize="small" />
             : <AdminPanelSettingsIcon className="text-primary" fontSize="small" />
           }
           <h1 className="font-heading text-base sm:text-lg font-bold text-white">
             {isSuperAdmin ? 'Super Admin Panel' : 'Admin Panel'}
           </h1>
-          <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${isSuperAdmin || hasFullAccess ? 'bg-purple-900/30 text-purple-400' : 'bg-blue-900/30 text-blue-400'}`}>
-            {isSuperAdmin || hasFullAccess ? 'FULL ACCESS' : 'ADMIN'}
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${isSuperAdmin ? 'bg-purple-900/30 text-purple-400' : 'bg-blue-900/30 text-blue-400'}`}>
+            {isSuperAdmin ? 'SUPER ADMIN' : 'ADMIN'}
           </span>
         </div>
         <button onClick={() => setAdminModalOpen(false)} className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800">
@@ -2605,17 +2691,14 @@ export default function AdminModal() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 mt-[52px] md:mt-0 bg-slate-900">
-          {/* Render the active section */}
-          {activeSection === 'affiliate' && <AffiliateSection userEmail={user.email} />}
-          {activeSection === 'dashboard' && <DashboardSection isSuperAdmin={isSuperAdmin} />}
-          {activeSection === 'matches' && <MatchesSection />}
-          {activeSection === 'bookings' && <BookingsSection />}
-          {activeSection === 'withdrawals' && <WithdrawalsSection />}
-          {/* Conditional rendering for Super Admin only sections */}
+          {activeSection === 'affiliate'     && <AffiliateSection userEmail={user.email} />}
+          {activeSection === 'dashboard'     && <DashboardSection isSuperAdmin={isSuperAdmin} />}
+          {activeSection === 'matches'       && <MatchesSection />}
+          {activeSection === 'bookings'      && <BookingsSection />}
+          {activeSection === 'withdrawals'   && <WithdrawalsSection />}
           {activeSection === 'upgrade-chats' && isSuperAdmin && <UpgradeChatsSection isSuperAdmin={isSuperAdmin} />}
-          {activeSection === 'payouts' && isSuperAdmin && <PayoutsSection />}
-          {/* Conditional rendering for Audit section (Super Admin OR specific emails) */}
-          {activeSection === 'audit' && (isSuperAdmin || hasFullAccess) && <AuditSection isSuperAdmin={isSuperAdmin} />}
+          {activeSection === 'payouts'       && isSuperAdmin && <PayoutsSection />}
+          {activeSection === 'audit'         && <AuditSection isSuperAdmin={isSuperAdmin} />}
         </div>
       </div>
     </div>
