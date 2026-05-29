@@ -377,14 +377,10 @@ export default function LoginPage() {
 
             {/* Password */}
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                  Password
-                </label>
-                <Link to="/forgot-password" className="text-xs font-semibold hover:underline" style={{ color: 'var(--primary)' }}>
-                  Forgot Password?
-                </Link>
-              </div>
+              {/* ✅ REMOVED: Forgot Password link — label only now */}
+              <label className="block text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                Password
+              </label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
