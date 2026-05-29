@@ -34,6 +34,7 @@ interface WalletData {
   currency?: string;
   depositCountToday?: number; // Added to track daily deposits
   hasMadeFirstDepositToday?: boolean; // New field to track if the first deposit has been made today
+  hasEverDeposited?: boolean; // **NEW**: Flag to check if the user has ever made a deposit
   [key: string]: unknown;
 }
 
@@ -371,7 +372,7 @@ function GroupedSelect(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
       {...props}
       style={{ ...groupedInputStyle, paddingRight: '2.5rem', ...props.style }}
       onFocus={e => { (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = 'var(--card-alt)'; props.onFocus?.(e); }}
-      onBlur={e => { (e.currentTarget.parentElement as HTMLElement).style.backgroundColor = ''; props.onBlur?.(e); }}
+      onBlur={e => { (e.currentTarget as HTMLElement).style.backgroundColor = ''; props.onBlur?.(e); }}
     />
   );
 }
@@ -461,7 +462,8 @@ interface WithdrawModalProps {
   currency: CurrencyInfo;
   minDepositsForWithdrawal: number; // New prop for minimum deposits
   userDepositsToday: number;        // New prop for user's deposits today
-  hasMadeFirstDepositToday: boolean; // New prop to check if first deposit was made
+  hasMadeFirstDepositToday?: boolean; // Prop to check if first deposit was made today
+  hasEverDeposited?: boolean; // **NEW PROP**: Flag to determine if the user has ever made a deposit
   isAdmin: boolean;                 // New prop to check if user is admin
 }
 
@@ -474,6 +476,7 @@ function WithdrawModal({
   minDepositsForWithdrawal,
   userDepositsToday,
   hasMadeFirstDepositToday,
+  hasEverDeposited, // Use the new prop
   isAdmin,
 }: WithdrawModalProps) {
   const [step, setStep]                   = useState<'form' | 'confirm' | 'done'>('form');
@@ -522,12 +525,16 @@ function WithdrawModal({
     }
   };
 
-  // Logic for checking if withdrawal is allowed:
-  // Admins can always withdraw.
-  // Regular users need to have made at least `minDepositsForWithdrawal` deposits today.
-  // Also, the `hasMadeFirstDepositToday` flag must be true. If it's false,
-  // it means no deposit has been made today, and withdrawal should be restricted.
-  const canWithdraw = isAdmin || (hasMadeFirstDepositToday && userDepositsToday >= minDepositsForWithdrawal);
+  // Revised Logic for Withdrawal Eligibility:
+  // - Admins are always eligible.
+  // - Users who have NEVER deposited are eligible.
+  // - Users who HAVE deposited before are eligible ONLY IF:
+  //   - They made their first deposit today (`hasMadeFirstDepositToday`) AND
+  //   - They have met the minimum daily deposit count (`userDepositsToday >= minDepositsForWithdrawal`).
+  const canWithdraw = isAdmin ||
+                      !hasEverDeposited || // If they've never deposited, they can withdraw.
+                      (hasMadeFirstDepositToday && userDepositsToday >= minDepositsForWithdrawal);
+
 
   const canProceed = amountLocal > 0 && amountLocal <= balanceLocal && !!accountNumber && !!accountName && canWithdraw;
 
@@ -640,32 +647,39 @@ function WithdrawModal({
             </GroupedField>
           </GroupedFields>
 
-          {/* Alert banner for withdrawal conditions */}
-          {!isAdmin && !hasMadeFirstDepositToday && (
+          {/* Alert banner for withdrawal conditions FOR USERS WHO HAVE DEPOSITED BEFORE */}
+          {!isAdmin && hasEverDeposited && !hasMadeFirstDepositToday && (
             <AlertBanner
               type="error"
-              message="You must make at least one deposit to be eligible for withdrawals."
+              message="You must make at least one deposit today to be eligible for withdrawals."
             />
           )}
-          {!isAdmin && hasMadeFirstDepositToday && userDepositsToday < minDepositsForWithdrawal && (
+          {!isAdmin && hasEverDeposited && hasMadeFirstDepositToday && userDepositsToday < minDepositsForWithdrawal && (
             <AlertBanner
               type="error"
               message={`You need to make ${minDepositsForWithdrawal - userDepositsToday} more deposit(s) today to withdraw. Your current deposits today: ${userDepositsToday}.`}
             />
           )}
+          {/* This alert would be for users who have NEVER deposited, but according to the new rule,
+              they should bypass this restriction. If the backend doesn't provide `hasEverDeposited`,
+              and `hasMadeFirstDepositToday` is false, it could be that they never deposited OR
+              that they deposited previously but not today. The current logic would restrict them.
+              The NEW rule implies IF `!hasEverDeposited` THEN `canWithdraw = true`.
+              The alerts below are now ONLY for users who HAVE deposited before. */}
+
 
           {error && <AlertBanner type="error" message={error} />}
 
           <BtnPrimary
             size="lg"
-            disabled={!canProceed} // Disabled if conditions not met
+            disabled={!canProceed} // Disabled if inputs are invalid OR if!canWithdraw
             onClick={() => {
-              if (canWithdraw) {
-                setStep('confirm'); // Proceed to confirm if conditions met
-              } else {
-                // If conditions not met but button is clicked, the alert banners should already be visible.
-                // No explicit action needed here as the logic for canProceed handles this.
+              // Proceed to confirm step only if all conditions met (including canWithdraw)
+              if (canProceed) {
+                setStep('confirm');
               }
+              // If not canProceed, the button is disabled, or the disabled state prevents this click.
+              // The alert banners will guide the user if they are not eligible but have valid inputs.
             }}
           >
             Continue
@@ -875,7 +889,8 @@ export default function WalletPage() {
 
   // Extract user-specific data for withdrawal logic
   const userDepositsToday = walletData?.depositCountToday ?? 0;
-  const hasMadeFirstDepositToday = walletData?.hasMadeFirstDepositToday ?? false; // Use the new field
+  const hasMadeFirstDepositToday = walletData?.hasMadeFirstDepositToday ?? false; // Use the existing field
+  const hasEverDeposited = walletData?.hasEverDeposited ?? false; // **NEW**: Use the new flag from wallet data
   const isAdmin = currentUser?.role === 'ADMIN'; // Assuming user object has a 'role' property
 
   // ── Loading skeleton ──────────────────────────────────────────────────────
@@ -1108,7 +1123,8 @@ export default function WalletPage() {
         currency={currency}
         minDepositsForWithdrawal={MIN_DEPOSITS_FOR_WITHDRAWAL}
         userDepositsToday={userDepositsToday}
-        hasMadeFirstDepositToday={hasMadeFirstDepositToday} // Pass the new prop
+        hasMadeFirstDepositToday={hasMadeFirstDepositToday}
+        hasEverDeposited={hasEverDeposited} // Pass the NEW flag
         isAdmin={isAdmin}
       />
       <AffiliateWithdrawModal
