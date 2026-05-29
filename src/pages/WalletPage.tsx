@@ -32,6 +32,7 @@ import VolunteerActivismIcon   from '@mui/icons-material/VolunteerActivism';
 interface WalletData {
   balance: number;
   currency?: string;
+  depositCountToday?: number; // Added to track daily deposits
   [key: string]: unknown;
 }
 
@@ -457,9 +458,21 @@ interface WithdrawModalProps {
   onSuccess: () => void;
   balanceGhs: number;
   currency: CurrencyInfo;
+  minDepositsForWithdrawal: number; // New prop for minimum deposits
+  userDepositsToday: number;        // New prop for user's deposits today
+  isAdmin: boolean;                 // New prop to check if user is admin
 }
 
-function WithdrawModal({ open, onClose, onSuccess, balanceGhs, currency }: WithdrawModalProps) {
+function WithdrawModal({
+  open,
+  onClose,
+  onSuccess,
+  balanceGhs,
+  currency,
+  minDepositsForWithdrawal,
+  userDepositsToday,
+  isAdmin,
+}: WithdrawModalProps) {
   const [step, setStep]                   = useState<'form' | 'confirm' | 'done'>('form');
   const [amount, setAmount]               = useState('');
   const [method, setMethod]               = useState('momo');
@@ -506,7 +519,10 @@ function WithdrawModal({ open, onClose, onSuccess, balanceGhs, currency }: Withd
     }
   };
 
-  const canProceed = amountLocal > 0 && amountLocal <= balanceLocal && !!accountNumber && !!accountName;
+  // Check if withdrawal is allowed based on deposit count
+  const canWithdraw = isAdmin || userDepositsToday >= minDepositsForWithdrawal;
+
+  const canProceed = amountLocal > 0 && amountLocal <= balanceLocal && !!accountNumber && !!accountName && canWithdraw;
 
   const currencyLabel = `Amount (${currency.code})`;
 
@@ -616,6 +632,13 @@ function WithdrawModal({ open, onClose, onSuccess, balanceGhs, currency }: Withd
               <GroupedInput type="text" value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="Full name on account" />
             </GroupedField>
           </GroupedFields>
+
+          {!canWithdraw && (
+            <AlertBanner
+              type="error"
+              message={`You need to make at least ${minDepositsForWithdrawal} deposits today to withdraw. Your current deposits today: ${userDepositsToday}.`}
+            />
+          )}
 
           {error && <AlertBanner type="error" message={error} />}
 
@@ -766,6 +789,9 @@ export default function WalletPage() {
   const [currency,        setCurrency]        = useState<CurrencyInfo>(DEFAULT_CURRENCY);
   const [currencyLoading, setCurrencyLoading] = useState(true);
 
+  // Constants for withdrawal logic
+  const MIN_DEPOSITS_FOR_WITHDRAWAL = 3; // Minimum number of deposits required per day
+
   useEffect(() => {
     if (!currentUser) navigate('/login', { replace: true, state: { from: '/wallet' } });
   }, [currentUser, navigate]);
@@ -821,6 +847,10 @@ export default function WalletPage() {
   const ghsBalance    = walletData?.balance ?? 0;
   const affBalanceGhs = affiliateStats?.availableBalance   ?? 0;
   const affLifetimeGhs = affiliateStats?.lifetimeCommission ?? 0;
+
+  // Extract user-specific data for withdrawal logic
+  const userDepositsToday = walletData?.depositCountToday ?? 0;
+  const isAdmin = currentUser?.role === 'ADMIN'; // Assuming user object has a 'role' property
 
   // ── Loading skeleton ──────────────────────────────────────────────────────
   if (loading || currencyLoading) {
@@ -1050,6 +1080,9 @@ export default function WalletPage() {
         onSuccess={() => { setShowWithdraw(false); fetchWallet(); fetchTransactions(0); }}
         balanceGhs={ghsBalance}
         currency={currency}
+        minDepositsForWithdrawal={MIN_DEPOSITS_FOR_WITHDRAWAL}
+        userDepositsToday={userDepositsToday}
+        isAdmin={isAdmin}
       />
       <AffiliateWithdrawModal
         open={showAffWithdraw}
