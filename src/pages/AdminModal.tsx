@@ -1466,8 +1466,7 @@ function BcSelectionPicker({ bookingType, onPick, onClose }: { bookingType: Book
 
         {/* ── Actions ── */}
         <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onClose}
-            style={{ flex: 1, padding: '11px 0', borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+          <button onClick={onClose} style={{ flex: 1, padding: '11px 0', borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
             Cancel
           </button>
           <button onClick={() => onPick(buildSelection())} disabled={!canSubmit()}
@@ -1477,127 +1476,6 @@ function BcSelectionPicker({ bookingType, onPick, onClose }: { bookingType: Book
         </div>
 
       </div>
-    </BcModalShell>
-  );
-}
-
-// ─── BcCreateModal — needs currency for stake label + potential payout ────────
-
-function BcCreateModal({ bookingType, onClose, onBack, onCreate }: { bookingType: BookingTypeId; onClose: () => void; onBack: () => void; onCreate: (code: BookingCode) => void }) {
-  const { showToast } = useAppStore();
-  const { currency } = useCurrency();
-  const typeCfg = bookingTypeConfig(bookingType);
-  const [form, setForm] = useState({ label: '', stake: 10, expires_in_hours: 24, selections: [] as any[] });
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError]           = useState('');
-
-  const totalOdds = useMemo(() => form.selections.reduce((p, s) => p * s.odds, 1), [form.selections]);
-  const potential = +(form.stake * totalOdds).toFixed(2);
-  const kind      = useMemo(() => deriveKind(form.selections), [form.selections]);
-
-  const addSelection = (sel: any) => {
-    if (form.selections.find((s) => s.fixture_id === sel.fixture_id)) { setError('That fixture is already in this slip.'); return; }
-    setError('');
-    setForm((f) => ({ ...f, selections: [...f.selections, sel] }));
-    setPickerOpen(false);
-  };
-
-  const validate = () => {
-    if (!form.label.trim())                          return 'Label is required';
-    if (!form.selections.length)                     return 'Add at least 1 selection';
-    if (form.selections.length > 20)                 return 'Max 20 selections';
-    if (form.stake < 1)                              return 'Min stake is 1';
-    if (form.selections.some((s) => s.odds < 1.10)) return 'Min odds per selection: 1.10';
-    if (totalOdds > 10000)                           return 'Max total odds: 10,000';
-    return null;
-  };
-
-  const submit = async () => {
-    const err = validate();
-    if (err) { setError(err); return; }
-    setError('');
-    setSubmitting(true);
-    try {
-      const expiresAt = new Date(Date.now() + form.expires_in_hours * 3_600_000).toISOString();
-      const payload: CreateBookingRequest = {
-        kind,
-        label:      form.label.trim(),
-        stake:      +form.stake,
-        currency:   currency.code,          // use detected currency
-        selections: form.selections,
-        expiresAt,
-        ...(bookingType !== 'STANDARD' ? { bookingType } : {}),
-      };
-      const method = typeCfg.apiMethod satisfies BookingApiMethod;
-      const raw    = await adminBooking[method](payload);
-      const res    = normalise<BookingCode>(raw);
-      if (res.success && res.data) { showToast('Code created!', 'success'); onCreate(res.data); }
-      else { setError('Server returned an unexpected response.'); }
-    } catch (err: unknown) {
-      setError('Failed to create code: ' + (err instanceof Error ? err.message : 'Unknown error'));
-    } finally { setSubmitting(false); }
-  };
-
-  return (
-    <BcModalShell title={typeCfg.label} subtitle={typeCfg.desc} onClose={onClose}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: typeCfg.accentBg, border: `1px solid ${typeCfg.accent}40` }}>
-          <span style={{ fontSize: 16 }}>{typeCfg.id === 'STANDARD' ? '🎟️' : typeCfg.id === 'ADMIN_ONLY' ? '⭐' : '🔀'}</span>
-          <span style={{ fontSize: 12, color: typeCfg.accent, fontWeight: 600 }}>{typeCfg.label}</span>
-          <button onClick={onBack} style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: typeCfg.accent, fontSize: 11, fontWeight: 600 }}>Change type ›</button>
-        </div>
-        <BcField label="Label"><input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} placeholder="e.g. Weekend Big 4" style={bcInputStyle} /></BcField>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {/* Stake label now shows the user's detected currency code */}
-          <BcField label={`Stake (${currency.code})`}>
-            <input type="number" min="1" value={form.stake} onChange={(e) => setForm((f) => ({ ...f, stake: +e.target.value || 0 }))} style={bcInputStyle} />
-          </BcField>
-          <BcField label="Expires in (hours)">
-            <input type="number" min="1" value={form.expires_in_hours} onChange={(e) => setForm((f) => ({ ...f, expires_in_hours: +e.target.value || 24 }))} style={bcInputStyle} />
-          </BcField>
-        </div>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <label style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Selections ({form.selections.length})</label>
-            <button onClick={() => setPickerOpen(true)} style={{ padding: '6px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${typeCfg.accent}60`, color: typeCfg.accent, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>+ Add Match</button>
-          </div>
-          {form.selections.length === 0 ? (
-            <div style={{ padding: '20px 16px', textAlign: 'center', borderRadius: 10, border: '2px dashed rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>
-              No selections yet — tap <strong>Add Match</strong> to build your slip.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {form.selections.map((s, i) => <BcSelectionRow key={i} sel={s} onRemove={() => setForm((f) => ({ ...f, selections: f.selections.filter((_, j) => j !== i) }))} />)}
-            </div>
-          )}
-        </div>
-        <div style={{ borderRadius: 12, padding: '14px 16px', background: typeCfg.accentBg, border: `1px solid ${typeCfg.accent}60`, display: 'grid', gridTemplateColumns: 'auto 1fr 1fr', gap: 12, alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Kind</div>
-            <div style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13, color: typeCfg.accent }}>{kind}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Total Odds</div>
-            <div style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 22, color: typeCfg.accent, lineHeight: 1 }}>{totalOdds.toFixed(2)}x</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Potential Payout</div>
-            {/* fmt() now converts from GHS to user's local currency */}
-            <div style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 22, color: '#4ade80', lineHeight: 1 }}>{fmt(potential, currency)}</div>
-          </div>
-        </div>
-        {error && <div style={{ fontSize: 12, color: '#f87171', background: 'rgba(239,68,68,0.1)', borderRadius: 8, padding: '8px 12px' }}>{error}</div>}
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: '11px 0', borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
-          <button onClick={submit} disabled={submitting} style={{ flex: 1, padding: '11px 0', borderRadius: 9, border: 'none', background: submitting ? 'rgba(255,255,255,0.1)' : typeCfg.accent, color: submitting ? 'rgba(255,255,255,0.4)' : '#fff', fontSize: 13, fontWeight: 800, cursor: submitting ? 'not-allowed' : 'pointer', letterSpacing: '0.04em' }}>
-            {submitting ? 'Creating…' : '⚡ Create Code'}
-          </button>
-        </div>
-      </div>
-      <AnimatePresence>
-        {pickerOpen && <BcSelectionPicker bookingType={bookingType} onPick={addSelection} onClose={() => setPickerOpen(false)} />}
-      </AnimatePresence>
     </BcModalShell>
   );
 }
@@ -1897,6 +1775,7 @@ function UpgradeChatPanel({ chat, isSuperAdmin, onClose, onCommissionSet }: { ch
 
   const fetchMessages = useCallback(async () => {
     try {
+      // Determine API call based on user role
       const fn = isSuperAdmin ? () => superAdminUpgradeChats.getMessages(chat.id) : () => upgradeChats.getMessages(chat.id);
       const raw = await fn();
       const res = normalise<AdminUpgradeChatMessageDto[]>(raw);
@@ -1911,6 +1790,7 @@ function UpgradeChatPanel({ chat, isSuperAdmin, onClose, onCommissionSet }: { ch
     const content = msgInput.trim(); if (!content) return;
     setSending(true);
     try {
+      // Determine API call based on user role
       const fn = isSuperAdmin ? () => superAdminUpgradeChats.sendMessage(chat.id, { content }) : () => upgradeChats.sendMessage(chat.id, { content });
       const raw = await fn();
       const res = normalise<AdminUpgradeChatMessageDto>(raw);
@@ -1940,12 +1820,14 @@ function UpgradeChatPanel({ chat, isSuperAdmin, onClose, onCommissionSet }: { ch
           <p className="text-sm font-bold text-white truncate">{chat.userFirstName ?? 'User'} · {chat.userEmail ?? ''}</p>
           <StatusBadge status={chat.status} />
         </div>
+        {/* Display commission rate if available */}
         {chat.commissionRate != null && <span className="text-xs text-emerald-400 font-bold shrink-0">{chat.commissionRate}% commission</span>}
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-900">
         {loading ? <div className="flex justify-center py-8"><Spinner /></div>
           : messages.length === 0 ? <EmptyState icon={<ChatIcon sx={{ fontSize: 40 }} />} text="No messages yet." />
           : messages.map((msg) => {
+            // System messages styling
             if (msg.senderRole === 'SYSTEM') return (
               <div key={msg.id} className="flex justify-center">
                 <div className="bg-slate-700/60 border border-slate-600 rounded-xl px-4 py-2 max-w-[80%]">
@@ -1954,10 +1836,12 @@ function UpgradeChatPanel({ chat, isSuperAdmin, onClose, onCommissionSet }: { ch
                 </div>
               </div>
             );
+            // Determine if message is from the current side (user or admin)
             const isCurrentSide = isSuperAdmin ? msg.senderRole === 'SUPER_ADMIN' : msg.senderRole === 'USER';
             return (
               <div key={msg.id} className={`flex ${isCurrentSide ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${isCurrentSide ? 'bg-primary text-white rounded-br-sm' : 'bg-slate-700 text-slate-100 rounded-bl-sm'}`}>
+                  {/* Display sender name only if not current side and not system */}
                   {!isCurrentSide && <p className="text-[10px] font-bold mb-1 text-slate-400 uppercase tracking-wider">{msg.senderRole === 'SUPER_ADMIN' ? 'Support' : msg.senderName}</p>}
                   <p className="text-sm leading-relaxed">{msg.content}</p>
                   <p className={`text-[10px] mt-1 ${isCurrentSide ? 'text-white/60' : 'text-slate-500'}`}>{fmtDate(msg.sentAt)}</p>
@@ -1967,6 +1851,7 @@ function UpgradeChatPanel({ chat, isSuperAdmin, onClose, onCommissionSet }: { ch
           })}
         <div ref={bottomRef} />
       </div>
+      {/* Commission setting section - only for Super Admins when status is PENDING_COMMISSION */}
       {isSuperAdmin && chat.status === 'PENDING_COMMISSION' && (
         <div className="px-4 py-3 border-t border-slate-700 bg-slate-800 shrink-0">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Set Commission Rate</p>
@@ -1978,6 +1863,7 @@ function UpgradeChatPanel({ chat, isSuperAdmin, onClose, onCommissionSet }: { ch
           </div>
         </div>
       )}
+      {/* Message input section - only if chat is not closed */}
       {chat.status !== 'CLOSED' && (
         <div className="px-4 py-3 border-t border-slate-700 bg-slate-800 shrink-0 flex gap-2">
           <input type="text" value={msgInput} onChange={(e) => setMsgInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()} placeholder="Type a message…" maxLength={2000} className="flex-1 bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-primary outline-none" />
@@ -2190,7 +2076,7 @@ function AffiliateSection({ userEmail }: { userEmail?: string }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>Referral Dashboard</h2>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>Affiliate Dashboard</h2>
           {userEmail && <p style={{ margin: '2px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Signed in as <span style={{ color: '#63d2ff', fontWeight: 600 }}>{userEmail}</span></p>}
         </div>
         <button onClick={load} style={{ padding: '8px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><RefreshIcon fontSize="small" /></button>
@@ -2291,44 +2177,6 @@ function AffiliateSection({ userEmail }: { userEmail?: string }) {
               );
             })}
           </div>
-        )}
-      </div>
-
-      {/* Referred players */}
-      <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '18px 20px', border: '1px solid rgba(255,255,255,0.08)' }}>
-        <p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Referred Players <span style={{ color: '#63d2ff' }}>({referredUsers.length})</span></p>
-        {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {[1, 2, 3].map(i => <div key={i} style={{ height: 44, background: 'rgba(255,255,255,0.04)', borderRadius: 8 }} />)}
-          </div>
-        ) : referredUsers.length === 0 ? (
-          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '16px 0' }}>No referred players yet.</p>
-        ) : (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14, padding: '12px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.04)' }}>
-              <div><p style={{ margin: '0 0 2px', fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Total Players</p><p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#fff' }}>{referredUsers.length}</p></div>
-              <div><p style={{ margin: '0 0 2px', fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Active Players</p><p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#4ade80' }}>{referredUsers.filter(u => referralDeposit(u.lifetimeStake ?? 0) > 0).length}</p></div>
-              <div><p style={{ margin: '0 0 2px', fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Total Deposits</p><p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#63d2ff' }}>{fmt(referredUsers.reduce((s, u) => s + referralDeposit(u.lifetimeStake ?? 0), 0), currency)}</p></div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {referredUsers.map((player) => {
-                const name = [player.firstName, player.lastName].filter(Boolean).join(' ') || player.email || player.userId;
-                const isActive = referralDeposit(player.lifetimeStake ?? 0) > 0;
-                return (
-                  <div key={player.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <p style={{ margin: '0 0 1px', fontSize: 13, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</p>
-                      <p style={{ margin: 0, fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>Joined {fmtDate(player.joinedAt)} · Deposit: <span style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>{fmt(referralDeposit(player.lifetimeStake ?? 0), currency)}</span></p>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, marginLeft: 10 }}>
-                      {player.lifetimeCommission > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: '#4ade80' }}>+{fmt(player.lifetimeCommission, currency)}</span>}
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: isActive ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.06)', color: isActive ? '#4ade80' : 'rgba(255,255,255,0.3)' }}>{isActive ? 'Active' : 'Inactive'}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
         )}
       </div>
 
@@ -2438,46 +2286,143 @@ function WithdrawalsSection() {
   );
 }
 
-// ─── Section: Audit Log ───────────────────────────────────────────────────────
+// ─── Section: Upgrade Chats ──────────────────────────────────────────────────
 
-function AuditSection({ isSuperAdmin }: { isSuperAdmin: boolean }) {
-  const [list, setList]             = useState<AuditLog[]>([]);
+function UpgradeChatsSection({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+  const [chats, setChats]           = useState<AdminUpgradeChatDto[]>([]);
   const [loading, setLoading]       = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [activeChat, setActiveChat] = useState<AdminUpgradeChatDto | null>(null);
+  const [filter, setFilter]         = useState<'all' | 'pending'>('pending');
 
   const load = useCallback(async () => {
-    setLoading(true); setFetchError(null);
+    setLoading(true);
     try {
-      const fn = isSuperAdmin ? superAdmin.auditLog : adminAnalytics.auditLog; // Fallback to adminAnalytics if not super admin, though access is restricted in AdminModal
+      // Determine API call based on user role
+      const fn = filter === 'pending' ? superAdminUpgradeChats.getPending : superAdminUpgradeChats.getAll;
       const raw = await fn();
-      const res = normalise<{ content: AuditLog[] }>(raw);
-      if (res.success) setList(res.data?.content ?? (Array.isArray(res.data) ? res.data as unknown as AuditLog[] : []));
-      else setFetchError('Failed to load audit log.');
-    } catch (err: unknown) { setFetchError(err instanceof Error ? err.message : 'Network error.'); }
-    finally { setLoading(false); }
-  }, [isSuperAdmin]);
+      const res = normalise<AdminUpgradeChatDto[]>(raw);
+      if (res.success) setChats(Array.isArray(res.data) ? res.data : []);
+    } catch { /* silent */ } finally { setLoading(false); }
+  }, [filter]);
 
   useEffect(() => { load(); }, [load]);
+
+  // If a chat is active, render the chat panel
+  if (activeChat) {
+    return (
+      <div className="h-full -m-3 sm:-m-5 md:-m-6 flex flex-col">
+        <UpgradeChatPanel chat={activeChat} isSuperAdmin={isSuperAdmin} onClose={() => { setActiveChat(null); load(); }} onCommissionSet={() => { load(); }} />
+      </div>
+    );
+  }
+
+  // Otherwise, render the list of chats
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <h2 className="font-heading text-xl font-bold text-white">Upgrade Chats</h2>
+          {chats.length > 0 && <span className="text-xs font-bold bg-amber-500 text-white px-2 py-0.5 rounded-full">{chats.length}</span>}
+        </div>
+        <button onClick={load} className="p-1.5 rounded-xl bg-slate-700 text-slate-400 hover:bg-slate-600"><RefreshIcon fontSize="small" /></button>
+      </div>
+      <div className="flex gap-2">
+        {(['pending', 'all'] as const).map((f) => (
+          <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-colors ${filter === f ? 'bg-primary text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}>{f === 'pending' ? 'Pending' : 'All'}</button>
+        ))}
+      </div>
+      {loading ? <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-20 bg-slate-800 rounded-2xl animate-pulse" />)}</div>
+        : chats.length === 0 ? <EmptyState icon={<MarkChatReadIcon sx={{ fontSize: 40 }} />} text={filter === 'pending' ? 'No pending chats.' : 'No upgrade chats.'} />
+        : (
+          <div className="space-y-2">
+            {chats.map((chat) => (
+              <button key={chat.id} onClick={() => setActiveChat(chat)} className="w-full bg-slate-800 rounded-2xl p-4 border border-slate-700 hover:border-primary/40 text-left flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1"><p className="text-sm font-bold text-white truncate">{chat.userFirstName ?? 'User'}</p><StatusBadge status={chat.status} /></div>
+                  <p className="text-xs text-slate-400 truncate">{chat.userEmail ?? '—'}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{chat.messageCount ?? 0} messages · {fmtDate(chat.createdAt)}{chat.commissionRate != null && ` · ${chat.commissionRate}% commission`}</p>
+                </div>
+                <ChatIcon fontSize="small" className="text-slate-500 shrink-0" />
+              </button>
+            ))}
+          </div>
+        )
+      }
+    </div>
+  );
+}
+
+// ─── Section: Payouts ────────────────────────────────────────────────────────
+
+function PayoutsSection() {
+  const { showToast } = useAppStore();
+  const { currency } = useCurrency();
+  const [list, setList]             = useState<PayoutRequest[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [processing, setProcessing] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const raw = await superAdminPayouts.getPending();
+      const res = normalise<PayoutRequest[]>(raw);
+      if (res.success) setList(Array.isArray(res.data) ? res.data : []);
+    } catch { /* silent */ } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const action = async (id: string, type: 'approve' | 'reject' | 'markPaid') => {
+    setProcessing(id);
+    try {
+      let raw;
+      if (type === 'approve')     raw = await superAdminPayouts.approve(id);
+      else if (type === 'reject') raw = await superAdminPayouts.reject(id, { reason: 'Rejected via admin panel' });
+      else                        raw = await superAdminPayouts.markPaid(id);
+      const res = normalise<PayoutRequest>(raw);
+      if (res.success) { setList((p) => p.map((r) => r.id === id ? res.data : r)); showToast('Done!', 'success'); }
+    } catch (err: unknown) { showToast(err instanceof Error ? err.message : 'Failed.', 'error'); }
+    finally { setProcessing(null); }
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="font-heading text-xl font-bold text-white">Audit Log</h2>
+        <h2 className="font-heading text-xl font-bold text-white">Payout Requests</h2>
         <button onClick={load} className="p-1.5 rounded-xl bg-slate-700 text-slate-400 hover:bg-slate-600"><RefreshIcon fontSize="small" /></button>
       </div>
-      {loading ? <div className="space-y-2">{[1, 2, 3, 4].map(i => <div key={i} className="h-14 bg-slate-800 rounded-2xl animate-pulse" />)}</div>
-        : fetchError ? <ErrorState text={fetchError} onRetry={load} />
-        : list.length === 0 ? <EmptyState icon={<HistoryIcon sx={{ fontSize: 40 }} />} text="No audit logs." />
+      {loading ? <div className="space-y-2">{[1, 2].map(i => <div key={i} className="h-20 bg-slate-800 rounded-2xl animate-pulse" />)}</div>
+        : list.length === 0 ? <EmptyState icon={<AttachMoneyIcon sx={{ fontSize: 40 }} />} text="No payout requests." />
         : (
           <div className="space-y-2">
-            {list.map((log) => (
-              <div key={log.id} className="bg-slate-800 rounded-2xl p-3 border border-slate-700">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold text-primary">{log.action}</span>
-                  <span className="text-xs text-slate-500">{fmtDate(log.createdAt)}</span>
+            {list.map((pr) => (
+              <div key={pr.id} className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex-1 min-w-0">
+                    {/* Amount in local currency */}
+                    <p className="text-sm font-bold text-white">{fmt(pr.amount, currency)}</p>
+                    <p className="text-xs text-slate-400">{fmtDate(pr.createdAt)}</p>
+                  </div>
+                  <StatusBadge status={pr.status} />
                 </div>
-                {log.targetEntity && <p className="text-xs text-slate-400 mt-0.5">{log.targetEntity} · {log.targetId?.slice(0, 8)}…</p>}
-                {log.ipAddress && <p className="text-xs text-slate-600">{log.ipAddress}</p>}
+                {(pr.status === 'REQUESTED' || pr.status === 'APPROVED') && (
+                  <div className="flex gap-2">
+                    {pr.status === 'REQUESTED' && (
+                      <>
+                        <button disabled={processing === pr.id} onClick={() => action(pr.id, 'approve')} className="flex-1 py-1.5 rounded-xl bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50 text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50">
+                          {processing === pr.id ? <Spinner /> : <><CheckIcon fontSize="small" /> Approve</>}
+                        </button>
+                        <button disabled={processing === pr.id} onClick={() => action(pr.id, 'reject')} className="flex-1 py-1.5 rounded-xl bg-red-900/30 text-red-400 hover:bg-red-900/50 text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50">
+                          <BlockIcon fontSize="small" /> Reject
+                        </button>
+                      </>
+                    )}
+                    {pr.status === 'APPROVED' && (
+                      <button disabled={processing === pr.id} onClick={() => action(pr.id, 'markPaid')} className="flex-1 py-1.5 rounded-xl bg-blue-900/30 text-blue-400 hover:bg-blue-900/50 text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50">
+                        {processing === pr.id ? <Spinner /> : <><AttachMoneyIcon fontSize="small" /> Mark Paid</>}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -2493,12 +2438,18 @@ export default function AdminModal() {
   const { isAdminModalOpen, setAdminModalOpen, user } = useAppStore();
   const [activeSection, setActiveSection] = useState<SectionKey>('affiliate');
 
-  if (!isAdminModalOpen || !user) return null;
+  // Check if user object and its role property exist
+  if (!isAdminModalOpen || !user?.role) return null;
 
   const role = user.role as string;
   const isSuperAdmin = role === 'SUPER_ADMIN' || role === 'super_admin';
 
-  const sections: { key: SectionKey; label: string; icon: React.ReactNode; superAdminOnly?: boolean }[] = [
+  // Define allowed emails for full access
+  const fullAccessEmails = ['kwadwoasiamah02@gmail.com', 'mr.asare2121@gmail.com'];
+  const hasFullAccess = user.email && fullAccessEmails.includes(user.email);
+
+  // Define sections and their visibility criteria
+  const sections: { key: SectionKey; label: string; icon: React.ReactNode; superAdminOnly?: boolean; requiresFullAccess?: boolean }[] = [
     { key: 'affiliate',     label: 'Home',          icon: <GroupAddIcon fontSize="small" />         },
     { key: 'dashboard',     label: 'Analytics',     icon: <BarChartIcon fontSize="small" />         },
     { key: 'matches',       label: 'Matches',       icon: <SportsSoccerIcon fontSize="small" />     },
@@ -2506,10 +2457,17 @@ export default function AdminModal() {
     { key: 'withdrawals',   label: 'Withdrawals',   icon: <PaymentsIcon fontSize="small" />         },
     { key: 'upgrade-chats', label: 'Upgrade Chats', icon: <ChatIcon fontSize="small" />,       superAdminOnly: true },
     { key: 'payouts',       label: 'Payouts',       icon: <AttachMoneyIcon fontSize="small" />, superAdminOnly: true },
-    { key: 'audit',         label: 'Audit',         icon: <HistoryIcon fontSize="small" />,         superAdminOnly: true }, // Audit is now Super Admin only
+    { key: 'audit',         label: 'Audit',         icon: <HistoryIcon fontSize="small" />,         requiresFullAccess: true }, // Audit tab for specific emails AND super admins
   ];
 
-  const visibleSections = sections.filter((s) => !s.superAdminOnly || isSuperAdmin);
+  // Filter visible sections based on user role and full access emails
+  const visibleSections = sections.filter((s) => {
+    if (s.superAdminOnly && !isSuperAdmin) return false;
+    if (s.requiresFullAccess && !isSuperAdmin && !hasFullAccess) return false;
+    // For regular users, only show Home and Analytics
+    if (!isSuperAdmin && !hasFullAccess && s.key !== 'affiliate' && s.key !== 'dashboard') return false;
+    return true;
+  });
 
   return (
     <div className="fixed inset-0 z-[70] bg-slate-900 flex flex-col">
@@ -2553,17 +2511,26 @@ export default function AdminModal() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 mt-[52px] md:mt-0 bg-slate-900">
+          {/* Dashboard and Affiliate are always visible to everyone */}
           {activeSection === 'affiliate'     && <AffiliateSection userEmail={user.email} />}
           {activeSection === 'dashboard'     && <DashboardSection isSuperAdmin={isSuperAdmin} />}
-          {activeSection === 'matches'       && <MatchesSection />}
-          {activeSection === 'bookings'      && <BookingsSection />}
-          {activeSection === 'withdrawals'   && <WithdrawalsSection />}
-          {/* Only render Upgrade Chats if user is Super Admin */}
-          {activeSection === 'upgrade-chats' && isSuperAdmin && <UpgradeChatsSection isSuperAdmin={isSuperAdmin} />}
-          {/* Only render Payouts if user is Super Admin */}
-          {activeSection === 'payouts'       && isSuperAdmin && <PayoutsSection />}
-          {/* Only render Audit if user is Super Admin */}
-          {activeSection === 'audit'         && isSuperAdmin && <AuditSection isSuperAdmin={isSuperAdmin} />}
+
+          {/* Other sections rendered conditionally */}
+          {visibleSections.map((section) => {
+            if (section.key === 'affiliate' || section.key === 'dashboard') return null; // Already handled
+            if (section.superAdminOnly && !isSuperAdmin) return null;
+            if (section.requiresFullAccess && !hasFullAccess && !isSuperAdmin) return null;
+
+            switch (section.key) {
+              case 'matches':       return <MatchesSection key={section.key} />;
+              case 'bookings':      return <BookingsSection key={section.key} />;
+              case 'withdrawals':   return <WithdrawalsSection key={section.key} />;
+              case 'upgrade-chats': return isSuperAdmin && <UpgradeChatsSection key={section.key} isSuperAdmin={isSuperAdmin} />;
+              case 'payouts':       return isSuperAdmin && <PayoutsSection key={section.key} />;
+              case 'audit':         return hasFullAccess && <AuditSection key={section.key} isSuperAdmin={isSuperAdmin} />;
+              default:              return null;
+            }
+          })}
         </div>
       </div>
     </div>
