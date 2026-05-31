@@ -48,6 +48,7 @@ import ContentCopyIcon         from '@mui/icons-material/ContentCopy';
 import OpenInNewIcon           from '@mui/icons-material/OpenInNew';
 import DeleteIcon              from '@mui/icons-material/Delete';
 import DeleteSweepIcon         from '@mui/icons-material/DeleteSweep';
+import MenuIcon                from '@mui/icons-material/Menu';
 
 // ─── DEFAULT COMMISSION RATE ──────────────────────────────────────────────────
 const DEFAULT_COMMISSION_RATE = 70; // 70%
@@ -419,7 +420,7 @@ function CreateMatchModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
   return (
     <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
         <motion.div initial={{ opacity: 0, scale: 0.96, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 16 }} transition={{ type: 'spring', stiffness: 400, damping: 32 }} style={{ width: '100%', maxWidth: 560, background: 'linear-gradient(160deg, #0f0f1a 0%, #13131f 60%, #0d0d18 100%)', border: '1.5px solid rgba(99,210,255,0.15)', borderRadius: 18, boxShadow: '0 32px 80px rgba(0,0,0,0.9)', overflow: 'hidden', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
             <div>
@@ -516,7 +517,7 @@ function ScoreModal({ match, onClose, onSaved }: { match: Match; onClose: () => 
   };
   return (
     <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
         <motion.div initial={{ opacity: 0, scale: 0.96, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 400, damping: 30 }} style={{ width: '100%', maxWidth: 380, background: 'linear-gradient(160deg, #0f0f1a, #13131f)', border: '1.5px solid rgba(74,222,128,0.2)', borderRadius: 18, padding: 24, boxShadow: '0 32px 80px rgba(0,0,0,0.8)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
             <div><div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#4ade80', marginBottom: 4 }}>🟢 Live Score</div><h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#fff' }}>Update Score</h3></div>
@@ -558,7 +559,7 @@ function StatusTransitionModal({ match, onClose, onSaved }: { match: Match; onCl
   };
   return (
     <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
         <motion.div initial={{ opacity: 0, scale: 0.96, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 400, damping: 30 }} style={{ width: '100%', maxWidth: 360, background: 'linear-gradient(160deg, #0f0f1a, #13131f)', border: `1.5px solid ${cfg.border}`, borderRadius: 18, padding: 24, boxShadow: '0 32px 80px rgba(0,0,0,0.8)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
             <div><div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: cfg.text, marginBottom: 4 }}>Match Status</div><h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#fff' }}>{match.homeTeam} vs {match.awayTeam}</h3></div>
@@ -657,21 +658,21 @@ function MatchesSection() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <h2 className="font-heading text-xl font-bold text-white">Matches</h2>
           {hiddenCount > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'rgba(255,71,87,0.15)', color: '#ff4757', border: '1px solid rgba(255,71,87,0.25)' }}>{hiddenCount} hidden</span>}
         </div>
-        <div className="flex items-center gap-2">
-          {filtered.length > 0 && <button onClick={hideAllMatches} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, background: 'rgba(255,71,87,0.1)', border: '1px solid rgba(255,71,87,0.3)', color: '#ff4757', fontSize: 11, fontWeight: 800, cursor: 'pointer', letterSpacing: '0.05em', textTransform: 'uppercase' }} onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,71,87,0.2)'; }} onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,71,87,0.1)'; }}><DeleteSweepIcon fontSize="small" /> Delete All</button>}
+        <div className="flex items-center gap-2 flex-wrap">
+          {filtered.length > 0 && <button onClick={hideAllMatches} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, background: 'rgba(255,71,87,0.1)', border: '1px solid rgba(255,71,87,0.3)', color: '#ff4757', fontSize: 11, fontWeight: 800, cursor: 'pointer', letterSpacing: '0.05em', textTransform: 'uppercase' }} onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,71,87,0.2)'; }} onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,71,87,0.1)'; }}><DeleteSweepIcon fontSize="small" /> <span className="hidden sm:inline">Delete All</span></button>}
           <button onClick={loadMatches} disabled={loading} className="p-1.5 rounded-xl bg-slate-700 text-slate-400 hover:bg-slate-600 disabled:opacity-50 transition-colors"><RefreshIcon fontSize="small" /></button>
-          <button onClick={() => setShowCreate(true)} style={{ padding: '9px 18px', borderRadius: 9, background: 'linear-gradient(135deg, #63d2ff, #3891ff)', border: 'none', color: '#fff', fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', cursor: 'pointer', textTransform: 'uppercase', boxShadow: '0 4px 20px rgba(99,210,255,0.3)', display: 'flex', alignItems: 'center', gap: 6 }}><AddIcon fontSize="small" /> New Match</button>
+          <button onClick={() => setShowCreate(true)} style={{ padding: '9px 14px', borderRadius: 9, background: 'linear-gradient(135deg, #63d2ff, #3891ff)', border: 'none', color: '#fff', fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', cursor: 'pointer', textTransform: 'uppercase', boxShadow: '0 4px 20px rgba(99,210,255,0.3)', display: 'flex', alignItems: 'center', gap: 6 }}><AddIcon fontSize="small" /> <span className="hidden sm:inline">New Match</span></button>
         </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 12, overflowX: 'auto' }}>
-        {MATCH_TABS.map((t) => { const active = filter === t; const count = tabCounts[t]; return <button key={t} onClick={() => setFilter(t)} style={{ padding: '6px 14px', borderRadius: 8, border: `1.5px solid ${active ? 'rgba(99,210,255,0.4)' : 'rgba(255,255,255,0.07)'}`, background: active ? 'rgba(99,210,255,0.1)' : 'transparent', color: active ? '#63d2ff' : 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>{t === 'LIVE' && liveCount > 0 && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#4ade80', flexShrink: 0 }} />}{t} {count > 0 && <span style={{ opacity: 0.6 }}>({count})</span>}</button>; })}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 12, overflowX: 'auto', scrollbarWidth: 'none' }}>
+        {MATCH_TABS.map((t) => { const active = filter === t; const count = tabCounts[t]; return <button key={t} onClick={() => setFilter(t)} style={{ padding: '6px 12px', borderRadius: 8, border: `1.5px solid ${active ? 'rgba(99,210,255,0.4)' : 'rgba(255,255,255,0.07)'}`, background: active ? 'rgba(99,210,255,0.1)' : 'transparent', color: active ? '#63d2ff' : 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>{t === 'LIVE' && liveCount > 0 && <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#4ade80', flexShrink: 0 }} />}{t} {count > 0 && <span style={{ opacity: 0.6 }}>({count})</span>}</button>; })}
       </div>
-      {loading && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>{[1,2,3,4,5,6].map((i) => <div key={i} className="animate-pulse" style={{ height: 200, borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(255,255,255,0.06)' }} />)}</div>}
+      {loading && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>{[1,2,3,4,5,6].map((i) => <div key={i} className="animate-pulse" style={{ height: 200, borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(255,255,255,0.06)' }} />)}</div>}
       {!loading && fetchError && <ErrorState text={fetchError} onRetry={loadMatches} />}
       {!loading && !fetchError && filtered.length === 0 && (
         <div style={{ textAlign: 'center', padding: '60px 24px' }}>
@@ -681,7 +682,7 @@ function MatchesSection() {
           {filter === 'ALL' && hiddenCount === 0 && <button onClick={() => setShowCreate(true)} style={{ padding: '10px 22px', borderRadius: 9, background: 'linear-gradient(135deg, #63d2ff, #3891ff)', border: 'none', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}>+ Create your first match</button>}
         </div>
       )}
-      {!loading && !fetchError && filtered.length > 0 && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}><AnimatePresence>{filtered.map((m, i) => <MatchCard key={m.id} match={m} index={i} onScoreClick={setScoreTarget} onStatusClick={setStatusTarget} onHide={hideMatch} />)}</AnimatePresence></div>}
+      {!loading && !fetchError && filtered.length > 0 && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}><AnimatePresence>{filtered.map((m, i) => <MatchCard key={m.id} match={m} index={i} onScoreClick={setScoreTarget} onStatusClick={setStatusTarget} onHide={hideMatch} />)}</AnimatePresence></div>}
       {showCreate && <CreateMatchModal onClose={() => setShowCreate(false)} onCreated={handleCreated} />}
       {scoreTarget && <ScoreModal match={scoreTarget} onClose={() => setScoreTarget(null)} onSaved={upsert} />}
       {statusTarget && <StatusTransitionModal match={statusTarget} onClose={() => setStatusTarget(null)} onSaved={upsert} />}
@@ -709,16 +710,20 @@ type BookingApiMethod = typeof BOOKING_TYPES[number]['apiMethod'];
 function BcModalShell({ title, subtitle, onClose, children }: { title: string; subtitle?: string; onClose: () => void; children: React.ReactNode }) {
   useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, [onClose]);
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <motion.div initial={{ opacity: 0, scale: 0.96, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 8 }} transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }} style={{ background: 'linear-gradient(160deg, #0f0f1a 0%, #13131f 60%, #0d0d18 100%)', borderRadius: 16, border: '1.5px solid rgba(255,255,255,0.08)', width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 60px rgba(0,0,0,0.7)' }}>
-        <div style={{ padding: '18px 20px 0' }}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0' }}>
+      <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }} transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }} style={{ background: 'linear-gradient(160deg, #0f0f1a 0%, #13131f 60%, #0d0d18 100%)', borderRadius: '16px 16px 0 0', border: '1.5px solid rgba(255,255,255,0.08)', borderBottom: 'none', width: '100%', maxWidth: 560, maxHeight: '92vh', display: 'flex', flexDirection: 'column', boxShadow: '0 -24px 60px rgba(0,0,0,0.7)' }}>
+        {/* drag handle */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 0' }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.15)' }} />
+        </div>
+        <div style={{ padding: '14px 20px 0' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
             <div><div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>{title}</div>{subtitle && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 3 }}>{subtitle}</div>}</div>
             <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: 6, cursor: 'pointer', color: 'rgba(255,255,255,0.5)', display: 'flex', flexShrink: 0, marginLeft: 12 }}><CloseIcon style={{ fontSize: 14 }} /></button>
           </div>
-          <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginTop: 16 }} />
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginTop: 14 }} />
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 20px' }}>{children}</div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 32px' }}>{children}</div>
       </motion.div>
     </motion.div>
   );
@@ -910,7 +915,7 @@ function BcViewModal({ code, onClose }: { code: BookingCode; onClose: () => void
 }
 
 function BcStatCard({ label, value, accent }: { label: string; value: string; accent?: string }) {
-  return <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700"><p className="text-xs text-slate-400 mb-1.5 uppercase tracking-wider font-bold">{label}</p><p style={{ fontFamily: 'monospace', fontSize: 22, fontWeight: 700, color: accent ?? '#fff', lineHeight: 1 }}>{value}</p></div>;
+  return <div className="bg-slate-800 rounded-2xl p-3 border border-slate-700"><p className="text-xs text-slate-400 mb-1 uppercase tracking-wider font-bold">{label}</p><p style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 700, color: accent ?? '#fff', lineHeight: 1 }}>{value}</p></div>;
 }
 
 function BcCodeCard({ code, onView, onHide }: { code: BookingCode; onView: () => void; onHide: () => void }) {
@@ -930,9 +935,9 @@ function BcCodeCard({ code, onView, onHide }: { code: BookingCode; onView: () =>
   return (
     <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden', transition: 'border-color .15s, box-shadow .15s' }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(99,210,255,0.35)'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.4)'; }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.boxShadow = 'none'; }}>
       <div style={{ height: 3, background: sc.text, opacity: 0.7 }} />
-      <div style={{ padding: '16px 18px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14, gap: 8 }}>
-          <div style={{ minWidth: 0 }}><div style={{ fontFamily: 'monospace', fontSize: 20, fontWeight: 800, color: '#63d2ff', letterSpacing: '0.06em' }}>{code.code}</div><div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{code.label || '—'}</div></div>
+      <div style={{ padding: '14px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12, gap: 8 }}>
+          <div style={{ minWidth: 0 }}><div style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 800, color: '#63d2ff', letterSpacing: '0.06em' }}>{code.code}</div><div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{code.label || '—'}</div></div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', background: sc.bg, color: sc.text, display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 5, height: 5, borderRadius: '50%', background: sc.dot, display: 'inline-block' }} />{status}</span>
@@ -941,16 +946,16 @@ function BcCodeCard({ code, onView, onHide }: { code: BookingCode; onView: () =>
             {(code as any).bookingType && (code as any).bookingType !== 'STANDARD' && <span style={{ padding: '2px 7px', borderRadius: 5, fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', background: btCfg.accentBg, color: btCfg.accent }}>{(code as any).bookingType === 'ADMIN_ONLY' ? 'Admin Only' : 'Mixed'}</span>}
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
-          {[{ label: 'Stake', value: fmt(code.stake ?? 0, currency), accent: undefined }, { label: 'Total Odds', value: totalOdds.toFixed(2) + 'x', accent: '#63d2ff' }, { label: 'Potential', value: fmt(potentialPayout, currency), accent: '#4ade80' }, { label: 'Redeemed', value: `${redemptionCount}${maxRedemptions != null ? ' / ' + maxRedemptions : ''}`, accent: undefined }].map((s) => <div key={s.label} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>{s.label}</div><div style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700, color: s.accent ?? '#fff' }}>{s.value}</div></div>)}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12 }}>
+          {[{ label: 'Stake', value: fmt(code.stake ?? 0, currency), accent: undefined }, { label: 'Total Odds', value: totalOdds.toFixed(2) + 'x', accent: '#63d2ff' }, { label: 'Potential', value: fmt(potentialPayout, currency), accent: '#4ade80' }, { label: 'Redeemed', value: `${redemptionCount}${maxRedemptions != null ? ' / ' + maxRedemptions : ''}`, accent: undefined }].map((s) => <div key={s.label} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '7px 9px' }}><div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>{s.label}</div><div style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color: s.accent ?? '#fff' }}>{s.value}</div></div>)}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 14, flexWrap: 'wrap' }}>
-          <span>🎟️ {selCount} selection{selCount !== 1 ? 's' : ''}</span><span style={{ opacity: 0.4 }}>·</span><span style={{ padding: '1px 7px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: 'rgba(99,210,255,0.1)', color: '#63d2ff' }}>{(code as any).kind}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 12, flexWrap: 'wrap' }}>
+          <span>🎟️ {selCount} sel.</span><span style={{ opacity: 0.4 }}>·</span><span style={{ padding: '1px 7px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: 'rgba(99,210,255,0.1)', color: '#63d2ff' }}>{(code as any).kind}</span>
           {expiresAt && (<><span style={{ opacity: 0.4 }}>·</span><span>⏱ {fmtTimeAgo(expiresAt)}</span></>)}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={onView} style={{ flex: 1, padding: '8px 0', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>👁 View</button>
-          <button onClick={copyCode} style={{ flex: 1, padding: '8px 0', borderRadius: 8, background: copied ? 'rgba(74,222,128,0.15)' : 'rgba(99,210,255,0.1)', border: `1px solid ${copied ? 'rgba(74,222,128,0.3)' : 'rgba(99,210,255,0.2)'}`, color: copied ? '#4ade80' : '#63d2ff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>{copied ? '✓ Copied!' : '📋 Copy Code'}</button>
+          <button onClick={copyCode} style={{ flex: 1, padding: '8px 0', borderRadius: 8, background: copied ? 'rgba(74,222,128,0.15)' : 'rgba(99,210,255,0.1)', border: `1px solid ${copied ? 'rgba(74,222,128,0.3)' : 'rgba(99,210,255,0.2)'}`, color: copied ? '#4ade80' : '#63d2ff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>{copied ? '✓ Copied!' : '📋 Copy'}</button>
         </div>
       </div>
     </div>
@@ -989,29 +994,25 @@ function BookingsSection() {
   const stats = useMemo(() => { const active = visibleCodes.filter((c) => (c as any).status === 'active' && !isExpired((c as any).expiresAt ?? (c as any).expires_at)).length; const redeemed = visibleCodes.reduce((s, c) => s + +((c as any).redemptionCount ?? (c as any).redemption_count ?? 0), 0); const avgOdds = visibleCodes.length ? (visibleCodes.reduce((s, c) => s + +((c as any).totalOdds ?? (c as any).total_odds ?? 0), 0) / visibleCodes.length).toFixed(2) : null; const avgStake = visibleCodes.length ? visibleCodes.reduce((s, c) => s + +(c.stake ?? 0), 0) / visibleCodes.length : null; return { active, redeemed, avgOdds, avgStake }; }, [visibleCodes]);
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2"><h2 className="font-heading text-xl font-bold text-white">Booking Codes</h2>{hiddenCount > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'rgba(255,71,87,0.15)', color: '#ff4757', border: '1px solid rgba(255,71,87,0.25)' }}>{hiddenCount} hidden</span>}</div>
         <div className="flex items-center gap-2">
-          {visibleCodes.length > 0 && <button onClick={hideAllCodes} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, background: 'rgba(255,71,87,0.1)', border: '1px solid rgba(255,71,87,0.3)', color: '#ff4757', fontSize: 11, fontWeight: 800, cursor: 'pointer', letterSpacing: '0.05em', textTransform: 'uppercase' }} onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,71,87,0.2)'; }} onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,71,87,0.1)'; }}><DeleteSweepIcon fontSize="small" /> Delete All</button>}
+          {visibleCodes.length > 0 && <button onClick={hideAllCodes} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 10px', borderRadius: 8, background: 'rgba(255,71,87,0.1)', border: '1px solid rgba(255,71,87,0.3)', color: '#ff4757', fontSize: 11, fontWeight: 800, cursor: 'pointer' }} onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,71,87,0.2)'; }} onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,71,87,0.1)'; }}><DeleteSweepIcon fontSize="small" /></button>}
           <button onClick={load} disabled={loading} className="p-1.5 rounded-xl bg-slate-700 text-slate-400 hover:bg-slate-600 disabled:opacity-50 transition-colors"><RefreshIcon fontSize="small" /></button>
-          <button onClick={() => setModalState('picker')} style={{ padding: '9px 18px', borderRadius: 9, background: 'linear-gradient(135deg, #63d2ff, #3891ff)', border: 'none', color: '#fff', fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', cursor: 'pointer', textTransform: 'uppercase', boxShadow: '0 4px 20px rgba(99,210,255,0.3)', display: 'flex', alignItems: 'center', gap: 6 }}><AddIcon fontSize="small" /> New Code</button>
+          <button onClick={() => setModalState('picker')} style={{ padding: '9px 14px', borderRadius: 9, background: 'linear-gradient(135deg, #63d2ff, #3891ff)', border: 'none', color: '#fff', fontSize: 12, fontWeight: 800, letterSpacing: '0.06em', cursor: 'pointer', textTransform: 'uppercase', boxShadow: '0 4px 20px rgba(99,210,255,0.3)', display: 'flex', alignItems: 'center', gap: 6 }}><AddIcon fontSize="small" /> <span className="hidden sm:inline">New Code</span></button>
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-        <BcStatCard label="Active Codes"      value={loading ? '—' : String(stats.active)} />
-        <BcStatCard label="Total Redemptions" value={loading ? '—' : String(stats.redeemed)} accent="#63d2ff" />
-        <BcStatCard label="Avg Total Odds"    value={loading ? '—' : stats.avgOdds ? stats.avgOdds + 'x' : '—'} accent="#4ade80" />
-        <BcStatCard label="Avg Stake"         value={loading ? '—' : stats.avgStake != null ? fmt(stats.avgStake, currency) : '—'} accent="#a78bfa" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }} className="sm:grid-cols-4">
+        <BcStatCard label="Active"      value={loading ? '—' : String(stats.active)} />
+        <BcStatCard label="Redeemed" value={loading ? '—' : String(stats.redeemed)} accent="#63d2ff" />
+        <BcStatCard label="Avg Odds"    value={loading ? '—' : stats.avgOdds ? stats.avgOdds + 'x' : '—'} accent="#4ade80" />
+        <BcStatCard label="Avg Stake"   value={loading ? '—' : stats.avgStake != null ? fmt(stats.avgStake, currency) : '—'} accent="#a78bfa" />
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div><div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>{loading ? 'Loading…' : `${visibleCodes.length} codes${hiddenCount > 0 ? ` (${hiddenCount} hidden)` : ''}`}</div><div style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>Live Codes</div></div>
-        {hiddenCount > 0 && <button onClick={() => setHiddenIds(new Set())} style={{ fontSize: 11, fontWeight: 700, color: '#ff4757', background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: 6, textDecoration: 'underline' }}>Restore {hiddenCount} hidden</button>}
-      </div>
-      {loading ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>{[1,2,3,4].map((i) => <div key={i} className="animate-pulse" style={{ height: 220, borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}><div style={{ height: 3, background: 'rgba(255,255,255,0.06)' }} /></div>)}</div>
+      {loading ? <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>{[1,2,3,4].map((i) => <div key={i} className="animate-pulse" style={{ height: 200, borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}><div style={{ height: 3, background: 'rgba(255,255,255,0.06)' }} /></div>)}</div>
         : fetchError ? <ErrorState text={fetchError} onRetry={load} />
         : visibleCodes.length === 0 ? <div style={{ textAlign: 'center', padding: '60px 24px' }}><div style={{ fontSize: 40, marginBottom: 12 }}>🎟️</div><p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)', fontWeight: 600, marginBottom: 16 }}>No booking codes{hiddenCount > 0 ? ' visible' : ' yet'}</p>{hiddenCount > 0 ? <button onClick={() => setHiddenIds(new Set())} style={{ marginBottom: 10, padding: '8px 18px', borderRadius: 8, background: 'rgba(255,71,87,0.1)', border: '1px solid rgba(255,71,87,0.3)', color: '#ff4757', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>Restore {hiddenCount} hidden</button> : <button onClick={() => setModalState('picker')} style={{ padding: '10px 22px', borderRadius: 9, background: 'linear-gradient(135deg, #63d2ff, #3891ff)', border: 'none', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}>+ Create First Code</button>}</div>
-        : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}><AnimatePresence>{visibleCodes.map((c, i) => <motion.div key={(c as any).id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ delay: Math.min(i * 0.04, 0.4), duration: 0.3 }}><BcCodeCard code={c} onView={() => setViewCode(c)} onHide={() => hideCode((c as any).id)} /></motion.div>)}</AnimatePresence></div>}
+        : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}><AnimatePresence>{visibleCodes.map((c, i) => <motion.div key={(c as any).id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ delay: Math.min(i * 0.04, 0.4), duration: 0.3 }}><BcCodeCard code={c} onView={() => setViewCode(c)} onHide={() => hideCode((c as any).id)} /></motion.div>)}</AnimatePresence></div>}
       <AnimatePresence>
         {modalState === 'picker' && <BcTypePickerModal key="picker" onClose={() => setModalState(null)} onPick={(t) => setModalState(t)} />}
         {(modalState === 'STANDARD' || modalState === 'ADMIN_ONLY' || modalState === 'MIXED') && <BcCreateModal key="create" bookingType={modalState} onClose={() => setModalState(null)} onBack={() => setModalState('picker')} onCreate={handleCreate} />}
@@ -1064,7 +1065,7 @@ function UpgradeChatPanel({ chat, isSuperAdmin, onClose, onCommissionSet }: { ch
       <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-700 bg-slate-800 shrink-0">
         <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400"><CloseIcon fontSize="small" /></button>
         <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white truncate">{chat.userFirstName ?? 'User'} · {chat.userEmail ?? ''}</p><StatusBadge status={chat.status} /></div>
-        {chat.commissionRate != null && <span className="text-xs text-emerald-400 font-bold shrink-0">{chat.commissionRate}% commission</span>}
+        {chat.commissionRate != null && <span className="text-xs text-emerald-400 font-bold shrink-0">{chat.commissionRate}%</span>}
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-900">
         {loading ? <div className="flex justify-center py-8"><Spinner /></div>
@@ -1078,7 +1079,7 @@ function UpgradeChatPanel({ chat, isSuperAdmin, onClose, onCommissionSet }: { ch
       </div>
       {isSuperAdmin && chat.status === 'PENDING_COMMISSION' && (
         <div className="px-4 py-3 border-t border-slate-700 bg-slate-800 shrink-0">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Set Commission Rate <span className="text-emerald-400 normal-case font-medium">(standard: {DEFAULT_COMMISSION_RATE}%)</span></p>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Set Commission <span className="text-emerald-400 normal-case font-medium">(std: {DEFAULT_COMMISSION_RATE}%)</span></p>
           <div className="flex gap-2">
             <input type="number" min={0.1} max={100} step={0.1} value={commissionInput} onChange={(e) => setCommissionInput(e.target.value)} placeholder={`${DEFAULT_COMMISSION_RATE}`} className="flex-1 bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-primary outline-none" />
             <button onClick={handleSetCommission} disabled={settingCommission || !commissionInput} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-sm font-bold flex items-center gap-1.5">{settingCommission ? <Spinner /> : <><CheckIcon fontSize="small" /> Set</>}</button>
@@ -1127,15 +1128,15 @@ function DashboardSection({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="font-heading text-xl font-bold text-white">Dashboard</h2>
         <div className="flex gap-1.5">{['7d','30d','90d'].map((r) => <button key={r} onClick={() => setRange(r)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${range === r ? 'bg-primary text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}>{r}</button>)}<button onClick={load} className="p-1.5 rounded-lg bg-slate-700 text-slate-400 hover:bg-slate-600"><RefreshIcon fontSize="small" /></button></div>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{kpis.map((kpi) => <div key={kpi.label} className="bg-slate-800 rounded-2xl p-4 border border-slate-700"><p className="text-xs text-slate-400 mb-1.5">{kpi.label}</p>{loading ? <div className="h-7 bg-slate-700 rounded animate-pulse" /> : <p className="font-heading text-xl font-bold text-white">{kpi.value}</p>}</div>)}</div>
-      {affiliateStats && <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700"><p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Affiliate Summary</p><div className="grid grid-cols-2 md:grid-cols-4 gap-3">{[{ label: 'Total Referrals', value: String(affiliateStats.totalReferrals) }, { label: 'Users Total Deposit', value: fmt(affiliateStats.lifetimeStake, currency) }, { label: 'Lifetime Commissions', value: fmt(affiliateStats.lifetimeCommission, currency) }, { label: 'Available Balance', value: fmt(affiliateStats.availableBalance, currency) }].map((s) => <div key={s.label}><p className="text-xs text-slate-500">{s.label}</p><p className="text-sm font-bold text-white mt-0.5">{s.value}</p></div>)}</div></div>}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{kpis.map((kpi) => <div key={kpi.label} className="bg-slate-800 rounded-2xl p-3 border border-slate-700"><p className="text-xs text-slate-400 mb-1">{kpi.label}</p>{loading ? <div className="h-6 bg-slate-700 rounded animate-pulse" /> : <p className="font-heading text-lg font-bold text-white">{kpi.value}</p>}</div>)}</div>
+      {affiliateStats && <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700"><p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Affiliate Summary</p><div className="grid grid-cols-2 md:grid-cols-4 gap-3">{[{ label: 'Referrals', value: String(affiliateStats.totalReferrals) }, { label: 'Users Deposit', value: fmt(affiliateStats.lifetimeStake, currency) }, { label: 'Lifetime Comm.', value: fmt(affiliateStats.lifetimeCommission, currency) }, { label: 'Available', value: fmt(affiliateStats.availableBalance, currency) }].map((s) => <div key={s.label}><p className="text-xs text-slate-500">{s.label}</p><p className="text-sm font-bold text-white mt-0.5">{s.value}</p></div>)}</div></div>}
       <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Revenue Trend</p>
-        {loading ? <div className="h-28 bg-slate-700 rounded animate-pulse" /> : <div className="flex items-end gap-1 h-28">{(analytics?.dailyRevenue as number[] | undefined ?? [35,55,42,68,75,60,85,90,72,95,80,88]).map((h, i) => { const max = Math.max(...(analytics?.dailyRevenue as number[] | undefined ?? [100])); const pct = typeof h === 'number' ? (h / max) * 100 : h; return <div key={i} className="flex-1 bg-primary/70 rounded-t hover:bg-primary transition-colors" style={{ height: `${pct}%` }} />; })}</div>}
+        {loading ? <div className="h-24 bg-slate-700 rounded animate-pulse" /> : <div className="flex items-end gap-1 h-24">{(analytics?.dailyRevenue as number[] | undefined ?? [35,55,42,68,75,60,85,90,72,95,80,88]).map((h, i) => { const max = Math.max(...(analytics?.dailyRevenue as number[] | undefined ?? [100])); const pct = typeof h === 'number' ? (h / max) * 100 : h; return <div key={i} className="flex-1 bg-primary/70 rounded-t hover:bg-primary transition-colors" style={{ height: `${pct}%` }} />; })}</div>}
       </div>
     </div>
   );
@@ -1183,37 +1184,37 @@ function AffiliateSection({ userEmail }: { userEmail?: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div><h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>DASHBOARD</h2>{userEmail && <p style={{ margin: '2px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Signed in as <span style={{ color: '#63d2ff', fontWeight: 600 }}>{userEmail}</span></p>}</div>
+        <div><h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>DASHBOARD</h2>{userEmail && <p style={{ margin: '2px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Signed in as <span style={{ color: '#63d2ff', fontWeight: 600 }}>{userEmail}</span></p>}</div>
         <button onClick={load} style={{ padding: '8px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><RefreshIcon fontSize="small" /></button>
       </div>
-      <div style={{ background: '#fff', borderRadius: 16, padding: '18px 20px', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}><span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#374151' }}>YOUR REFERRAL LINK</span><span style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', letterSpacing: '0.06em' }}>CODE: {loading ? '…' : primaryCode}</span></div>
-        <button onClick={copyMainLink} disabled={!primaryUrl} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 10, background: copiedMain ? '#f0fdf4' : '#f9fafb', border: `1.5px solid ${copiedMain ? '#86efac' : '#e5e7eb'}`, cursor: primaryUrl ? 'pointer' : 'not-allowed', transition: 'all 0.2s' }}><span style={{ fontSize: 16 }}>{copiedMain ? '✓' : '📋'}</span><span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: copiedMain ? '#16a34a' : '#6b7280', flexShrink: 0 }}>{copiedMain ? 'COPIED!' : 'COPY'}</span><span style={{ flex: 1, fontSize: 12, color: '#dc2626', fontWeight: 500, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{loading ? 'Loading…' : (primaryUrl ?? 'No referral link yet — create one below')}</span></button>
+      <div style={{ background: '#fff', borderRadius: 16, padding: '16px 18px', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#374151' }}>YOUR REFERRAL LINK</span><span style={{ fontSize: 10, fontWeight: 700, color: '#dc2626', letterSpacing: '0.06em' }}>CODE: {loading ? '…' : primaryCode}</span></div>
+        <button onClick={copyMainLink} disabled={!primaryUrl} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: copiedMain ? '#f0fdf4' : '#f9fafb', border: `1.5px solid ${copiedMain ? '#86efac' : '#e5e7eb'}`, cursor: primaryUrl ? 'pointer' : 'not-allowed', transition: 'all 0.2s' }}><span style={{ fontSize: 14 }}>{copiedMain ? '✓' : '📋'}</span><span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: copiedMain ? '#16a34a' : '#6b7280', flexShrink: 0 }}>{copiedMain ? 'COPIED!' : 'COPY'}</span><span style={{ flex: 1, fontSize: 11, color: '#dc2626', fontWeight: 500, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{loading ? 'Loading…' : (primaryUrl ?? 'No referral link yet — create one below')}</span></button>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        {statCards.map((card) => <div key={card.label} style={{ background: '#fff', borderRadius: 14, padding: '16px 18px', boxShadow: '0 2px 12px rgba(0,0,0,0.25)' }}><div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}><span style={{ fontSize: 13 }}>{card.icon}</span><span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6b7280' }}>{card.label}</span></div>{loading ? <div style={{ height: 28, background: '#f3f4f6', borderRadius: 6 }} /> : <p style={{ margin: 0, fontSize: 22, fontWeight: 800, color: card.label === 'TOTAL EARNED' ? '#16a34a' : '#111827', lineHeight: 1.1 }}>{card.value}</p>}</div>)}
+        {statCards.map((card) => <div key={card.label} style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', boxShadow: '0 2px 12px rgba(0,0,0,0.25)' }}><div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}><span style={{ fontSize: 12 }}>{card.icon}</span><span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6b7280' }}>{card.label}</span></div>{loading ? <div style={{ height: 24, background: '#f3f4f6', borderRadius: 6 }} /> : <p style={{ margin: 0, fontSize: 18, fontWeight: 800, color: card.label === 'TOTAL EARNED' ? '#16a34a' : '#111827', lineHeight: 1.1 }}>{card.value}</p>}</div>)}
       </div>
-      <div style={{ background: '#fff', borderRadius: 16, padding: '20px', boxShadow: '0 2px 12px rgba(0,0,0,0.25)' }}>
-        <p style={{ margin: '0 0 6px', fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6b7280' }}>AVAILABLE TO WITHDRAW</p>
-        {loading ? <div style={{ height: 32, background: '#f3f4f6', borderRadius: 6, marginBottom: 16 }} /> : <p style={{ margin: '0 0 16px', fontSize: 28, fontWeight: 900, color: '#111827', lineHeight: 1 }}>{stats ? fmt(stats.availableBalance, currency) : `${currency.symbol}0.00`}</p>}
-        <button onClick={requestPayout} disabled={requesting || !payoutWindow || (stats?.availableBalance ?? 0) <= 0} style={{ width: '100%', padding: '14px', borderRadius: 10, border: 'none', background: payoutWindow && (stats?.availableBalance ?? 0) > 0 ? 'linear-gradient(135deg, #f87171, #dc2626)' : '#d1d5db', color: '#fff', fontSize: 13, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: payoutWindow && (stats?.availableBalance ?? 0) > 0 ? 'pointer' : 'not-allowed', boxShadow: payoutWindow ? '0 4px 16px rgba(220,38,38,0.35)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>{requesting ? <Spinner /> : null}{requesting ? 'Requesting…' : payoutWindow ? 'REQUEST PAYOUT' : 'PAYOUT WINDOW CLOSED'}</button>
-        {!payoutWindow && !loading && <p style={{ margin: '8px 0 0', fontSize: 11, color: '#9ca3af', textAlign: 'center' }}>Payouts are available on Fridays only</p>}
+      <div style={{ background: '#fff', borderRadius: 16, padding: '18px', boxShadow: '0 2px 12px rgba(0,0,0,0.25)' }}>
+        <p style={{ margin: '0 0 4px', fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6b7280' }}>AVAILABLE TO WITHDRAW</p>
+        {loading ? <div style={{ height: 28, background: '#f3f4f6', borderRadius: 6, marginBottom: 14 }} /> : <p style={{ margin: '0 0 14px', fontSize: 26, fontWeight: 900, color: '#111827', lineHeight: 1 }}>{stats ? fmt(stats.availableBalance, currency) : `${currency.symbol}0.00`}</p>}
+        <button onClick={requestPayout} disabled={requesting || !payoutWindow || (stats?.availableBalance ?? 0) <= 0} style={{ width: '100%', padding: '13px', borderRadius: 10, border: 'none', background: payoutWindow && (stats?.availableBalance ?? 0) > 0 ? 'linear-gradient(135deg, #f87171, #dc2626)' : '#d1d5db', color: '#fff', fontSize: 13, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: payoutWindow && (stats?.availableBalance ?? 0) > 0 ? 'pointer' : 'not-allowed', boxShadow: payoutWindow ? '0 4px 16px rgba(220,38,38,0.35)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>{requesting ? <Spinner /> : null}{requesting ? 'Requesting…' : payoutWindow ? 'REQUEST PAYOUT' : 'PAYOUT WINDOW CLOSED'}</button>
+        {!payoutWindow && !loading && <p style={{ margin: '8px 0 0', fontSize: 11, color: '#9ca3af', textAlign: 'center' }}>Payouts available on Fridays</p>}
       </div>
-      {stats && <div style={{ background: '#fff', borderRadius: 16, padding: '18px 20px', boxShadow: '0 2px 12px rgba(0,0,0,0.25)' }}><p style={{ margin: '0 0 14px', fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6b7280' }}>REFERRAL STATS</p><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>{[{ label: 'Total Referrals', value: String(stats.totalReferrals) }, { label: 'Users Total Deposit', value: fmt(stats.lifetimeStake, currency) }, { label: 'Lifetime Commissions', value: fmt(stats.lifetimeCommission, currency) }, { label: 'Available Balance', value: fmt(stats.availableBalance, currency) }].map((s) => <div key={s.label}><p style={{ margin: '0 0 2px', fontSize: 10, color: '#9ca3af', fontWeight: 600 }}>{s.label}</p><p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#111827' }}>{s.value}</p></div>)}</div></div>}
-      <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '18px 20px', border: '1px solid rgba(255,255,255,0.08)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}><p style={{ margin: 0, fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Referral Links <span style={{ color: '#63d2ff' }}>({links.length})</span></p><button onClick={() => setShowLinkForm(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: '#63d2ff', background: 'transparent', border: 'none', cursor: 'pointer' }}><AddIcon fontSize="small" /> New Link</button></div>
+      {stats && <div style={{ background: '#fff', borderRadius: 16, padding: '16px 18px', boxShadow: '0 2px 12px rgba(0,0,0,0.25)' }}><p style={{ margin: '0 0 12px', fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6b7280' }}>REFERRAL STATS</p><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>{[{ label: 'Total Referrals', value: String(stats.totalReferrals) }, { label: 'Users Total Deposit', value: fmt(stats.lifetimeStake, currency) }, { label: 'Lifetime Commissions', value: fmt(stats.lifetimeCommission, currency) }, { label: 'Available Balance', value: fmt(stats.availableBalance, currency) }].map((s) => <div key={s.label}><p style={{ margin: '0 0 2px', fontSize: 10, color: '#9ca3af', fontWeight: 600 }}>{s.label}</p><p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#111827' }}>{s.value}</p></div>)}</div></div>}
+      <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '16px 18px', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}><p style={{ margin: 0, fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Links <span style={{ color: '#63d2ff' }}>({links.length})</span></p><button onClick={() => setShowLinkForm(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: '#63d2ff', background: 'transparent', border: 'none', cursor: 'pointer' }}><AddIcon fontSize="small" /> New</button></div>
         {showLinkForm && <div style={{ display: 'flex', gap: 8, marginBottom: 12, padding: 12, borderRadius: 10, background: 'rgba(255,255,255,0.06)' }}><input type="text" placeholder="Label (optional)" value={newLinkLabel} onChange={e => setNewLinkLabel(e.target.value)} onKeyDown={e => e.key === 'Enter' && createLink()} disabled={creatingLink} style={{ flex: 1, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#fff', outline: 'none' }} /><button onClick={createLink} disabled={creatingLink} style={{ padding: '8px 16px', borderRadius: 8, background: '#63d2ff', border: 'none', color: '#000', fontSize: 12, fontWeight: 800, cursor: creatingLink ? 'not-allowed' : 'pointer', opacity: creatingLink ? 0.5 : 1 }}>{creatingLink ? '…' : 'Create'}</button></div>}
-        {loading ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{[1,2].map(i => <div key={i} style={{ height: 52, background: 'rgba(255,255,255,0.04)', borderRadius: 10 }} />)}</div>
-          : links.length === 0 ? <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '16px 0' }}>No referral links yet. Create one above.</p>
-          : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{links.map(link => { const url = buildUrl(link.code); const isCopied = copiedId === link.id; return <div key={link.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}><div style={{ flex: 1, minWidth: 0 }}>{link.label && <p style={{ margin: '0 0 2px', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>{link.label}</p>}<p style={{ margin: 0, fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.35)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</p>{link.commissionPercent != null && <span style={{ fontSize: 10, fontWeight: 700, color: '#63d2ff' }}>{link.commissionPercent}% commission</span>}</div><div style={{ display: 'flex', gap: 4, flexShrink: 0 }}><button onClick={() => copyLink(link.id, url)} style={{ padding: 7, borderRadius: 7, background: isCopied ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.06)', border: 'none', cursor: 'pointer', color: isCopied ? '#4ade80' : 'rgba(255,255,255,0.5)', display: 'flex' }}>{isCopied ? <CheckIcon fontSize="small" /> : <ContentCopyIcon fontSize="small" />}</button><a href={url} target="_blank" rel="noreferrer" style={{ padding: 7, borderRadius: 7, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', display: 'flex', textDecoration: 'none' }}><OpenInNewIcon fontSize="small" /></a></div></div>; })}</div>}
+        {loading ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{[1,2].map(i => <div key={i} style={{ height: 48, background: 'rgba(255,255,255,0.04)', borderRadius: 10 }} />)}</div>
+          : links.length === 0 ? <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '14px 0' }}>No links yet. Create one above.</p>
+          : <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{links.map(link => { const url = buildUrl(link.code); const isCopied = copiedId === link.id; return <div key={link.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}><div style={{ flex: 1, minWidth: 0 }}>{link.label && <p style={{ margin: '0 0 2px', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>{link.label}</p>}<p style={{ margin: 0, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.35)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</p>{link.commissionPercent != null && <span style={{ fontSize: 10, fontWeight: 700, color: '#63d2ff' }}>{link.commissionPercent}% commission</span>}</div><div style={{ display: 'flex', gap: 4, flexShrink: 0 }}><button onClick={() => copyLink(link.id, url)} style={{ padding: 6, borderRadius: 7, background: isCopied ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.06)', border: 'none', cursor: 'pointer', color: isCopied ? '#4ade80' : 'rgba(255,255,255,0.5)', display: 'flex' }}>{isCopied ? <CheckIcon fontSize="small" /> : <ContentCopyIcon fontSize="small" />}</button><a href={url} target="_blank" rel="noreferrer" style={{ padding: 6, borderRadius: 7, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', display: 'flex', textDecoration: 'none' }}><OpenInNewIcon fontSize="small" /></a></div></div>; })}</div>}
       </div>
-      <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '18px 20px', border: '1px solid rgba(255,255,255,0.08)' }}>
+      <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '16px 18px', border: '1px solid rgba(255,255,255,0.08)' }}>
         <p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Referred Players <span style={{ color: '#63d2ff' }}>({referredUsers.length})</span></p>
         {loading ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{[1,2,3].map(i => <div key={i} style={{ height: 44, background: 'rgba(255,255,255,0.04)', borderRadius: 8 }} />)}</div>
-          : referredUsers.length === 0 ? <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '16px 0' }}>No referred players yet.</p>
-          : <><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14, padding: '12px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.04)' }}><div><p style={{ margin: '0 0 2px', fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Total Players</p><p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#fff' }}>{referredUsers.length}</p></div><div><p style={{ margin: '0 0 2px', fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Active Players</p><p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#4ade80' }}>{referredUsers.filter(u => referralDeposit(u.lifetimeStake ?? 0) > 0).length}</p></div><div><p style={{ margin: '0 0 2px', fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Total Deposits</p><p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#63d2ff' }}>{fmt(referredUsers.reduce((s, u) => s + referralDeposit(u.lifetimeStake ?? 0), 0), currency)}</p></div></div><div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>{referredUsers.map((player) => { const name = [player.firstName, player.lastName].filter(Boolean).join(' ') || player.email || player.userId; const isActive = referralDeposit(player.lifetimeStake ?? 0) > 0; return <div key={player.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><div style={{ minWidth: 0, flex: 1 }}><p style={{ margin: '0 0 1px', fontSize: 13, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</p><p style={{ margin: 0, fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>Joined {fmtDate(player.joinedAt)} · Deposit: <span style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>{fmt(referralDeposit(player.lifetimeStake ?? 0), currency)}</span></p></div><div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, marginLeft: 10 }}>{player.lifetimeCommission > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: '#4ade80' }}>+{fmt(player.lifetimeCommission, currency)}</span>}<span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: isActive ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.06)', color: isActive ? '#4ade80' : 'rgba(255,255,255,0.3)' }}>{isActive ? 'Active' : 'Inactive'}</span></div></div>; })}</div></>}
+          : referredUsers.length === 0 ? <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '14px 0' }}>No referred players yet.</p>
+          : <><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)' }}><div><p style={{ margin: '0 0 2px', fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Total</p><p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#fff' }}>{referredUsers.length}</p></div><div><p style={{ margin: '0 0 2px', fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Active</p><p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#4ade80' }}>{referredUsers.filter(u => referralDeposit(u.lifetimeStake ?? 0) > 0).length}</p></div><div><p style={{ margin: '0 0 2px', fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Deposits</p><p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#63d2ff' }}>{fmt(referredUsers.reduce((s, u) => s + referralDeposit(u.lifetimeStake ?? 0), 0), currency)}</p></div></div><div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>{referredUsers.map((player) => { const name = [player.firstName, player.lastName].filter(Boolean).join(' ') || player.email || player.userId; const isActive = referralDeposit(player.lifetimeStake ?? 0) > 0; return <div key={player.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><div style={{ minWidth: 0, flex: 1 }}><p style={{ margin: '0 0 1px', fontSize: 13, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</p><p style={{ margin: 0, fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>Joined {fmtDate(player.joinedAt)} · <span style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>{fmt(referralDeposit(player.lifetimeStake ?? 0), currency)}</span></p></div><div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, marginLeft: 10 }}>{player.lifetimeCommission > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: '#4ade80' }}>+{fmt(player.lifetimeCommission, currency)}</span>}<span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: isActive ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.06)', color: isActive ? '#4ade80' : 'rgba(255,255,255,0.3)' }}>{isActive ? 'Active' : 'Inactive'}</span></div></div>; })}</div></>}
       </div>
-      {payoutHistory.length > 0 && <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '18px 20px', border: '1px solid rgba(255,255,255,0.08)' }}><p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Payout History</p><div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{payoutHistory.map((pr) => <div key={pr.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)' }}><div><p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 700, color: '#fff' }}>{fmt(pr.amount, currency)}</p><p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{fmtDate(pr.createdAt)}</p></div><StatusBadge status={pr.status} /></div>)}</div></div>}
+      {payoutHistory.length > 0 && <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: '16px 18px', border: '1px solid rgba(255,255,255,0.08)' }}><p style={{ margin: '0 0 12px', fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>Payout History</p><div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{payoutHistory.map((pr) => <div key={pr.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)' }}><div><p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 700, color: '#fff' }}>{fmt(pr.amount, currency)}</p><p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{fmtDate(pr.createdAt)}</p></div><StatusBadge status={pr.status} /></div>)}</div></div>}
     </div>
   );
 }
@@ -1244,11 +1245,11 @@ function WithdrawalsSection() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between"><h2 className="font-heading text-xl font-bold text-white">Withdrawals</h2><button onClick={load} className="p-1.5 rounded-xl bg-slate-700 text-slate-400 hover:bg-slate-600"><RefreshIcon fontSize="small" /></button></div>
-      <div className="flex gap-2 overflow-x-auto">{([undefined, 'PENDING', 'APPROVED', 'REJECTED'] as const).map((s) => <button key={String(s)} onClick={() => setStatusFilter(s)} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors ${statusFilter === s ? 'bg-primary text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}>{s ?? 'All'}</button>)}</div>
+      <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>{([undefined, 'PENDING', 'APPROVED', 'REJECTED'] as const).map((s) => <button key={String(s)} onClick={() => setStatusFilter(s)} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex-shrink-0 ${statusFilter === s ? 'bg-primary text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}>{s ?? 'All'}</button>)}</div>
       {loading ? <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-16 bg-slate-800 rounded-2xl animate-pulse" />)}</div>
         : fetchError ? <ErrorState text={fetchError} onRetry={load} />
         : list.length === 0 ? <EmptyState icon={<PaymentsIcon sx={{ fontSize: 40 }} />} text="No withdrawals found." />
-        : <div className="space-y-2">{list.map((w) => <div key={w.id} className="bg-slate-800 rounded-2xl p-4 border border-slate-700 flex items-center justify-between gap-3"><div className="flex-1 min-w-0"><p className="text-sm font-bold text-white truncate">{w.user?.firstName ?? ''} {w.user?.lastName ?? ''} · {fmt(w.amount, currency)}</p><p className="text-xs text-slate-400">{w.method} · {w.accountName} · {w.accountNumber}</p><p className="text-xs text-slate-500">{fmtDate(w.createdAt)}</p></div><div className="flex items-center gap-2 shrink-0"><StatusBadge status={w.status} />{w.status === 'PENDING' && (<><button disabled={processing === w.id} onClick={() => approve(w.id)} className="p-1.5 rounded-lg bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50 disabled:opacity-50">{processing === w.id ? <Spinner /> : <CheckIcon fontSize="small" />}</button><button disabled={processing === w.id} onClick={() => reject(w.id)} className="p-1.5 rounded-lg bg-red-900/30 text-red-400 hover:bg-red-900/50 disabled:opacity-50"><BlockIcon fontSize="small" /></button></>)}</div></div>)}</div>}
+        : <div className="space-y-2">{list.map((w) => <div key={w.id} className="bg-slate-800 rounded-2xl p-3 border border-slate-700 flex items-center justify-between gap-3"><div className="flex-1 min-w-0"><p className="text-sm font-bold text-white truncate">{w.user?.firstName ?? ''} {w.user?.lastName ?? ''} · {fmt(w.amount, currency)}</p><p className="text-xs text-slate-400 truncate">{w.method} · {w.accountNumber}</p><p className="text-xs text-slate-500">{fmtDate(w.createdAt)}</p></div><div className="flex items-center gap-2 shrink-0"><StatusBadge status={w.status} />{w.status === 'PENDING' && (<><button disabled={processing === w.id} onClick={() => approve(w.id)} className="p-1.5 rounded-lg bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50 disabled:opacity-50">{processing === w.id ? <Spinner /> : <CheckIcon fontSize="small" />}</button><button disabled={processing === w.id} onClick={() => reject(w.id)} className="p-1.5 rounded-lg bg-red-900/30 text-red-400 hover:bg-red-900/50 disabled:opacity-50"><BlockIcon fontSize="small" /></button></>)}</div></div>)}</div>}
     </div>
   );
 }
@@ -1277,7 +1278,7 @@ function UpgradeChatsSection({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       <div className="flex gap-2">{(['pending','all'] as const).map((f) => <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-colors ${filter === f ? 'bg-primary text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}>{f === 'pending' ? 'Pending' : 'All'}</button>)}</div>
       {loading ? <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-20 bg-slate-800 rounded-2xl animate-pulse" />)}</div>
         : chats.length === 0 ? <EmptyState icon={<MarkChatReadIcon sx={{ fontSize: 40 }} />} text={filter === 'pending' ? 'No pending chats.' : 'No upgrade chats.'} />
-        : <div className="space-y-2">{chats.map((chat) => <button key={chat.id} onClick={() => setActiveChat(chat)} className="w-full bg-slate-800 rounded-2xl p-4 border border-slate-700 hover:border-primary/40 text-left flex items-center justify-between gap-3"><div className="flex-1 min-w-0"><div className="flex items-center gap-2 mb-1"><p className="text-sm font-bold text-white truncate">{chat.userFirstName ?? 'User'}</p><StatusBadge status={chat.status} /></div><p className="text-xs text-slate-400 truncate">{chat.userEmail ?? '—'}</p><p className="text-xs text-slate-500 mt-0.5">{chat.messageCount ?? 0} messages · {fmtDate(chat.createdAt)}{chat.commissionRate != null && ` · ${chat.commissionRate}% commission`}</p></div><ChatIcon fontSize="small" className="text-slate-500 shrink-0" /></button>)}</div>}
+        : <div className="space-y-2">{chats.map((chat) => <button key={chat.id} onClick={() => setActiveChat(chat)} className="w-full bg-slate-800 rounded-2xl p-3 border border-slate-700 hover:border-primary/40 text-left flex items-center justify-between gap-3"><div className="flex-1 min-w-0"><div className="flex items-center gap-2 mb-1"><p className="text-sm font-bold text-white truncate">{chat.userFirstName ?? 'User'}</p><StatusBadge status={chat.status} /></div><p className="text-xs text-slate-400 truncate">{chat.userEmail ?? '—'}</p><p className="text-xs text-slate-500 mt-0.5">{chat.messageCount ?? 0} msgs · {fmtDate(chat.createdAt)}{chat.commissionRate != null && ` · ${chat.commissionRate}%`}</p></div><ChatIcon fontSize="small" className="text-slate-500 shrink-0" /></button>)}</div>}
     </div>
   );
 }
@@ -1310,7 +1311,7 @@ function PayoutsSection() {
       <div className="flex items-center justify-between"><h2 className="font-heading text-xl font-bold text-white">Payout Requests</h2><button onClick={load} className="p-1.5 rounded-xl bg-slate-700 text-slate-400 hover:bg-slate-600"><RefreshIcon fontSize="small" /></button></div>
       {loading ? <div className="space-y-2">{[1,2].map(i => <div key={i} className="h-20 bg-slate-800 rounded-2xl animate-pulse" />)}</div>
         : list.length === 0 ? <EmptyState icon={<AttachMoneyIcon sx={{ fontSize: 40 }} />} text="No payout requests." />
-        : <div className="space-y-2">{list.map((pr) => <div key={pr.id} className="bg-slate-800 rounded-2xl p-4 border border-slate-700"><div className="flex items-center justify-between gap-3 mb-3"><div className="flex-1 min-w-0"><p className="text-sm font-bold text-white">{fmt(pr.amount, currency)}</p><p className="text-xs text-slate-400">{fmtDate(pr.createdAt)}</p></div><StatusBadge status={pr.status} /></div>{(pr.status === 'REQUESTED' || pr.status === 'APPROVED') && <div className="flex gap-2">{pr.status === 'REQUESTED' && (<><button disabled={processing === pr.id} onClick={() => action(pr.id, 'approve')} className="flex-1 py-1.5 rounded-xl bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50 text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50">{processing === pr.id ? <Spinner /> : <><CheckIcon fontSize="small" /> Approve</>}</button><button disabled={processing === pr.id} onClick={() => action(pr.id, 'reject')} className="flex-1 py-1.5 rounded-xl bg-red-900/30 text-red-400 hover:bg-red-900/50 text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50"><BlockIcon fontSize="small" /> Reject</button></>)}{pr.status === 'APPROVED' && <button disabled={processing === pr.id} onClick={() => action(pr.id, 'markPaid')} className="flex-1 py-1.5 rounded-xl bg-blue-900/30 text-blue-400 hover:bg-blue-900/50 text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50">{processing === pr.id ? <Spinner /> : <><AttachMoneyIcon fontSize="small" /> Mark Paid</>}</button>}</div>}</div>)}</div>}
+        : <div className="space-y-2">{list.map((pr) => <div key={pr.id} className="bg-slate-800 rounded-2xl p-3 border border-slate-700"><div className="flex items-center justify-between gap-3 mb-3"><div className="flex-1 min-w-0"><p className="text-sm font-bold text-white">{fmt(pr.amount, currency)}</p><p className="text-xs text-slate-400">{fmtDate(pr.createdAt)}</p></div><StatusBadge status={pr.status} /></div>{(pr.status === 'REQUESTED' || pr.status === 'APPROVED') && <div className="flex gap-2">{pr.status === 'REQUESTED' && (<><button disabled={processing === pr.id} onClick={() => action(pr.id, 'approve')} className="flex-1 py-1.5 rounded-xl bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50 text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50">{processing === pr.id ? <Spinner /> : <><CheckIcon fontSize="small" /> Approve</>}</button><button disabled={processing === pr.id} onClick={() => action(pr.id, 'reject')} className="flex-1 py-1.5 rounded-xl bg-red-900/30 text-red-400 hover:bg-red-900/50 text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50"><BlockIcon fontSize="small" /> Reject</button></>)}{pr.status === 'APPROVED' && <button disabled={processing === pr.id} onClick={() => action(pr.id, 'markPaid')} className="flex-1 py-1.5 rounded-xl bg-blue-900/30 text-blue-400 hover:bg-blue-900/50 text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50">{processing === pr.id ? <Spinner /> : <><AttachMoneyIcon fontSize="small" /> Mark Paid</>}</button>}</div>}</div>)}</div>}
     </div>
   );
 }
@@ -1318,58 +1319,121 @@ function PayoutsSection() {
 // ─── Main AdminModal ──────────────────────────────────────────────────────────
 
 export default function AdminModal() {
-  const { isAdminModalOpen, setAdminModalOpen, user } = useAppStore();
+  // ── FIX 1: pull setModalOpen from store ──────────────────────────────────
+  const { isAdminModalOpen, setAdminModalOpen, setModalOpen, user } = useAppStore();
   const [activeSection, setActiveSection] = useState<SectionKey>('affiliate');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  // ── FIX 2: sync setModalOpen so BottomNav hides when AdminModal is open ──
+  useEffect(() => {
+    setModalOpen(isAdminModalOpen);
+    return () => setModalOpen(false);
+  }, [isAdminModalOpen, setModalOpen]);
+
+  // Close mobile sidebar on section change
+  const handleSectionChange = (key: SectionKey) => {
+    setActiveSection(key);
+    setMobileSidebarOpen(false);
+  };
 
   if (!isAdminModalOpen || !user) return null;
 
   const role = user.role as string;
   const isSuperAdmin = role === 'SUPER_ADMIN' || role === 'super_admin';
 
-  // All admins see all tabs — no email gate, no privileged-only restrictions.
   const sections: { key: SectionKey; label: string; icon: React.ReactNode }[] = [
     { key: 'affiliate',     label: 'Home',          icon: <GroupAddIcon fontSize="small" /> },
     { key: 'dashboard',     label: 'Analytics',     icon: <BarChartIcon fontSize="small" /> },
     { key: 'matches',       label: 'Matches',       icon: <SportsSoccerIcon fontSize="small" /> },
     { key: 'bookings',      label: 'Codes',         icon: <QrCodeIcon fontSize="small" /> },
     { key: 'withdrawals',   label: 'Withdrawals',   icon: <PaymentsIcon fontSize="small" /> },
-    { key: 'upgrade-chats', label: 'Upgrade Chats', icon: <ChatIcon fontSize="small" /> },
+    { key: 'upgrade-chats', label: 'Chats',         icon: <ChatIcon fontSize="small" /> },
     { key: 'payouts',       label: 'Payouts',       icon: <AttachMoneyIcon fontSize="small" /> },
   ];
 
+  const activeLabel = sections.find(s => s.key === activeSection)?.label ?? '';
+
   return (
-    <div className="fixed inset-0 z-[70] bg-slate-900 flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 shrink-0 bg-slate-900">
+    // ── FIX 3: z-index raised to 9998 so it's below BottomNav (9999) ──────
+    <div className="fixed inset-0 z-[9998] bg-slate-900 flex flex-col">
+
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-b border-slate-700 shrink-0 bg-slate-900" style={{ minHeight: 52 }}>
         <div className="flex items-center gap-2">
-          {isSuperAdmin ? <SupervisorAccountIcon className="text-purple-400" fontSize="small" /> : <AdminPanelSettingsIcon className="text-primary" fontSize="small" />}
-          <h1 className="font-heading text-base sm:text-lg font-bold text-white">{isSuperAdmin ? 'Super Admin Panel' : 'Admin Panel'}</h1>
-          <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${isSuperAdmin ? 'bg-purple-900/30 text-purple-400' : 'bg-blue-900/30 text-blue-400'}`}>{isSuperAdmin ? 'SUPER ADMIN' : 'ADMIN'}</span>
+          {/* Mobile hamburger */}
+          <button
+            className="md:hidden p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white mr-1"
+            onClick={() => setMobileSidebarOpen(v => !v)}
+          >
+            <MenuIcon fontSize="small" />
+          </button>
+
+          {isSuperAdmin
+            ? <SupervisorAccountIcon className="text-purple-400 hidden sm:block" fontSize="small" />
+            : <AdminPanelSettingsIcon className="text-primary hidden sm:block" fontSize="small" />
+          }
+          <h1 className="font-heading text-sm sm:text-base font-bold text-white truncate">
+            <span className="hidden sm:inline">{isSuperAdmin ? 'Super Admin' : 'Admin'} · </span>
+            {activeLabel}
+          </h1>
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-md hidden xs:inline ${isSuperAdmin ? 'bg-purple-900/30 text-purple-400' : 'bg-blue-900/30 text-blue-400'}`}>
+            {isSuperAdmin ? 'SUPER' : 'ADMIN'}
+          </span>
         </div>
-        <button onClick={() => setAdminModalOpen(false)} className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800"><CloseIcon fontSize="small" /></button>
+        <button onClick={() => setAdminModalOpen(false)} className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 shrink-0">
+          <CloseIcon fontSize="small" />
+        </button>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Desktop sidebar */}
+      <div className="flex flex-1 overflow-hidden relative">
+
+        {/* ── Mobile sidebar overlay ───────────────────────────────────── */}
+        <AnimatePresence>
+          {mobileSidebarOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="md:hidden fixed inset-0 bg-black/60 z-30"
+                onClick={() => setMobileSidebarOpen(false)}
+              />
+              <motion.nav
+                initial={{ x: -240 }}
+                animate={{ x: 0 }}
+                exit={{ x: -240 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 36 }}
+                className="md:hidden fixed top-[52px] left-0 bottom-0 w-56 z-40 bg-slate-800 border-r border-slate-700 p-3 flex flex-col gap-1 overflow-y-auto"
+              >
+                {sections.map((section) => (
+                  <button
+                    key={section.key}
+                    onClick={() => handleSectionChange(section.key)}
+                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-left ${activeSection === section.key ? 'bg-primary text-white shadow-sm' : 'text-slate-300 hover:bg-slate-700'}`}
+                  >
+                    {section.icon}{section.label}
+                  </button>
+                ))}
+              </motion.nav>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* ── Desktop sidebar ──────────────────────────────────────────── */}
         <nav className="hidden md:flex w-52 flex-col border-r border-slate-700 bg-slate-800 p-3 gap-1 shrink-0 overflow-y-auto">
           {sections.map((section) => (
-            <button key={section.key} onClick={() => setActiveSection(section.key)} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-left ${activeSection === section.key ? 'bg-primary text-white shadow-sm' : 'text-slate-300 hover:bg-slate-700'}`}>
+            <button
+              key={section.key}
+              onClick={() => setActiveSection(section.key)}
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-left ${activeSection === section.key ? 'bg-primary text-white shadow-sm' : 'text-slate-300 hover:bg-slate-700'}`}
+            >
               {section.icon}{section.label}
             </button>
           ))}
         </nav>
 
-        {/* Mobile horizontal scroll nav */}
-        <div className="md:hidden absolute top-[52px] left-0 right-0 flex overflow-x-auto gap-1.5 px-3 py-2 border-b border-slate-700 bg-slate-900 z-10 shrink-0" style={{ scrollbarWidth: 'none' }}>
-          {sections.map((section) => (
-            <button key={section.key} onClick={() => setActiveSection(section.key)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap min-h-[36px] transition-colors ${activeSection === section.key ? 'bg-primary text-white' : 'bg-slate-700 text-slate-300'}`}>
-              {section.icon}{section.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 mt-[52px] md:mt-0 bg-slate-900">
+        {/* ── Content ──────────────────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 bg-slate-900">
           {activeSection === 'affiliate'     && <AffiliateSection userEmail={user.email} />}
           {activeSection === 'dashboard'     && <DashboardSection isSuperAdmin={isSuperAdmin} />}
           {activeSection === 'matches'       && <MatchesSection />}
