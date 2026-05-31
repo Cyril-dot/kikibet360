@@ -12,12 +12,12 @@ interface Country {
   flagImg: string;
   currency: string;
   symbol: string;
-  gateways: ("moolre" | "paystack" | "binance")[];
+  gateways: ("moolre" | "binance")[];
 }
 
 const COUNTRIES: Country[] = [
   { code: "GH", name: "Ghana",         flag: "🇬🇭", flagImg: "https://flagcdn.com/w40/gh.png", currency: "GHS", symbol: "GH₵",  gateways: ["moolre", "binance"] },
-  { code: "NG", name: "Nigeria",        flag: "🇳🇬", flagImg: "https://flagcdn.com/w40/ng.png", currency: "NGN", symbol: "₦",    gateways: ["paystack", "binance"] },
+  { code: "NG", name: "Nigeria",        flag: "🇳🇬", flagImg: "https://flagcdn.com/w40/ng.png", currency: "NGN", symbol: "₦",    gateways: ["binance"] },
   { code: "KE", name: "Kenya",          flag: "🇰🇪", flagImg: "https://flagcdn.com/w40/ke.png", currency: "KES", symbol: "KSh",  gateways: ["binance"] },
   { code: "TZ", name: "Tanzania",       flag: "🇹🇿", flagImg: "https://flagcdn.com/w40/tz.png", currency: "TZS", symbol: "TSh",  gateways: ["binance"] },
   { code: "UG", name: "Uganda",         flag: "🇺🇬", flagImg: "https://flagcdn.com/w40/ug.png", currency: "UGX", symbol: "USh",  gateways: ["binance"] },
@@ -33,13 +33,10 @@ const COUNTRIES: Country[] = [
 ];
 
 // ─── NETWORK LOGOS ────────────────────────────────────────────────────────────
-// Replace these paths with your own uploaded logo files.
-// e.g. if you upload mtn.png → use "/logos/mtn.png" or import it directly.
 const MOMO_NETWORKS = [
   {
     id: "MTN",
     label: "MTN MoMo",
-    // ↓ Replace with your uploaded MTN logo path
     logo: "https://upload.wikimedia.org/wikipedia/commons/2/29/MTN-Logo.png",
     fallbackBg: "#FFCB00",
     fallbackInitial: "M",
@@ -47,7 +44,6 @@ const MOMO_NETWORKS = [
   {
     id: "VODAFONE",
     label: "Telecel Cash",
-    // ↓ Replace with your uploaded Telecel logo path
     logo: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRYqBE5Z2TJCiY6TNe5xgJLiOJLgcxnjyddKw&s",
     fallbackBg: "#e30613",
     fallbackInitial: "T",
@@ -55,7 +51,6 @@ const MOMO_NETWORKS = [
   {
     id: "AIRTELTIGO",
     label: "AirtelTigo Money",
-    // ↓ Replace with your uploaded AirtelTigo logo path
     logo: "https://www.gsma.com/get-involved/gsma-membership/wp-content/uploads/2014/06/AirtelTigo-Logo-White-background.png",
     fallbackBg: "#e2001a",
     fallbackInitial: "AT",
@@ -82,7 +77,6 @@ function FlagImg({ country, size = 24 }: { country: Country; size?: number }) {
   );
 }
 
-// Network logo with fallback coloured initial badge
 function NetworkLogo({ network, size = 32 }: { network: typeof MOMO_NETWORKS[0]; size?: number }) {
   const [err, setErr] = useState(false);
   if (err) {
@@ -124,7 +118,6 @@ function CopyBtn({ text }: { text: string }) {
         transition: "all 0.2s", fontFamily: "inherit",
       }}
     >
-      {/* Google Material Icon */}
       <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
         {ok ? "check_circle" : "content_copy"}
       </span>
@@ -158,7 +151,7 @@ export default function DepositPage() {
 
   /* ── state ── */
   const [country,     setCountry]     = useState<Country | null>(null);
-  const [gateway,     setGateway]     = useState<"moolre" | "paystack" | "binance" | null>(null);
+  const [gateway,     setGateway]     = useState<"moolre" | "binance" | null>(null);
   const [ipDetecting, setIpDetecting] = useState(true);
 
   const [rates, setRates] = useState<Record<string, number>>({});
@@ -208,9 +201,6 @@ export default function DepositPage() {
   const [smsCode,   setSmsCode]   = useState("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  /* paystack */
-  const [psEmail, setPsEmail] = useState("");
-
   /* binance */
   const [txid,        setTxid]        = useState("");
   const [cryptoAmt,   setCryptoAmt]   = useState("");
@@ -252,7 +242,7 @@ export default function DepositPage() {
     if (c.gateways.length === 1) setGateway(c.gateways[0]);
   };
 
-  const selectGateway = (gw: "moolre" | "paystack" | "binance") => {
+  const selectGateway = (gw: "moolre" | "binance") => {
     setGateway(gw); setError(""); setAmount(""); setStep("form");
   };
 
@@ -299,23 +289,6 @@ export default function DepositPage() {
     finally { setLoading(false); }
   };
 
-  const handlePaystack = async () => {
-    setError("");
-    const cur = country!.currency;
-    const localAmt = parseFloat(amount);
-    const min = minLocal(cur);
-    if (!localAmt || localAmt < min) return setError(`Min deposit: ${country!.symbol}${min.toLocaleString()}`);
-    if (!/\S+@\S+\.\S+/.test(psEmail)) return setError("Valid email required.");
-    setLoading(true);
-    try {
-      const data = await post("/api/wallet/deposit/paystack/init", { amount: localToGhs(localAmt, cur), email: psEmail.trim(), currency: cur });
-      const url = data?.data?.authorization_url;
-      if (url) window.location.href = url;
-      else setError("No payment link. Try again.");
-    } catch (e: unknown) { setError((e as Error).message); }
-    finally { setLoading(false); }
-  };
-
   const validateBinance = () => {
     const e: Record<string, string> = {};
     if (!txid.trim() || txid.trim().length < 10) e.txid = "Valid TXID required (min 10 chars)";
@@ -341,7 +314,7 @@ export default function DepositPage() {
 
   const reset = () => {
     setCountry(null); setGateway(null); setAmount(""); setPhone(""); setMomoNet("MTN");
-    setError(""); setInfo(""); setExtRef(""); setSmsCode(""); setSub("wait"); setPsEmail("");
+    setError(""); setInfo(""); setExtRef(""); setSmsCode(""); setSub("wait");
     setTxid(""); setCryptoAmt(""); setCoin("USDT"); setCryptoNet("TRC20");
     setExpectedGhs(""); setSenderAddr(""); setUserNote(""); setBErrs({}); setStep("form");
     if (timerRef.current) clearInterval(timerRef.current);
@@ -530,7 +503,7 @@ export default function DepositPage() {
           </div>
           <div style={{ maxHeight: 260, overflowY: "auto" }}>
             {filtered.map(c => {
-              const hasInstant = c.gateways.includes("moolre") || c.gateways.includes("paystack");
+              const hasInstant = c.gateways.includes("moolre");
               return (
                 <button key={c.code} onClick={() => { handleSelectCountry(c); setDropOpen(false); setSearch(""); }}
                   style={{
@@ -564,16 +537,10 @@ export default function DepositPage() {
   ══════════════════════════════════════════════════════════════ */
   const GatewayTabs = () => {
     if (!country || country.gateways.length <= 1) return null;
-    const tabs: { id: "moolre" | "paystack" | "binance"; icon: string; matIcon: string; label: string; sub: string }[] =
-      country.code === "GH"
-        ? [
-            { id: "moolre",  icon: "📲", matIcon: "phone_android", label: "Mobile Money",   sub: "MTN · Telecel · AirtelTigo" },
-            { id: "binance", icon: "₿",  matIcon: "currency_bitcoin", label: "Crypto",      sub: "USDT · BTC · ETH · BNB" },
-          ]
-        : [
-            { id: "paystack", icon: "💳", matIcon: "credit_card", label: "Paystack",         sub: "Cards · Bank · USSD · MoMo" },
-            { id: "binance",  icon: "₿",  matIcon: "currency_bitcoin", label: "Crypto",      sub: "USDT · BTC · ETH · BNB" },
-          ];
+    const tabs: { id: "moolre" | "binance"; matIcon: string; label: string; sub: string }[] = [
+      { id: "moolre",  matIcon: "phone_android",    label: "Mobile Money", sub: "MTN · Telecel · AirtelTigo" },
+      { id: "binance", matIcon: "currency_bitcoin",  label: "Crypto",       sub: "USDT · BTC · ETH · BNB" },
+    ];
 
     return (
       <div style={{ marginBottom: 22 }}>
@@ -618,9 +585,8 @@ export default function DepositPage() {
       <div style={{ fontSize: 10, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8 }}>Trusted Payment Partners</div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {[
-          { label: "Moolre",   matIcon: "phone_android", desc: "MoMo" },
-          { label: "Paystack", matIcon: "credit_card",   desc: "Cards & Bank" },
-          { label: "Binance",  matIcon: "currency_bitcoin", desc: "Crypto" },
+          { label: "Moolre",  matIcon: "phone_android",    desc: "MoMo" },
+          { label: "Binance", matIcon: "currency_bitcoin",  desc: "Crypto" },
         ].map(b => (
           <div key={b.label} style={{
             display: "flex", alignItems: "center", gap: 6,
@@ -757,47 +723,6 @@ export default function DepositPage() {
           </button>
         </>
       )}
-    </div>
-  );
-
-  /* ══════════════════════════════════════════════════════════════
-     PAYSTACK PANEL
-  ══════════════════════════════════════════════════════════════ */
-  const PaystackForm = () => (
-    <div>
-      {error && <ErrBox msg={error} />}
-      <AmountField />
-      <div style={{ marginBottom: 18 }}>
-        <label style={lbl}>Email Address</label>
-        <div style={{ display: "flex", alignItems: "center", background: T.raised, border: `1px solid ${T.border}`, borderRadius: 10, overflow: "hidden" }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 18, color: T.dim, padding: "0 12px", borderRight: `1px solid ${T.border}`, display: "flex", alignItems: "center", alignSelf: "stretch" }}>mail</span>
-          <input type="email" placeholder="your@email.com" value={psEmail} onChange={e => setPsEmail(e.target.value)}
-            style={{ ...inp, border: "none", borderRadius: 0, background: "none" }} />
-        </div>
-        <div style={{ fontSize: 11, color: T.dim, marginTop: 5 }}>Required by Paystack</div>
-      </div>
-      <div style={{ background: T.faint, border: `1px solid ${T.border}`, borderRadius: 9, padding: "10px 13px", marginBottom: 18 }}>
-        <div style={{ fontSize: 10, color: T.dim, marginBottom: 8, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Accepted</div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {[
-            { icon: "credit_card", label: "Card" },
-            { icon: "account_balance", label: "Bank" },
-            { icon: "dialpad", label: "USSD" },
-            { icon: "phone_android", label: "MoMo" },
-          ].map(m => (
-            <span key={m.label} style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 20, background: T.redLow, color: "#f87171", border: `1px solid ${T.redMid}`, display: "flex", alignItems: "center", gap: 4 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{m.icon}</span>{m.label}
-            </span>
-          ))}
-        </div>
-      </div>
-      <button onClick={handlePaystack} disabled={loading || !amount || !psEmail}
-        style={{ ...btnPrimary, opacity: loading || !amount || !psEmail ? 0.38 : 1, marginBottom: 8 }}>
-        {loading
-          ? <><Spin /> Redirecting…</>
-          : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>open_in_new</span>Pay {country!.symbol}{parseFloat(amount) || "0.00"} via Paystack</>
-        }
-      </button>
     </div>
   );
 
@@ -1011,9 +936,9 @@ export default function DepositPage() {
         <div style={{ borderTop: `1px solid ${T.border}`, padding: "16px 20px" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {[
-              { matIcon: "chat",        label: "Live Chat",     desc: "Chat with us on WhatsApp",  href: "https://wa.me/233000000000", color: "#25D366" },
-              { matIcon: "mail",        label: "Email Support", desc: "support@bet360.com",         href: "mailto:support@bet360.com",  color: "#60a5fa" },
-              { matIcon: "send",        label: "Telegram",      desc: "@Bet360Support",             href: "https://t.me/Bet360Support",  color: "#2AABEE" },
+              { matIcon: "chat",  label: "Live Chat",     desc: "Chat with us on WhatsApp", href: "https://wa.me/233000000000", color: "#25D366" },
+              { matIcon: "mail",  label: "Email Support", desc: "bet360support11@gmail.com",  href: "mailto:bet360support11@gmail.com", color: "#60a5fa" },
+              { matIcon: "send",  label: "Telegram",      desc: "@Bet360Support",            href: "https://t.me/Bet360Support",  color: "#2AABEE" },
             ].map(ch => (
               <a key={ch.label} href={ch.href} target="_blank" rel="noopener noreferrer" style={{
                 display: "flex", alignItems: "center", gap: 12,
@@ -1053,7 +978,6 @@ export default function DepositPage() {
       if (step === "done")    return <SuccessScreen type="momo" />;
       return <MoolreForm />;
     }
-    if (gateway === "paystack") return <PaystackForm />;
     if (gateway === "binance") {
       if (step === "proof")   return <BinanceProof />;
       if (step === "success") return <SuccessScreen type="crypto" />;
@@ -1069,7 +993,6 @@ export default function DepositPage() {
       if (step === "done")    return "Deposit Successful";
       return "Mobile Money";
     }
-    if (gateway === "paystack") return "Pay with Paystack";
     if (gateway === "binance") {
       if (step === "proof")   return "Payment Proof";
       if (step === "success") return "Under Review";
@@ -1186,7 +1109,7 @@ export default function DepositPage() {
                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>lock</span>
                 256-bit encrypted · Bet 360
               </span>
-              <span style={{ fontSize: 10, color: "rgba(245,245,240,0.14)" }}>Moolre · Paystack · Binance</span>
+              <span style={{ fontSize: 10, color: "rgba(245,245,240,0.14)" }}>Moolre · Binance</span>
             </div>
           </div>
 

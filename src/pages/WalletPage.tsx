@@ -846,11 +846,11 @@ export default function WalletPage() {
                   {
                     icon: <EmailIcon sx={{ fontSize: 20 }} />,
                     label: 'Email Support',
-                    sub: 'support@bet360.com',
+                    sub: 'bet360support11@gmail.com',
                     color: '#ef4444',
                     bg: 'rgba(220,38,38,0.08)',
                     border: 'rgba(220,38,38,0.2)',
-                    href: 'mailto:support@bet360.com',
+                    href: 'mailto:bet360support11@gmail.com',
                   },
                 ].map(channel => (
                   <a key={channel.label} href={channel.href} target="_blank" rel="noopener noreferrer"
