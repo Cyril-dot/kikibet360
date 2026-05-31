@@ -118,6 +118,8 @@
     color: var(--text-main);
     font-family: 'Inter', sans-serif;
     -webkit-tap-highlight-color: transparent;
+    /* ↓ Clamp base font: min 13px on tiny screens, 16px on desktop */
+    font-size: clamp(13px, 3.5vw, 16px);
   }
 }
 
@@ -181,10 +183,10 @@
     position: relative;
     background: var(--card-bg);
     border: 1.5px solid var(--card-border);
-    border-radius: 14px;
+    border-radius: 12px;
     overflow: hidden;
     cursor: pointer;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     transition: border-color 0.18s, box-shadow 0.18s, background-color 0.18s;
   }
   .match-card:last-child { margin-bottom: 0; }
@@ -228,19 +230,20 @@
   .match-card-topbar {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 9px 13px 0;
+    gap: 5px;
+    padding: 7px 11px 0;
   }
 
   .match-card-league-logo {
-    width: 14px;
-    height: 14px;
+    width: 12px;
+    height: 12px;
     object-fit: contain;
     flex-shrink: 0;
   }
 
+  /* ↓ REDUCED from 0.72rem */
   .match-card-league {
-    font-size: 0.72rem;
+    font-size: 0.62rem;
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -258,24 +261,23 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: 0.65rem;
+    /* ↓ REDUCED from 0.65rem */
+    font-size: 0.58rem;
     font-weight: 700;
     letter-spacing: 0.05em;
-    border-radius: 6px;
-    padding: 3px 8px;
+    border-radius: 5px;
+    padding: 2px 7px;
     white-space: nowrap;
     flex-shrink: 0;
     line-height: 1;
   }
 
-  /* Live badge */
   .match-status-badge.live {
     background: var(--live-green-soft);
     color: var(--live-green);
     border: 1px solid color-mix(in srgb, var(--live-green) 30%, transparent);
   }
 
-  /* Finished badge */
   .match-status-badge.finished {
     background: var(--card-alt);
     color: var(--text-muted);
@@ -284,7 +286,7 @@
     letter-spacing: 0.08em;
   }
 
-  /* Upcoming badge (kickoff time) */
+  /* ↓ REDUCED from 0.72rem */
   .match-status-badge.upcoming {
     background: transparent;
     color: var(--text-muted);
@@ -292,43 +294,43 @@
     font-weight: 500;
     gap: 3px;
     letter-spacing: 0;
-    font-size: 0.72rem;
+    font-size: 0.62rem;
   }
 
   /* ── Body: teams + scores ──────────────────────────────────── */
 
   .match-card-body {
-    padding: 10px 13px 11px;
+    padding: 8px 11px 9px;
     display: flex;
     flex-direction: column;
-    gap: 7px;
+    gap: 5px;
   }
 
   .match-team-row {
     display: flex;
     align-items: center;
-    gap: 9px;
+    gap: 7px;
   }
 
   .match-team-logo {
-    width: 23px;
-    height: 23px;
+    width: 20px;
+    height: 20px;
     object-fit: contain;
     flex-shrink: 0;
     border-radius: 3px;
   }
   .match-team-logo-placeholder {
-    width: 23px;
-    height: 23px;
+    width: 20px;
+    height: 20px;
     flex-shrink: 0;
     border-radius: 3px;
     background: var(--card-alt);
     border: 1.5px solid var(--card-border);
   }
 
-  /* TEAM NAME — bigger + heavier */
+  /* ↓ REDUCED from 1.05rem — was the main offender on mobile */
   .match-team-name {
-    font-size: 1.05rem;
+    font-size: 0.82rem;
     font-weight: 700;
     color: var(--text-main);
     white-space: nowrap;
@@ -348,13 +350,13 @@
     font-weight: 500;
   }
 
-  /* SCORE */
+  /* ↓ REDUCED from 1.2rem */
   .match-score {
-    font-size: 1.2rem;
+    font-size: 1rem;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     color: var(--text-main);
-    min-width: 22px;
+    min-width: 18px;
     text-align: right;
     flex-shrink: 0;
     line-height: 1;
@@ -364,16 +366,15 @@
   .match-score.winner { color: var(--text-main); }
   .match-score.loser  { color: var(--text-muted); font-weight: 600; }
 
-  /* Score divider for live/finished */
+  /* ↓ REDUCED from 0.78rem */
   .match-score-divider {
-    font-size: 0.78rem;
+    font-size: 0.68rem;
     color: var(--text-faint);
     font-weight: 400;
     flex-shrink: 0;
     padding: 0 2px;
   }
 
-  /* Upcoming — kickoff time in score column */
   .match-kickoff-col {
     display: flex;
     flex-direction: column;
@@ -381,18 +382,20 @@
     justify-content: center;
     flex-shrink: 0;
     gap: 1px;
-    min-width: 44px;
+    min-width: 38px;
   }
+  /* ↓ REDUCED from 1.25rem */
   .match-kickoff-time {
     font-family: 'Barlow Condensed', sans-serif;
-    font-size: 1.25rem;
+    font-size: 1rem;
     font-weight: 800;
     color: var(--primary);
     line-height: 1;
     font-variant-numeric: tabular-nums;
   }
+  /* ↓ REDUCED from 0.58rem */
   .match-kickoff-label {
-    font-size: 0.58rem;
+    font-size: 0.52rem;
     font-weight: 600;
     letter-spacing: 0.07em;
     text-transform: uppercase;
@@ -405,7 +408,7 @@
   .match-vs-separator {
     height: 1px;
     background: var(--card-border);
-    margin: 0 12px;
+    margin: 0 10px;
     opacity: 0.8;
   }
 
@@ -415,8 +418,8 @@
 
   .match-odds-row {
     display: flex;
-    gap: 6px;
-    padding: 0 10px 11px;
+    gap: 5px;
+    padding: 0 8px 9px;
   }
 
   .match-odds-btn {
@@ -425,15 +428,16 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
-    padding: 9px 6px;
-    border-radius: 10px;
+    gap: 2px;
+    padding: 7px 4px;
+    border-radius: 9px;
     border: 1.5px solid var(--card-border);
     background: var(--odds-bg);
     color: var(--text-main);
     cursor: pointer;
     transition: border-color 0.15s, background-color 0.15s, color 0.15s, transform 0.1s;
-    min-height: 54px;
+    /* ↓ REDUCED from 54px */
+    min-height: 46px;
     position: relative;
     overflow: hidden;
   }
@@ -462,9 +466,9 @@
     opacity: 0.5;
   }
 
-  /* ODDS LABEL */
+  /* ↓ REDUCED from 0.65rem */
   .match-odds-label {
-    font-size: 0.65rem;
+    font-size: 0.56rem;
     font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
@@ -474,9 +478,9 @@
   .match-odds-btn.selected .match-odds-label { color: rgba(255,255,255,0.78); }
   .match-odds-btn:hover:not(.selected):not(.locked) .match-odds-label { color: var(--primary); }
 
-  /* ODDS VALUE — big + bold */
+  /* ↓ REDUCED from 1.1rem */
   .match-odds-value {
-    font-size: 1.1rem;
+    font-size: 0.9rem;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     line-height: 1;
@@ -484,14 +488,14 @@
     letter-spacing: 0.01em;
   }
 
-  /* More odds link */
+  /* ↓ REDUCED from 0.68rem */
   .match-more-odds {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 3px;
-    padding: 0 10px 9px;
-    font-size: 0.68rem;
+    padding: 0 8px 7px;
+    font-size: 0.6rem;
     font-weight: 600;
     color: var(--text-faint);
     letter-spacing: 0.03em;
@@ -508,31 +512,33 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 6px 13px 11px;
+    padding: 5px 11px 9px;
     gap: 8px;
   }
 
+  /* ↓ REDUCED from 0.65rem */
   .match-result-label {
-    font-size: 0.65rem;
+    font-size: 0.58rem;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--text-faint);
   }
 
+  /* ↓ REDUCED from 1.5rem */
   .match-result-score-block {
     display: flex;
     align-items: center;
     gap: 6px;
     font-family: 'Barlow Condensed', sans-serif;
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     color: var(--text-main);
     letter-spacing: 0.02em;
   }
   .match-result-score-block .sep {
-    font-size: 1rem;
+    font-size: 0.85rem;
     font-weight: 400;
     color: var(--text-faint);
   }
@@ -556,24 +562,25 @@
   ═══════════════════════════════════════════════════════════════ */
 
   .league-group {
-    margin-bottom: 18px;
+    margin-bottom: 14px;
   }
   .league-group:last-child { margin-bottom: 0; }
 
   .league-group-header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 2px 2px 9px;
+    gap: 7px;
+    padding: 2px 2px 7px;
   }
   .league-group-header-logo {
-    width: 17px;
-    height: 17px;
+    width: 15px;
+    height: 15px;
     object-fit: contain;
     flex-shrink: 0;
   }
+  /* ↓ REDUCED from 0.72rem */
   .league-group-name {
-    font-size: 0.72rem;
+    font-size: 0.65rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -584,15 +591,16 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* ↓ REDUCED from 0.65rem */
   .league-group-count {
-    font-size: 0.65rem;
+    font-size: 0.58rem;
     font-weight: 600;
     color: var(--text-faint);
     background: var(--card-alt);
     border: 1.5px solid var(--card-border);
     border-radius: 10px;
-    padding: 2px 8px;
-    min-width: 22px;
+    padding: 2px 7px;
+    min-width: 20px;
     text-align: center;
     flex-shrink: 0;
   }
@@ -605,21 +613,23 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
   }
+  /* ↓ REDUCED from 1.05rem */
   .section-title-text {
     display: flex;
     align-items: center;
     gap: 6px;
     font-family: 'Barlow Condensed', sans-serif;
-    font-size: 1.05rem;
+    font-size: 0.92rem;
     font-weight: 700;
     letter-spacing: 0.04em;
     color: var(--text-main);
   }
+  /* ↓ REDUCED from 0.85rem */
   .section-count {
     font-family: 'Inter', sans-serif;
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     font-weight: 400;
     color: var(--text-muted);
     letter-spacing: 0;
@@ -633,15 +643,16 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    margin: 14px 0 10px;
+    margin: 12px 0 8px;
   }
   .league-divider-line {
     flex: 1;
     height: 1px;
     background: var(--border-light);
   }
+  /* ↓ REDUCED from 0.65rem */
   .league-divider-label {
-    font-size: 0.65rem;
+    font-size: 0.58rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -663,13 +674,14 @@
      SPORT / LEAGUE TABS
   ═══════════════════════════════════════════════════════════════ */
 
+  /* ↓ REDUCED from 0.8rem */
   .sport-tab {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 7px 14px;
+    gap: 4px;
+    padding: 6px 12px;
     border-radius: 20px;
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     font-weight: 600;
     white-space: nowrap;
     flex-shrink: 0;
@@ -687,12 +699,13 @@
     box-shadow: var(--primary-glow);
   }
 
+  /* ↓ REDUCED from 0.75rem */
   .league-tab {
     display: inline-flex;
     align-items: center;
-    padding: 5px 12px;
+    padding: 4px 10px;
     border-radius: 16px;
-    font-size: 0.75rem;
+    font-size: 0.68rem;
     font-weight: 600;
     white-space: nowrap;
     flex-shrink: 0;

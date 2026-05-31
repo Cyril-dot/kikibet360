@@ -49,14 +49,6 @@ import OpenInNewIcon           from '@mui/icons-material/OpenInNew';
 import DeleteIcon              from '@mui/icons-material/Delete';
 import DeleteSweepIcon         from '@mui/icons-material/DeleteSweep';
 
-// ─── PRIVILEGED EMAIL GATE ────────────────────────────────────────────────────
-// Only these two emails (plus SUPER_ADMIN role) can see all tabs.
-// All other admin accounts only see Home + Analytics.
-const PRIVILEGED_EMAILS = [
-  'kwadwoasiamah02@gmail.com',
-  'mr.asare2121@gmail.com',
-];
-
 // ─── DEFAULT COMMISSION RATE ──────────────────────────────────────────────────
 const DEFAULT_COMMISSION_RATE = 70; // 70%
 
@@ -1037,7 +1029,6 @@ function UpgradeChatPanel({ chat, isSuperAdmin, onClose, onCommissionSet }: { ch
   const [loading, setLoading] = useState(true);
   const [msgInput, setMsgInput] = useState('');
   const [sending, setSending] = useState(false);
-  // Pre-filled with the standard 70% commission rate
   const [commissionInput, setCommissionInput] = useState(String(DEFAULT_COMMISSION_RATE));
   const [settingCommission, setSettingCommission] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -1335,26 +1326,16 @@ export default function AdminModal() {
   const role = user.role as string;
   const isSuperAdmin = role === 'SUPER_ADMIN' || role === 'super_admin';
 
-  // Full access = privileged email OR super admin role.
-  // Everyone else (regular admins) only sees Home + Analytics.
-  const hasFullAccess = isSuperAdmin || PRIVILEGED_EMAILS.includes((user.email ?? '').toLowerCase().trim());
-
-  const sections: { key: SectionKey; label: string; icon: React.ReactNode; privilegedOnly?: boolean }[] = [
+  // All admins see all tabs — no email gate, no privileged-only restrictions.
+  const sections: { key: SectionKey; label: string; icon: React.ReactNode }[] = [
     { key: 'affiliate',     label: 'Home',          icon: <GroupAddIcon fontSize="small" /> },
     { key: 'dashboard',     label: 'Analytics',     icon: <BarChartIcon fontSize="small" /> },
-    // ── Privileged-only tabs ──────────────────────────────────────────────────
-    { key: 'matches',       label: 'Matches',       icon: <SportsSoccerIcon fontSize="small" />, privilegedOnly: true },
-    { key: 'bookings',      label: 'Codes',         icon: <QrCodeIcon fontSize="small" />,       privilegedOnly: true },
-    { key: 'withdrawals',   label: 'Withdrawals',   icon: <PaymentsIcon fontSize="small" />,     privilegedOnly: true },
-    { key: 'upgrade-chats', label: 'Upgrade Chats', icon: <ChatIcon fontSize="small" />,         privilegedOnly: true },
-    { key: 'payouts',       label: 'Payouts',       icon: <AttachMoneyIcon fontSize="small" />,  privilegedOnly: true },
-    // NOTE: Audit tab has been removed as requested.
+    { key: 'matches',       label: 'Matches',       icon: <SportsSoccerIcon fontSize="small" /> },
+    { key: 'bookings',      label: 'Codes',         icon: <QrCodeIcon fontSize="small" /> },
+    { key: 'withdrawals',   label: 'Withdrawals',   icon: <PaymentsIcon fontSize="small" /> },
+    { key: 'upgrade-chats', label: 'Upgrade Chats', icon: <ChatIcon fontSize="small" /> },
+    { key: 'payouts',       label: 'Payouts',       icon: <AttachMoneyIcon fontSize="small" /> },
   ];
-
-  const visibleSections = sections.filter((s) => !s.privilegedOnly || hasFullAccess);
-
-  // Guard: if the currently-active section is not visible, fall back to affiliate
-  const resolvedSection = visibleSections.some((s) => s.key === activeSection) ? activeSection : 'affiliate';
 
   return (
     <div className="fixed inset-0 z-[70] bg-slate-900 flex flex-col">
@@ -1371,8 +1352,8 @@ export default function AdminModal() {
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop sidebar */}
         <nav className="hidden md:flex w-52 flex-col border-r border-slate-700 bg-slate-800 p-3 gap-1 shrink-0 overflow-y-auto">
-          {visibleSections.map((section) => (
-            <button key={section.key} onClick={() => setActiveSection(section.key)} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-left ${resolvedSection === section.key ? 'bg-primary text-white shadow-sm' : 'text-slate-300 hover:bg-slate-700'}`}>
+          {sections.map((section) => (
+            <button key={section.key} onClick={() => setActiveSection(section.key)} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-left ${activeSection === section.key ? 'bg-primary text-white shadow-sm' : 'text-slate-300 hover:bg-slate-700'}`}>
               {section.icon}{section.label}
             </button>
           ))}
@@ -1380,8 +1361,8 @@ export default function AdminModal() {
 
         {/* Mobile horizontal scroll nav */}
         <div className="md:hidden absolute top-[52px] left-0 right-0 flex overflow-x-auto gap-1.5 px-3 py-2 border-b border-slate-700 bg-slate-900 z-10 shrink-0" style={{ scrollbarWidth: 'none' }}>
-          {visibleSections.map((section) => (
-            <button key={section.key} onClick={() => setActiveSection(section.key)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap min-h-[36px] transition-colors ${resolvedSection === section.key ? 'bg-primary text-white' : 'bg-slate-700 text-slate-300'}`}>
+          {sections.map((section) => (
+            <button key={section.key} onClick={() => setActiveSection(section.key)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap min-h-[36px] transition-colors ${activeSection === section.key ? 'bg-primary text-white' : 'bg-slate-700 text-slate-300'}`}>
               {section.icon}{section.label}
             </button>
           ))}
@@ -1389,13 +1370,13 @@ export default function AdminModal() {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 mt-[52px] md:mt-0 bg-slate-900">
-          {resolvedSection === 'affiliate'     && <AffiliateSection userEmail={user.email} />}
-          {resolvedSection === 'dashboard'     && <DashboardSection isSuperAdmin={isSuperAdmin} />}
-          {resolvedSection === 'matches'       && hasFullAccess && <MatchesSection />}
-          {resolvedSection === 'bookings'      && hasFullAccess && <BookingsSection />}
-          {resolvedSection === 'withdrawals'   && hasFullAccess && <WithdrawalsSection />}
-          {resolvedSection === 'upgrade-chats' && hasFullAccess && <UpgradeChatsSection isSuperAdmin={isSuperAdmin} />}
-          {resolvedSection === 'payouts'       && hasFullAccess && <PayoutsSection />}
+          {activeSection === 'affiliate'     && <AffiliateSection userEmail={user.email} />}
+          {activeSection === 'dashboard'     && <DashboardSection isSuperAdmin={isSuperAdmin} />}
+          {activeSection === 'matches'       && <MatchesSection />}
+          {activeSection === 'bookings'      && <BookingsSection />}
+          {activeSection === 'withdrawals'   && <WithdrawalsSection />}
+          {activeSection === 'upgrade-chats' && <UpgradeChatsSection isSuperAdmin={isSuperAdmin} />}
+          {activeSection === 'payouts'       && <PayoutsSection />}
         </div>
       </div>
     </div>

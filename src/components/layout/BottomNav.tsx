@@ -6,16 +6,16 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 
 const navItems = [
-  { to: '/',        label: 'Home',     icon: <HomeIcon /> },
-  { to: '/live',    label: 'Sports',   icon: <SportsSoccerIcon /> },
-  { to: '/betslip', label: 'Bet Slip', icon: <ReceiptLongIcon /> },
-  { to: '/account', label: 'Account',  icon: <AccountCircleIcon /> },
+  { to: '/',        label: 'Home',     icon: <HomeIcon fontSize="small" /> },
+  { to: '/live',    label: 'Sports',   icon: <SportsSoccerIcon fontSize="small" /> },
+  { to: '/betslip', label: 'Bet Slip', icon: <ReceiptLongIcon fontSize="small" /> },
+  { to: '/account', label: 'Account',  icon: <AccountCircleIcon fontSize="small" /> },
 ];
 
 export default function BottomNav() {
   const location = useLocation();
-  const betSlip = useAppStore((s) => s.betSlip);
-  const modalOpen = useAppStore((s) => (s as any).modalOpen ?? false);
+  const betSlip  = useAppStore((s) => s.betSlip);
+  const modalOpen = useAppStore((s) => s.modalOpen);   // ✅ no cast needed
 
   return (
     <nav
@@ -28,7 +28,7 @@ export default function BottomNav() {
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
-      <div className="flex items-center justify-around h-16">
+      <div className="flex items-center justify-around h-14">
         {navItems.map((item) => {
           const isActive = location.pathname === item.to;
           return (
@@ -42,29 +42,23 @@ export default function BottomNav() {
                 {item.icon}
                 {item.to === '/betslip' && betSlip.length > 0 && (
                   <span
-                    className="absolute -top-1.5 -right-2.5 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-0.5"
-                    style={{ background: '#CC0000' }}
+                    className="absolute -top-1.5 -right-2.5 text-white font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-0.5"
+                    style={{ background: '#CC0000', fontSize: '9px' }}
                   >
                     {betSlip.length}
                   </span>
                 )}
               </div>
               <span
-                className="text-[10px]"
-                style={{ fontWeight: isActive ? 800 : 500 }}
+                className="leading-none"
+                style={{ fontSize: '9px', fontWeight: isActive ? 800 : 500 }}
               >
                 {item.label}
               </span>
-              {/* Active indicator */}
               {isActive && (
                 <span
                   className="absolute bottom-0 left-1/2 -translate-x-1/2"
-                  style={{
-                    width: 4,
-                    height: 4,
-                    borderRadius: '50%',
-                    background: '#CC0000',
-                  }}
+                  style={{ width: 4, height: 4, borderRadius: '50%', background: '#CC0000' }}
                 />
               )}
             </Link>
