@@ -32,10 +32,11 @@ import PhoneAndroidIcon      from '@mui/icons-material/PhoneAndroid';
 import AccountBalanceIcon    from '@mui/icons-material/AccountBalance';
 import AddCardIcon           from '@mui/icons-material/AddCard';
 import PaymentsIcon          from '@mui/icons-material/Payments';
+import ExpandMoreIcon        from '@mui/icons-material/ExpandMore';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const DEPOSITS_REQUIRED_TO_ACTIVATE = 3;  // lifetime deposits needed to unlock withdrawals
+const DEPOSITS_REQUIRED_TO_ACTIVATE = 3;
 const MIN_WITHDRAWAL_AMOUNT         = 2000; // in GHS
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -140,7 +141,6 @@ const INCOMING_KINDS = [
 
 function isIncoming(kind: string) { return INCOMING_KINDS.includes(kind); }
 
-/** Total lifetime deposit count across all transactions loaded so far. */
 function countLifetimeDeposits(transactions: Transaction[]): number {
   return transactions.filter(tx => tx.kind === 'DEPOSIT').length;
 }
@@ -224,8 +224,80 @@ function ModalRow({ label, value, last = false }: { label: string; value: string
   );
 }
 
+// ── Network Picker (custom dropdown, fully visible) ───────────────────────────
+
+function NetworkPicker({ networks, value, onChange }: {
+  networks: string[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      {/* Trigger button */}
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl text-left transition-all"
+        style={{
+          backgroundColor: 'rgba(255,255,255,0.08)',
+          border: open ? '1px solid rgba(220,38,38,0.6)' : '1px solid rgba(255,255,255,0.18)',
+          color: '#fff',
+          fontSize: 15,
+          fontWeight: 600,
+        }}
+      >
+        <div className="flex items-center gap-2.5">
+          <PhoneAndroidIcon sx={{ fontSize: 18, color: '#ef4444' }} />
+          <span>{value}</span>
+        </div>
+        <ExpandMoreIcon
+          sx={{ fontSize: 20, color: 'rgba(255,255,255,0.5)', transition: 'transform 0.2s' }}
+          style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}
+        />
+      </button>
+
+      {/* Dropdown panel */}
+      {open && (
+        <div
+          className="absolute left-0 right-0 z-50 mt-2 rounded-2xl overflow-hidden shadow-2xl"
+          style={{
+            backgroundColor: '#1a1a1a',
+            border: '1px solid rgba(255,255,255,0.15)',
+          }}
+        >
+          {networks.map((n, i) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => { onChange(n); setOpen(false); }}
+              className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-all hover:bg-white/10 active:bg-white/5"
+              style={{
+                color: n === value ? '#ef4444' : '#fff',
+                fontWeight: n === value ? 700 : 500,
+                fontSize: 15,
+                borderBottom: i < networks.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                backgroundColor: n === value ? 'rgba(220,38,38,0.1)' : 'transparent',
+              }}
+            >
+              <PhoneAndroidIcon sx={{ fontSize: 17, color: n === value ? '#ef4444' : 'rgba(255,255,255,0.35)' }} />
+              {n}
+              {n === value && (
+                <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full"
+                  style={{ backgroundColor: 'rgba(220,38,38,0.2)', color: '#ef4444' }}>
+                  Selected
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Account Activation Prompt Modal ──────────────────────────────────────────
-// Shown when a user tries to withdraw but hasn't made 3 lifetime deposits yet.
 
 interface ActivationPromptModalProps {
   open: boolean;
@@ -240,79 +312,52 @@ function ActivationPromptModal({ open, onClose, lifetimeDeposits }: ActivationPr
   return (
     <ModalShell open={open} onClose={onClose}>
       <div className="space-y-5">
-        {/* Close button row */}
         <div className="flex items-center justify-between">
-          <div /> {/* spacer */}
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl text-white/40 hover:text-white transition-colors"
-          >
+          <div />
+          <button onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-xl text-white/40 hover:text-white transition-colors">
             <CancelIcon fontSize="small" />
           </button>
         </div>
-
-        {/* Icon */}
         <div className="flex justify-center">
           <div className="w-16 h-16 rounded-full flex items-center justify-center"
             style={{ background: 'linear-gradient(135deg, #1a0000, #440000)', border: '1px solid rgba(220,38,38,0.4)' }}>
             <AddCardIcon style={{ color: '#ef4444', fontSize: 28 }} />
           </div>
         </div>
-
-        {/* Title & body */}
         <div className="text-center space-y-2">
           <h3 className="text-xl font-bold text-white">Complete 3 Deposits</h3>
           <p className="text-sm text-white/50 leading-relaxed">
             Make {DEPOSITS_REQUIRED_TO_ACTIVATE} deposits to your account to activate withdrawals.
-            {remaining > 0 && (
-              <> You're {remaining} deposit{remaining > 1 ? 's' : ''} away.</>
-            )}
+            {remaining > 0 && <> You're {remaining} deposit{remaining > 1 ? 's' : ''} away.</>}
           </p>
         </div>
-
-        {/* Progress dots */}
         <div className="flex items-center justify-center gap-3 py-1">
           {dots.map((_, i) => (
-            <div
-              key={i}
+            <div key={i}
               className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm transition-all"
               style={
                 i < lifetimeDeposits
                   ? { backgroundColor: '#dc2626', color: '#fff', boxShadow: '0 0 16px rgba(220,38,38,0.5)' }
                   : { backgroundColor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.1)' }
-              }
-            >
+              }>
               {i < lifetimeDeposits ? '✓' : i + 1}
             </div>
           ))}
         </div>
-
-        {/* Progress bar */}
         <div className="w-full rounded-full h-1.5" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
-          <div
-            className="h-1.5 rounded-full transition-all duration-500"
-            style={{
-              width: `${(lifetimeDeposits / DEPOSITS_REQUIRED_TO_ACTIVATE) * 100}%`,
-              backgroundColor: '#dc2626',
-            }}
-          />
+          <div className="h-1.5 rounded-full transition-all duration-500"
+            style={{ width: `${(lifetimeDeposits / DEPOSITS_REQUIRED_TO_ACTIVATE) * 100}%`, backgroundColor: '#dc2626' }} />
         </div>
-
-        {/* CTAs */}
         <div className="grid grid-cols-2 gap-3 pt-1">
-          <button
-            onClick={onClose}
+          <button onClick={onClose}
             className="py-3 rounded-2xl text-sm font-semibold text-white/60"
-            style={{ backgroundColor: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
-          >
+            style={{ backgroundColor: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}>
             Maybe Later
           </button>
-          <Link
-            to="/deposit"
-            onClick={onClose}
+          <Link to="/deposit" onClick={onClose}
             className="py-3 rounded-2xl text-sm font-semibold text-white flex items-center justify-center gap-1.5"
-            style={{ backgroundColor: '#dc2626' }}
-          >
+            style={{ backgroundColor: '#dc2626' }}>
             <AddCardIcon fontSize="small" /> Deposit Now
           </Link>
         </div>
@@ -396,7 +441,6 @@ function WithdrawModal({ open, onClose, onSuccess, balanceGhs, currency }: Withd
   const amountGhs    = localToGhs(amountLocal, currency);
   const balanceLocal = balanceGhs * currency.rateFromGhs;
   const minLocal     = MIN_WITHDRAWAL_AMOUNT * currency.rateFromGhs;
-
   const amountValid  = amountLocal >= minLocal && amountLocal <= balanceLocal && !isNaN(amountLocal);
 
   const reset = () => {
@@ -409,6 +453,9 @@ function WithdrawModal({ open, onClose, onSuccess, balanceGhs, currency }: Withd
   const canProceed = amountValid &&
     (method === 'momo' ? !!phoneNumber && !!network : !!bankName && !!accountNumber && !!accountName);
 
+  // ── FIX: accountName must never be blank ──────────────────────────────────
+  // For MoMo, use the phone number as the account name so the backend
+  // @NotBlank validation on accountName is always satisfied.
   const submit = async () => {
     setLoading(true); setError('');
     try {
@@ -416,7 +463,7 @@ function WithdrawModal({ open, onClose, onSuccess, balanceGhs, currency }: Withd
         amount: amountGhs,
         method,
         accountNumber: method === 'momo' ? phoneNumber : accountNumber,
-        accountName:   method === 'momo' ? '' : accountName,
+        accountName:   method === 'momo' ? phoneNumber : accountName,   // ← FIX
         network:       method === 'momo' ? network : bankName,
       });
       setStep('done');
@@ -431,7 +478,6 @@ function WithdrawModal({ open, onClose, onSuccess, balanceGhs, currency }: Withd
     backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
     color: '#fff', fontSize: 15, outline: 'none',
   };
-  const selectStyle: React.CSSProperties = { ...inputStyle, appearance: 'none' as const };
 
   return (
     <ModalShell open={open} onClose={handleClose}>
@@ -556,14 +602,10 @@ function WithdrawModal({ open, onClose, onSuccess, balanceGhs, currency }: Withd
           {/* MoMo fields */}
           {method === 'momo' && (
             <div className="space-y-3">
+              {/* Custom network picker */}
               <div className="space-y-1">
                 <label className="text-xs font-bold uppercase tracking-wider text-white/40">Network</label>
-                <div className="relative">
-                  <select value={network} onChange={e => setNetwork(e.target.value)} style={selectStyle}>
-                    {momoNetworks.map(n => <option key={n} value={n}>{n}</option>)}
-                  </select>
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none text-xs">▾</span>
-                </div>
+                <NetworkPicker networks={momoNetworks} value={network} onChange={setNetwork} />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-bold uppercase tracking-wider text-white/40">Phone Number</label>
@@ -811,7 +853,6 @@ export default function WalletPage() {
 
   const isAdmin = isAdminUser(currentUser as Parameters<typeof isAdminUser>[0]);
 
-  // Lifetime deposit count — the ONLY gate for withdrawal activation
   const lifetimeDeposits  = countLifetimeDeposits(transactions);
   const accountActivated  = isAdmin || lifetimeDeposits >= DEPOSITS_REQUIRED_TO_ACTIVATE;
 
@@ -819,16 +860,15 @@ export default function WalletPage() {
   const affBalanceSufficient  = isAdmin || affBalanceGhs >= MIN_WITHDRAWAL_AMOUNT;
 
   // ── Withdraw button handlers ──────────────────────────────────────────────
-  // Gate order: activation check first, then balance check, then open modal.
   const handleWithdrawClick = () => {
-    if (!accountActivated)       { setShowActivationPrompt(true);   return; }
-    if (!mainBalanceSufficient)  { setShowInsufficientBal(true);    return; }
+    if (!accountActivated)      { setShowActivationPrompt(true);  return; }
+    if (!mainBalanceSufficient) { setShowInsufficientBal(true);   return; }
     setShowWithdraw(true);
   };
 
   const handleAffWithdrawClick = () => {
-    if (!accountActivated)      { setShowAffActivationPrompt(true); return; }
-    if (!affBalanceSufficient)  { setShowAffInsufficientBal(true);  return; }
+    if (!accountActivated)     { setShowAffActivationPrompt(true); return; }
+    if (!affBalanceSufficient) { setShowAffInsufficientBal(true);  return; }
     setShowAffWithdraw(true);
   };
 
@@ -909,7 +949,6 @@ export default function WalletPage() {
             style={{ background: 'linear-gradient(135deg, #1a0000 0%, #2d0000 50%, #440000 100%)', border: '1px solid rgba(220,38,38,0.25)' }}>
             <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full opacity-10" style={{ backgroundColor: '#dc2626' }} />
             <div className="absolute -bottom-12 -left-4 w-32 h-32 rounded-full opacity-5" style={{ backgroundColor: '#dc2626' }} />
-
             <div className="relative">
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
@@ -922,11 +961,9 @@ export default function WalletPage() {
                   {showBalance ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
                 </button>
               </div>
-
               <p className="text-4xl font-black tracking-tight text-white mt-2 mb-6">
                 {showBalance ? formatCurrency(ghsBalance, currency) : `${currency.code} ••••`}
               </p>
-
               <div className="grid grid-cols-2 gap-3">
                 <Link to="/deposit"
                   className="flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl text-sm font-bold text-white transition-all active:scale-[0.97]"
@@ -953,17 +990,15 @@ export default function WalletPage() {
                 <span className="text-white/30"><ChevronRightIcon fontSize="small" /></span>
               </div>
             </div>
-
             <p className="text-3xl font-black text-white mb-4">
               {showAffBalance ? formatCurrency(affBalanceGhs, currency) : `${currency.code} ••••`}
             </p>
-
             {affiliateStats && (
               <div className="grid grid-cols-3 gap-2 mb-4">
                 {[
-                  { icon: <PaidIcon sx={{ fontSize: 18 }} style={{ color: '#ffffff' }} />,    label: 'Total Earned', val: formatCurrency(affLifetimeGhs, currency), color: '#ffffff' },
+                  { icon: <PaidIcon sx={{ fontSize: 18 }} style={{ color: '#ffffff' }} />,      label: 'Total Earned', val: formatCurrency(affLifetimeGhs, currency), color: '#ffffff' },
                   { icon: <PeopleAltIcon sx={{ fontSize: 18 }} style={{ color: '#ef4444' }} />, label: 'Referrals',    val: String(affiliateStats.totalReferrals),     color: '#ef4444' },
-                  { icon: <WalletIcon sx={{ fontSize: 18 }} style={{ color: '#ffffff' }} />,   label: 'Available',    val: formatCurrency(affBalanceGhs, currency),   color: '#ffffff' },
+                  { icon: <WalletIcon sx={{ fontSize: 18 }} style={{ color: '#ffffff' }} />,    label: 'Available',    val: formatCurrency(affBalanceGhs, currency),   color: '#ffffff' },
                 ].map(stat => (
                   <div key={stat.label} className="rounded-2xl p-3 text-center"
                     style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -974,7 +1009,6 @@ export default function WalletPage() {
                 ))}
               </div>
             )}
-
             <button onClick={handleAffWithdrawClick}
               className="w-full py-3 rounded-2xl text-sm font-bold text-white/70 flex items-center justify-center gap-2 transition-all active:scale-[0.97]"
               style={{ backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
@@ -985,7 +1019,6 @@ export default function WalletPage() {
           {/* ── Recent Transactions ── */}
           <div className="rounded-3xl p-5" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.08)' }}>
             <h2 className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-4">Recent Transactions</h2>
-
             {transactions.length === 0 ? (
               <div className="text-center py-12">
                 <MoneyOffIcon sx={{ fontSize: 40 }} className="text-white/10 mx-auto mb-3" />
@@ -1022,7 +1055,6 @@ export default function WalletPage() {
                 })}
               </div>
             )}
-
             {txPage + 1 < txTotalPages && (
               <div className="mt-4">
                 <button onClick={() => fetchTransactions(txPage + 1)} disabled={txLoading}
@@ -1044,9 +1076,9 @@ export default function WalletPage() {
               <p className="text-xs text-white/20 mb-4">Online 24/7 — We're always here to help</p>
               <div className="grid grid-cols-1 gap-2">
                 {[
-                  { icon: <WhatsAppIcon sx={{ fontSize: 20 }} />, label: 'WhatsApp Support', sub: 'Chat with us instantly',       color: '#ffffff', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.1)', href: 'https://wa.me/233000000000' },
-                  { icon: <TelegramIcon sx={{ fontSize: 20 }} />, label: 'Telegram Support', sub: '@Bet360Support',               color: '#ffffff', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.1)', href: 'https://t.me/Bet360Support' },
-                  { icon: <EmailIcon    sx={{ fontSize: 20 }} />, label: 'Email Support',    sub: 'bet360support11@gmail.com',    color: '#ef4444', bg: 'rgba(220,38,38,0.08)',   border: 'rgba(220,38,38,0.2)',   href: 'mailto:bet360support11@gmail.com' },
+                  { icon: <WhatsAppIcon sx={{ fontSize: 20 }} />, label: 'WhatsApp Support', sub: 'Chat with us instantly',    color: '#ffffff', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.1)', href: 'https://wa.me/233000000000' },
+                  { icon: <TelegramIcon sx={{ fontSize: 20 }} />, label: 'Telegram Support', sub: '@Bet360Support',            color: '#ffffff', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.1)', href: 'https://t.me/Bet360Support' },
+                  { icon: <EmailIcon    sx={{ fontSize: 20 }} />, label: 'Email Support',    sub: 'bet360support11@gmail.com', color: '#ef4444', bg: 'rgba(220,38,38,0.08)',   border: 'rgba(220,38,38,0.2)',   href: 'mailto:bet360support11@gmail.com' },
                 ].map(channel => (
                   <a key={channel.label} href={channel.href} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-3 p-3.5 rounded-2xl transition-all active:scale-[0.98]"
@@ -1074,21 +1106,18 @@ export default function WalletPage() {
 
       {/* ── Modals ── */}
 
-      {/* Activation prompt — main wallet */}
       <ActivationPromptModal
         open={showActivationPrompt}
         onClose={() => setShowActivationPrompt(false)}
         lifetimeDeposits={lifetimeDeposits}
       />
 
-      {/* Activation prompt — affiliate */}
       <ActivationPromptModal
         open={showAffActivationPrompt}
         onClose={() => setShowAffActivationPrompt(false)}
         lifetimeDeposits={lifetimeDeposits}
       />
 
-      {/* Insufficient balance — main wallet */}
       <InsufficientBalanceModal
         open={showInsufficientBal}
         onClose={() => setShowInsufficientBal(false)}
@@ -1096,7 +1125,6 @@ export default function WalletPage() {
         currency={currency}
       />
 
-      {/* Insufficient balance — affiliate */}
       <InsufficientBalanceModal
         open={showAffInsufficientBal}
         onClose={() => setShowAffInsufficientBal(false)}
@@ -1104,7 +1132,6 @@ export default function WalletPage() {
         currency={currency}
       />
 
-      {/* Withdraw — main wallet */}
       <WithdrawModal
         open={showWithdraw}
         onClose={() => setShowWithdraw(false)}
@@ -1113,7 +1140,6 @@ export default function WalletPage() {
         currency={currency}
       />
 
-      {/* Withdraw — affiliate */}
       <AffiliateWithdrawModal
         open={showAffWithdraw}
         onClose={() => setShowAffWithdraw(false)}
