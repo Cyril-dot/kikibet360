@@ -1,11 +1,78 @@
 // Bet360 — Header.tsx
 // Auth-responsive: shows wallet balance + avatar when logged in, Join/Login when not
+// Currency: backend stores GH₵. Detected country switches display:
+//   Ghana   → GH₵ (no conversion)
+//   Nigeria → ₦ NGN (live GHS→NGN rate)
+//   Others  → $ USD (live GHS→USD rate)
 
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store';
 import { wallet as walletApi } from '../../utils/api';
 import type { ApiResponse } from '../../utils/api';
+
+// ─── Currency detection + conversion ─────────────────────────────────────────
+
+type CurrencyInfo = {
+  code: 'GHS' | 'NGN' | 'USD';
+  symbol: string;
+  rate: number; // how many units per 1 GHS
+};
+
+async function detectCurrency(): Promise<CurrencyInfo> {
+  // 1. Detect country via IP
+  let countryCode = 'GH'; // default to Ghana
+  try {
+    const geoRes = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(4000) });
+    if (geoRes.ok) {
+      const geo = await geoRes.json();
+      countryCode = geo?.country_code ?? 'GH';
+    }
+  } catch {
+    // fall through to default
+  }
+
+  // Ghana — no conversion needed
+  if (countryCode === 'GH') {
+    return { code: 'GHS', symbol: 'GH₵', rate: 1 };
+  }
+
+  // Nigeria — fetch live GHS→NGN rate
+  if (countryCode === 'NG') {
+    try {
+      const fxRes = await fetch('https://open.er-api.com/v6/latest/GHS', { signal: AbortSignal.timeout(5000) });
+      if (fxRes.ok) {
+        const fx = await fxRes.json();
+        const rate = fx?.rates?.NGN;
+        if (typeof rate === 'number' && rate > 0) {
+          return { code: 'NGN', symbol: '₦', rate };
+        }
+      }
+    } catch { /* fall through */ }
+    // Fallback rate if API fails (~realistic as of 2025)
+    return { code: 'NGN', symbol: '₦', rate: 52 };
+  }
+
+  // All other countries — show USD
+  try {
+    const fxRes = await fetch('https://open.er-api.com/v6/latest/GHS', { signal: AbortSignal.timeout(5000) });
+    if (fxRes.ok) {
+      const fx = await fxRes.json();
+      const rate = fx?.rates?.USD;
+      if (typeof rate === 'number' && rate > 0) {
+        return { code: 'USD', symbol: '$', rate };
+      }
+    }
+  } catch { /* fall through */ }
+  return { code: 'USD', symbol: '$', rate: 0.067 };
+}
+
+function formatAmount(cedis: number, currency: CurrencyInfo): string {
+  const converted = cedis * currency.rate;
+  if (currency.code === 'GHS') return `GH₵ ${converted.toFixed(2)}`;
+  if (currency.code === 'NGN') return `₦ ${converted.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `$ ${converted.toFixed(2)}`;
+}
 
 // ─── Logo ─────────────────────────────────────────────────────────────────────
 function Bet360Logo({ dark = false }: { dark?: boolean }) {
@@ -27,17 +94,22 @@ function Bet360Logo({ dark = false }: { dark?: boolean }) {
 }
 
 // ─── Wallet Balance chip ───────────────────────────────────────────────────────
-function WalletChip() {
-  const [balance, setBalance] = useState<number | null>(null);
+function WalletChip({ currency }: { currency: CurrencyInfo | null }) {
+  const [balanceCedis, setBalanceCedis] = useState<number | null>(null);
 
   useEffect(() => {
     walletApi.getWallet()
       .then((res: ApiResponse<Record<string, unknown>>) => {
         const data = res.data as Record<string, unknown>;
-        if (typeof data?.balance === 'number') setBalance(data.balance);
+        if (typeof data?.balance === 'number') setBalanceCedis(data.balance);
       })
       .catch(() => {});
   }, []);
+
+  const displayBalance =
+    balanceCedis === null || currency === null
+      ? '···'
+      : formatAmount(balanceCedis, currency);
 
   return (
     <Link
@@ -51,8 +123,8 @@ function WalletChip() {
         <path d="M3 8h16a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H5a2 2 0 0 1-2-2V8z"/>
         <circle cx="16" cy="13" r="1" fill="rgba(255,255,255,0.85)" stroke="none"/>
       </svg>
-      <span style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: '0.82rem', color: '#fff', letterSpacing: '0.01em', minWidth: 60, textAlign: 'right' }}>
-        {balance === null ? '···' : `GH₵ ${balance.toFixed(2)}`}
+      <span style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: '0.82rem', color: '#fff', letterSpacing: '0.01em', minWidth: 72, textAlign: 'right' }}>
+        {displayBalance}
       </span>
     </Link>
   );
@@ -151,9 +223,15 @@ function DepositBtn() {
 
 // ─── Header ───────────────────────────────────────────────────────────────────
 export default function Header() {
-  const [scrolled, setScrolled] = useState(false);
+  const [scrolled, setScrolled]   = useState(false);
+  const [currency, setCurrency]   = useState<CurrencyInfo | null>(null);
   const { user, modalOpen, setModalOpen } = useAppStore();
   const isLoggedIn = !!user;
+
+  // Detect country + fetch live rate once on mount
+  useEffect(() => {
+    detectCurrency().then(setCurrency);
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 4);
@@ -230,7 +308,7 @@ export default function Header() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {isLoggedIn ? (
               <>
-                <WalletChip />
+                <WalletChip currency={currency} />
                 <DepositBtn />
                 <UserMenu />
               </>
