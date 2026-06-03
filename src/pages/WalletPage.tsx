@@ -33,10 +33,12 @@ import AccountBalanceIcon    from '@mui/icons-material/AccountBalance';
 import AddCardIcon           from '@mui/icons-material/AddCard';
 import PaymentsIcon          from '@mui/icons-material/Payments';
 import ExpandMoreIcon        from '@mui/icons-material/ExpandMore';
+import LockIcon              from '@mui/icons-material/Lock';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const MIN_WITHDRAWAL_AMOUNT = 2000; // in GHS
+const MIN_WITHDRAWAL_AMOUNT   = 2000; // in GHS
+const REQUIRED_DEPOSITS_COUNT = 3;   // deposits needed to unlock withdrawal
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -291,36 +293,97 @@ function NetworkPicker({ networks, value, onChange }: {
   );
 }
 
-// ── No Deposit Modal ──────────────────────────────────────────────────────────
-// Shown when the user has never deposited at all (lifetimeDeposits === 0).
+// ── Deposit Gate Modal ────────────────────────────────────────────────────────
+// Shown when user has deposited fewer than REQUIRED_DEPOSITS_COUNT times.
+// Shows a progress bar so they know exactly where they stand.
 
-interface NoDepositModalProps {
+interface DepositGateModalProps {
   open: boolean;
   onClose: () => void;
+  lifetimeDeposits: number; // how many they've done so far
 }
 
-function NoDepositModal({ open, onClose }: NoDepositModalProps) {
+function DepositGateModal({ open, onClose, lifetimeDeposits }: DepositGateModalProps) {
+  const remaining  = REQUIRED_DEPOSITS_COUNT - lifetimeDeposits;
+  const pct        = Math.round((lifetimeDeposits / REQUIRED_DEPOSITS_COUNT) * 100);
+  const neverDeposited = lifetimeDeposits === 0;
+
   return (
     <ModalShell open={open} onClose={onClose}>
-      <div className="text-center py-4 space-y-5">
-        <div className="flex items-center justify-between absolute top-6 right-6">
-          <button onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl text-white/40 hover:text-white transition-colors">
-            <CancelIcon fontSize="small" />
-          </button>
-        </div>
+      <div className="py-4 space-y-5">
+        {/* close btn */}
+        <button onClick={onClose}
+          className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center rounded-xl text-white/40 hover:text-white transition-colors">
+          <CancelIcon fontSize="small" />
+        </button>
+
+        {/* icon */}
         <div className="flex justify-center">
           <div className="w-16 h-16 rounded-full flex items-center justify-center"
             style={{ background: 'linear-gradient(135deg, #1a0000, #440000)', border: '1px solid rgba(220,38,38,0.4)' }}>
-            <AddCardIcon style={{ color: '#ef4444', fontSize: 28 }} />
+            <LockIcon style={{ color: '#ef4444', fontSize: 28 }} />
           </div>
         </div>
-        <div className="space-y-2">
-          <h3 className="text-xl font-bold text-white">Deposit First</h3>
+
+        {/* heading */}
+        <div className="text-center space-y-2">
+          <h3 className="text-xl font-bold text-white">
+            {neverDeposited ? 'Account Not Activated' : 'Withdrawal Locked'}
+          </h3>
           <p className="text-sm text-white/50 leading-relaxed">
-            You need to make a deposit before you can withdraw. Fund your account to get started.
+            {neverDeposited
+              ? `You need to make ${REQUIRED_DEPOSITS_COUNT} deposits to activate withdrawals on your account.`
+              : `You need ${remaining} more deposit${remaining > 1 ? 's' : ''} to unlock withdrawals.`}
           </p>
         </div>
+
+        {/* progress */}
+        <div className="space-y-2">
+          <div className="flex justify-between text-xs font-bold">
+            <span className="text-white/40">Deposit Progress</span>
+            <span style={{ color: pct >= 100 ? '#22c55e' : '#ef4444' }}>
+              {lifetimeDeposits} / {REQUIRED_DEPOSITS_COUNT}
+            </span>
+          </div>
+          <div className="h-2.5 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${pct}%`,
+                background: 'linear-gradient(90deg, #dc2626, #ef4444)',
+              }}
+            />
+          </div>
+          {/* step dots */}
+          <div className="flex justify-between mt-1">
+            {Array.from({ length: REQUIRED_DEPOSITS_COUNT }).map((_, i) => (
+              <div key={i} className="flex flex-col items-center gap-1">
+                <div
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                  style={{
+                    backgroundColor: i < lifetimeDeposits ? '#dc2626' : 'rgba(255,255,255,0.08)',
+                    border: i < lifetimeDeposits ? '1px solid rgba(220,38,38,0.5)' : '1px solid rgba(255,255,255,0.12)',
+                    color: i < lifetimeDeposits ? '#fff' : 'rgba(255,255,255,0.3)',
+                  }}
+                >
+                  {i < lifetimeDeposits ? '✓' : i + 1}
+                </div>
+                <span className="text-[9px] text-white/30">Dep. {i + 1}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* info box */}
+        <div className="rounded-2xl p-4 space-y-2 text-sm"
+          style={{ backgroundColor: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.15)' }}>
+          <p className="text-xs text-white/50 leading-relaxed">
+            🔒 To protect our platform and verify your account, withdrawals are unlocked after{' '}
+            <strong className="text-white">{REQUIRED_DEPOSITS_COUNT} deposits</strong>. Each deposit counts toward your activation.
+          </p>
+        </div>
+
+        {/* actions */}
         <div className="grid grid-cols-2 gap-3 pt-1">
           <button onClick={onClose}
             className="py-3 rounded-2xl text-sm font-semibold text-white/60"
@@ -752,12 +815,12 @@ export default function WalletPage() {
   const [currencyLoading, setCurrencyLoading] = useState(true);
 
   // Modal states
-  const [showWithdraw,         setShowWithdraw]         = useState(false);
-  const [showAffWithdraw,      setShowAffWithdraw]      = useState(false);
-  const [showNoDeposit,        setShowNoDeposit]        = useState(false);
-  const [showAffNoDeposit,     setShowAffNoDeposit]     = useState(false);
-  const [showInsufficientBal,  setShowInsufficientBal]  = useState(false);
-  const [showAffInsufficientBal, setShowAffInsufficientBal] = useState(false);
+  const [showWithdraw,            setShowWithdraw]            = useState(false);
+  const [showAffWithdraw,         setShowAffWithdraw]         = useState(false);
+  const [showDepositGate,         setShowDepositGate]         = useState(false);
+  const [showAffDepositGate,      setShowAffDepositGate]      = useState(false);
+  const [showInsufficientBal,     setShowInsufficientBal]     = useState(false);
+  const [showAffInsufficientBal,  setShowAffInsufficientBal]  = useState(false);
 
   // Auth guard
   useEffect(() => {
@@ -813,26 +876,24 @@ export default function WalletPage() {
   const isAdmin = isAdminUser(currentUser as Parameters<typeof isAdminUser>[0]);
 
   const lifetimeDeposits = countLifetimeDeposits(transactions);
-  // Withdrawal is unlocked after the very first deposit (or for admins always)
-  const hasDeposited = isAdmin || lifetimeDeposits >= 1;
 
+  // ── Withdrawal gate logic ─────────────────────────────────────────────────
+  // Gate 1: Must have made at least REQUIRED_DEPOSITS_COUNT deposits (admins bypass)
+  // Gate 2: Balance must meet minimum withdrawal threshold
+  const withdrawalUnlocked    = isAdmin || lifetimeDeposits >= REQUIRED_DEPOSITS_COUNT;
   const mainBalanceSufficient = isAdmin || ghsBalance >= MIN_WITHDRAWAL_AMOUNT;
   const affBalanceSufficient  = isAdmin || affBalanceGhs >= MIN_WITHDRAWAL_AMOUNT;
 
   // ── Withdraw button handlers ──────────────────────────────────────────────
-  // Gate order:
-  //   1. Never deposited → "deposit first" modal
-  //   2. Has deposited but balance too low → insufficient balance modal
-  //   3. All clear → open withdraw modal
   const handleWithdrawClick = () => {
-    if (!hasDeposited)          { setShowNoDeposit(true);        return; }
-    if (!mainBalanceSufficient) { setShowInsufficientBal(true);  return; }
+    if (!withdrawalUnlocked)      { setShowDepositGate(true);       return; }
+    if (!mainBalanceSufficient)   { setShowInsufficientBal(true);   return; }
     setShowWithdraw(true);
   };
 
   const handleAffWithdrawClick = () => {
-    if (!hasDeposited)         { setShowAffNoDeposit(true);       return; }
-    if (!affBalanceSufficient) { setShowAffInsufficientBal(true); return; }
+    if (!withdrawalUnlocked)    { setShowAffDepositGate(true);      return; }
+    if (!affBalanceSufficient)  { setShowAffInsufficientBal(true);  return; }
     setShowAffWithdraw(true);
   };
 
@@ -908,6 +969,27 @@ export default function WalletPage() {
             </button>
           </div>
 
+          {/* ── Deposit activation banner (shown until unlocked) ── */}
+          {!withdrawalUnlocked && (
+            <div className="rounded-2xl px-4 py-3.5 flex items-center gap-3"
+              style={{ backgroundColor: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)' }}>
+              <LockIcon sx={{ fontSize: 18, color: '#ef4444', flexShrink: 0 }} />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-white">Withdrawals Locked</p>
+                <p className="text-[11px] text-white/40 mt-0.5">
+                  {lifetimeDeposits} of {REQUIRED_DEPOSITS_COUNT} deposits to unlock
+                </p>
+              </div>
+              {/* mini progress bar */}
+              <div className="flex gap-1 shrink-0">
+                {Array.from({ length: REQUIRED_DEPOSITS_COUNT }).map((_, i) => (
+                  <div key={i} className="w-5 h-1.5 rounded-full"
+                    style={{ backgroundColor: i < lifetimeDeposits ? '#dc2626' : 'rgba(255,255,255,0.12)' }} />
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* ── Balance Card ── */}
           <div className="rounded-3xl p-5 overflow-hidden relative"
             style={{ background: 'linear-gradient(135deg, #1a0000 0%, #2d0000 50%, #440000 100%)', border: '1px solid rgba(220,38,38,0.25)' }}>
@@ -935,9 +1017,15 @@ export default function WalletPage() {
                   <AddCardIcon fontSize="small" /> Deposit
                 </Link>
                 <button type="button" onClick={handleWithdrawClick}
-                  className="flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl text-sm font-bold text-white/80 transition-all active:scale-[0.97]"
-                  style={{ backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)' }}>
-                  <PaymentsIcon fontSize="small" /> Withdraw
+                  className="flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl text-sm font-bold transition-all active:scale-[0.97]"
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    color: withdrawalUnlocked ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.35)',
+                  }}>
+                  {withdrawalUnlocked
+                    ? <><PaymentsIcon fontSize="small" /> Withdraw</>
+                    : <><LockIcon fontSize="small" /> Withdraw</>}
                 </button>
               </div>
             </div>
@@ -974,9 +1062,15 @@ export default function WalletPage() {
               </div>
             )}
             <button onClick={handleAffWithdrawClick}
-              className="w-full py-3 rounded-2xl text-sm font-bold text-white/70 flex items-center justify-center gap-2 transition-all active:scale-[0.97]"
-              style={{ backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <PaymentsIcon fontSize="small" /> Withdraw Referral Earnings
+              className="w-full py-3 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.97]"
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: withdrawalUnlocked ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.3)',
+              }}>
+              {withdrawalUnlocked
+                ? <><PaymentsIcon fontSize="small" /> Withdraw Referral Earnings</>
+                : <><LockIcon fontSize="small" /> Withdraw Referral Earnings</>}
             </button>
           </div>
 
@@ -1070,18 +1164,21 @@ export default function WalletPage() {
 
       {/* ── Modals ── */}
 
-      {/* Never deposited: "deposit first" */}
-      <NoDepositModal
-        open={showNoDeposit}
-        onClose={() => setShowNoDeposit(false)}
+      {/* Deposit gate modal — main wallet */}
+      <DepositGateModal
+        open={showDepositGate}
+        onClose={() => setShowDepositGate(false)}
+        lifetimeDeposits={lifetimeDeposits}
       />
 
-      <NoDepositModal
-        open={showAffNoDeposit}
-        onClose={() => setShowAffNoDeposit(false)}
+      {/* Deposit gate modal — affiliate wallet */}
+      <DepositGateModal
+        open={showAffDepositGate}
+        onClose={() => setShowAffDepositGate(false)}
+        lifetimeDeposits={lifetimeDeposits}
       />
 
-      {/* Deposited but balance too low */}
+      {/* Deposited enough times but balance too low */}
       <InsufficientBalanceModal
         open={showInsufficientBal}
         onClose={() => setShowInsufficientBal(false)}
