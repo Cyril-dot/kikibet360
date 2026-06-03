@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API_BASE = "https://futballbackend-production-2b7e.up.railway.app";
@@ -48,7 +48,60 @@ const BINANCE_ADDRESS = "TWXJ98mLBTu4MVBRS8ZqtBdvk8D8Frdb6Y";
 const CRYPTO_COINS    = ["USDT", "BTC", "ETH", "BNB", "USDC"];
 const CRYPTO_NETWORKS = ["TRC20", "BEP20", "ERC20", "Arbitrum", "Optimism"];
 
-/* ─── Small helpers ─────────────────────────────────────────────────────────── */
+/* ─── Design Tokens (module-level so stable) ────────────────────────────────── */
+const T = {
+  bg:       "#0a0a0a",
+  surface:  "#141414",
+  raised:   "#1c1c1c",
+  border:   "rgba(255,255,255,0.07)",
+  red:      "#e02020",
+  redLow:   "rgba(224,32,32,0.1)",
+  redMid:   "rgba(224,32,32,0.25)",
+  gold:     "#d4a843",
+  goldLow:  "rgba(212,168,67,0.1)",
+  green:    "#22c55e",
+  greenLow: "rgba(34,197,94,0.1)",
+  greenMid: "rgba(34,197,94,0.22)",
+  white:    "#f5f5f0",
+  dim:      "rgba(245,245,240,0.38)",
+  faint:    "rgba(245,245,240,0.06)",
+};
+
+/* ─── Stable style objects (module-level) ───────────────────────────────────── */
+const inp: React.CSSProperties = {
+  width: "100%", boxSizing: "border-box",
+  background: T.raised, border: `1px solid ${T.border}`,
+  borderRadius: 10, padding: "11px 14px",
+  color: T.white, fontSize: 14, outline: "none", fontFamily: "inherit",
+  transition: "border 0.15s",
+};
+
+const btnPrimary: React.CSSProperties = {
+  width: "100%", padding: "13px", border: "none", borderRadius: 10,
+  fontSize: 13, fontWeight: 700, cursor: "pointer", letterSpacing: "0.02em",
+  background: T.red, color: "#fff",
+  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+  transition: "opacity 0.15s", fontFamily: "inherit",
+};
+
+const btnGreen: React.CSSProperties = {
+  ...btnPrimary, background: "linear-gradient(135deg,#16a34a,#15803d)",
+};
+
+const btnGhost: React.CSSProperties = {
+  width: "100%", padding: "12px",
+  background: "transparent", border: `1px solid ${T.border}`,
+  borderRadius: 10, color: T.dim, fontSize: 12, fontWeight: 600,
+  cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.02em",
+  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+};
+
+const lbl: React.CSSProperties = {
+  display: "block", fontSize: 10, fontWeight: 700,
+  color: T.dim, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 6,
+};
+
+/* ─── Small helpers (stable, outside main component) ───────────────────────── */
 function FlagImg({ country, size = 24 }: { country: Country; size?: number }) {
   const [err, setErr] = useState(false);
   if (err) return <span style={{ fontSize: size * 0.9 }}>{country.flag}</span>;
@@ -78,6 +131,24 @@ function Spin() {
   return <span style={{ display: "inline-block", width: 15, height: 15, border: "2px solid rgba(255,255,255,0.25)", borderTopColor: "#fff", borderRadius: "50%", animation: "_spin 0.7s linear infinite" }} />;
 }
 
+function ErrBox({ msg }: { msg: string }) {
+  return (
+    <div style={{ background: "rgba(224,32,32,0.08)", border: "1px solid rgba(224,32,32,0.28)", borderRadius: 10, padding: "10px 14px", color: "#f87171", fontSize: 12, marginBottom: 16, lineHeight: 1.55, display: "flex", alignItems: "flex-start", gap: 8 }}>
+      <span className="material-symbols-outlined" style={{ fontSize: 16, marginTop: 1, flexShrink: 0 }}>warning</span>
+      {msg}
+    </div>
+  );
+}
+
+function InfoBox({ msg }: { msg: string }) {
+  return (
+    <div style={{ background: T.faint, border: `1px solid ${T.border}`, borderRadius: 10, padding: "10px 14px", color: T.dim, fontSize: 12, marginBottom: 16, lineHeight: 1.55, display: "flex", alignItems: "flex-start", gap: 8 }}>
+      <span className="material-symbols-outlined" style={{ fontSize: 16, marginTop: 1, flexShrink: 0 }}>info</span>
+      {msg}
+    </div>
+  );
+}
+
 /* ─── Client-side image compressor ──────────────────────────────────────────── */
 function compressImageToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -103,9 +174,808 @@ function compressImageToBase64(file: File): Promise<string> {
   });
 }
 
-/* ══════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════════════════
+   STABLE SUB-COMPONENTS  (defined outside DepositPage so they never remount)
+   All mutable state is passed down as props / callbacks.
+═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Trust Badges ── */
+function TrustBadges() {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8 }}>Trusted Payment Partners</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {[
+          { label: "Moolre",  matIcon: "phone_android",   desc: "MoMo" },
+          { label: "Bank",    matIcon: "account_balance",  desc: "Transfer" },
+          { label: "Binance", matIcon: "currency_bitcoin", desc: "Crypto" },
+        ].map(b => (
+          <div key={b.label} style={{ display: "flex", alignItems: "center", gap: 6, background: T.faint, border: `1px solid ${T.border}`, borderRadius: 8, padding: "6px 10px" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18, color: T.dim }}>{b.matIcon}</span>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: T.white }}>{b.label}</div>
+              <div style={{ fontSize: 9, color: T.dim }}>{b.desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Amount Field ── */
+interface AmountFieldProps {
+  amount: string;
+  setAmount: (v: string) => void;
+  country: Country;
+  rateFor: (cur: string) => number;
+  minLocal: (cur: string) => number;
+  quickAmts: (cur: string) => number[];
+  localToGhs: (amt: number, cur: string) => number;
+}
+function AmountField({ amount, setAmount, country, rateFor, minLocal, quickAmts, localToGhs }: AmountFieldProps) {
+  const cur   = country.currency;
+  const sym   = country.symbol;
+  const min   = minLocal(cur);
+  const qa    = quickAmts(cur);
+  const local = parseFloat(amount);
+  const ghsEq = local > 0 && cur !== "GHS" ? localToGhs(local, cur) : null;
+  const rate  = rateFor(cur);
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <label style={lbl}>Amount ({cur})</label>
+      {cur !== "GHS" && rate !== 1 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, background: T.faint, border: `1px solid ${T.border}`, borderRadius: 7, padding: "5px 10px", width: "fit-content" }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 13, color: T.gold }}>currency_exchange</span>
+          <span style={{ fontSize: 9, color: T.dim, textTransform: "uppercase", letterSpacing: "0.5px" }}>Live Rate</span>
+          <span style={{ fontSize: 11, color: T.gold, fontWeight: 700 }}>1 GH₵ = {sym}{rate.toFixed(4)}</span>
+          <span style={{ fontSize: 9, color: T.dim }}>· Min: {sym}{min.toLocaleString()}</span>
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "stretch", background: T.raised, border: `1px solid ${T.border}`, borderRadius: 10, overflow: "hidden", marginBottom: 6 }}>
+        <span style={{ padding: "0 14px", display: "flex", alignItems: "center", color: T.dim, fontSize: 12, fontWeight: 700, borderRight: `1px solid ${T.border}`, background: "rgba(255,255,255,0.03)", flexShrink: 0, letterSpacing: "0.05em" }}>{sym}</span>
+        <input
+          type="number"
+          placeholder="0.00"
+          value={amount}
+          onChange={e => setAmount(e.target.value)}
+          style={{ flex: 1, background: "none", border: "none", outline: "none", color: T.white, fontSize: 22, fontWeight: 700, padding: "11px 14px", fontFamily: "inherit" }}
+        />
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <span style={{ fontSize: 11, color: T.dim }}>Min: {sym}{min.toLocaleString()}{cur !== "GHS" ? ` ≈ GH₵${MIN_DEPOSIT_GHS}` : ""}</span>
+        {ghsEq && <span style={{ fontSize: 11, color: "rgba(245,245,240,0.22)" }}>≈ GH₵{ghsEq.toFixed(2)}</span>}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
+        {qa.map((q, i) => (
+          <button key={i} onClick={() => setAmount(String(q))} style={{
+            background: parseFloat(amount) === q ? T.redLow : T.faint,
+            border: `1px solid ${parseFloat(amount) === q ? T.red : T.border}`,
+            borderRadius: 8, padding: "7px 0",
+            color: parseFloat(amount) === q ? "#f87171" : T.dim,
+            fontSize: 11, fontWeight: 700, cursor: "pointer", transition: "all 0.12s", fontFamily: "inherit",
+          }}>
+            {q >= 1000000 ? `${(q / 1000000).toFixed(1)}M` : q >= 1000 ? `${(q / 1000).toFixed(0)}k` : q}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Country Dropdown ── */
+interface CountryDropdownProps {
+  country: Country | null;
+  ipDetecting: boolean;
+  onSelect: (c: Country) => void;
+}
+function CountryDropdown({ country, ipDetecting, onSelect }: CountryDropdownProps) {
+  const [dropOpen, setDropOpen] = useState(false);
+  const [search,   setSearch]   = useState("");
+  const dropRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (dropRef.current && !dropRef.current.contains(e.target as Node)) setDropOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = COUNTRIES.filter(c =>
+    c.name.toLowerCase().includes(search.toLowerCase()) || c.currency.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div ref={dropRef} style={{ position: "relative", marginBottom: 22 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <div style={{ width: 20, height: 20, borderRadius: "50%", background: T.red, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <span style={{ fontSize: 10, fontWeight: 800, color: "#fff" }}>1</span>
+        </div>
+        <span style={{ fontSize: 13, fontWeight: 700, color: T.white }}>Select your country</span>
+        {ipDetecting && <span style={{ fontSize: 10, color: T.dim, display: "flex", alignItems: "center", gap: 4 }}><Spin /> detecting…</span>}
+        {!ipDetecting && country && <span style={{ fontSize: 10, color: T.green, display: "flex", alignItems: "center", gap: 3 }}><span className="material-symbols-outlined" style={{ fontSize: 13 }}>my_location</span>auto-detected</span>}
+      </div>
+      <button onClick={() => setDropOpen(o => !o)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: T.raised, border: `1px solid ${dropOpen ? T.red : T.border}`, borderRadius: 10, padding: "11px 14px", cursor: "pointer", fontFamily: "inherit", transition: "border 0.15s" }}>
+        {country ? (
+          <><FlagImg country={country} size={24} /><span style={{ flex: 1, textAlign: "left", color: T.white, fontSize: 14, fontWeight: 600 }}>{country.name}</span><span style={{ fontSize: 11, color: T.dim, marginRight: 6 }}>{country.currency}</span></>
+        ) : (
+          <span style={{ flex: 1, textAlign: "left", color: T.dim, fontSize: 13 }}>Choose a country…</span>
+        )}
+        <span className="material-symbols-outlined" style={{ color: T.dim, fontSize: 18, transform: dropOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }}>expand_more</span>
+      </button>
+
+      {dropOpen && (
+        <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, zIndex: 100, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, boxShadow: "0 12px 40px rgba(0,0,0,0.7)", overflow: "hidden" }}>
+          <div style={{ padding: "10px 12px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 8 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16, color: T.dim }}>search</span>
+            <input autoFocus type="text" placeholder="Search country or currency…" value={search} onChange={e => setSearch(e.target.value)}
+              style={{ ...inp, padding: "6px 0", fontSize: 13, marginBottom: 0, background: "none", border: "none", flex: 1 }} />
+          </div>
+          <div style={{ maxHeight: 260, overflowY: "auto" }}>
+            {filtered.map(c => {
+              const hasInstant = c.gateways.includes("moolre");
+              const hasBank    = c.gateways.includes("bank_ng");
+              const badge = hasInstant ? { label: "INSTANT", bg: T.redLow, color: "#f87171", border: T.redMid }
+                          : hasBank   ? { label: "BANK",    bg: T.greenLow, color: T.green, border: T.greenMid }
+                          :             { label: "CRYPTO",  bg: T.goldLow, color: T.gold, border: "rgba(212,168,67,0.3)" };
+              return (
+                <button key={c.code} onClick={() => { onSelect(c); setDropOpen(false); setSearch(""); }}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: country?.code === c.code ? T.redLow : "none", border: "none", borderBottom: `1px solid ${T.border}`, cursor: "pointer", fontFamily: "inherit", transition: "background 0.1s" }}>
+                  <FlagImg country={c} size={22} />
+                  <span style={{ flex: 1, textAlign: "left", color: T.white, fontSize: 13, fontWeight: 600 }}>{c.name}</span>
+                  <span style={{ fontSize: 10, color: T.dim, marginRight: 8 }}>{c.currency}</span>
+                  <span style={{ fontSize: 9, fontWeight: 800, padding: "2px 8px", borderRadius: 20, letterSpacing: "0.05em", background: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>
+                    {badge.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Gateway Tabs ── */
+interface GatewayTabsProps {
+  country: Country;
+  gateway: "moolre" | "binance" | "bank_ng" | null;
+  onSelect: (gw: "moolre" | "binance" | "bank_ng") => void;
+}
+function GatewayTabs({ country, gateway, onSelect }: GatewayTabsProps) {
+  if (!country || country.gateways.length <= 1) return null;
+
+  type TabDef = { id: "moolre" | "binance" | "bank_ng"; matIcon: string; label: string; sub: string };
+  const allTabs: TabDef[] = [
+    { id: "moolre",  matIcon: "phone_android",   label: "Mobile Money",  sub: "MTN · Telecel · AirtelTigo" },
+    { id: "bank_ng", matIcon: "account_balance",  label: "Bank Transfer", sub: "Paystack-Titan · Nigeria" },
+    { id: "binance", matIcon: "currency_bitcoin", label: "Crypto",        sub: "USDT · BTC · ETH · BNB" },
+  ];
+  const tabs = allTabs.filter(t => country.gateways.includes(t.id));
+
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <label style={lbl}>Payment method</label>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${tabs.length}, 1fr)`, gap: 8 }}>
+        {tabs.map(t => {
+          const active    = gateway === t.id;
+          const isCrypto  = t.id === "binance";
+          const isBank    = t.id === "bank_ng";
+          const accentClr = isCrypto ? T.gold : isBank ? T.green : "#f87171";
+          const accentBg  = isCrypto ? T.goldLow : isBank ? T.greenLow : T.redLow;
+          const accentBd  = isCrypto ? "rgba(212,168,67,0.5)" : isBank ? T.greenMid : T.red;
+          return (
+            <button key={t.id} onClick={() => onSelect(t.id)}
+              style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, padding: "13px 14px", background: active ? accentBg : T.raised, border: `1.5px solid ${active ? accentBd : T.border}`, borderRadius: 10, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 22, color: active ? accentClr : T.dim }}>{t.matIcon}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: T.white, lineHeight: 1.2 }}>{t.label}</span>
+              <span style={{ fontSize: 9, color: T.dim, lineHeight: 1.4 }}>{t.sub}</span>
+              {active && (
+                <span style={{ fontSize: 9, fontWeight: 800, color: accentClr, marginTop: 2, display: "flex", alignItems: "center", gap: 3 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 11 }}>check_circle</span>SELECTED
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ── Support Panel ── */
+function SupportPanel() {
+  const [supportOpen, setSupportOpen] = useState(false);
+  return (
+    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, overflow: "hidden", marginTop: 16, animation: "_fadeUp 0.3s ease" }}>
+      <button onClick={() => setSupportOpen(o => !o)}
+        style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "14px 20px", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 18, color: T.green }}>support_agent</span>
+        </div>
+        <div style={{ flex: 1, textAlign: "left" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: T.white }}>Need help? Contact Support</div>
+          <div style={{ fontSize: 11, color: T.dim }}>We're online 24/7 — response in under 5 mins</div>
+        </div>
+        <span className="material-symbols-outlined" style={{ color: T.dim, fontSize: 18, transform: supportOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }}>expand_more</span>
+      </button>
+      {supportOpen && (
+        <div style={{ borderTop: `1px solid ${T.border}`, padding: "16px 20px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {[
+              { matIcon: "chat",  label: "Live Chat",     desc: "Chat with us on WhatsApp", href: "https://wa.me/233000000000", color: "#25D366" },
+              { matIcon: "mail",  label: "Email Support", desc: "bet360support11@gmail.com",  href: "mailto:bet360support11@gmail.com", color: "#60a5fa" },
+              { matIcon: "send",  label: "Telegram",      desc: "@Bet360Support",            href: "https://t.me/Bet360Support",  color: "#2AABEE" },
+            ].map(ch => (
+              <a key={ch.label} href={ch.href} target="_blank" rel="noopener noreferrer"
+                style={{ display: "flex", alignItems: "center", gap: 12, background: T.raised, border: `1px solid ${T.border}`, borderRadius: 10, padding: "11px 13px", textDecoration: "none", transition: "border 0.15s" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 22, color: ch.color, flexShrink: 0 }}>{ch.matIcon}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: T.white }}>{ch.label}</div>
+                  <div style={{ fontSize: 11, color: T.dim }}>{ch.desc}</div>
+                </div>
+                <span className="material-symbols-outlined" style={{ fontSize: 16, color: ch.color }}>arrow_forward</span>
+              </a>
+            ))}
+          </div>
+          <div style={{ marginTop: 14, background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.15)", borderRadius: 9, padding: "10px 13px", fontSize: 11, color: T.dim, lineHeight: 1.6, display: "flex", gap: 8 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 15, color: T.green, flexShrink: 0, marginTop: 1 }}>schedule</span>
+            <span><strong style={{ color: T.white }}>Support hours:</strong> 24 hours, 7 days a week.<br />For deposit issues, have your <strong style={{ color: T.white }}>TXID / phone number</strong> ready.</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Moolre Form ── */
+interface MoolreFormProps {
+  error: string;
+  amount: string; setAmount: (v: string) => void;
+  phone: string; setPhone: (v: string) => void;
+  momoNet: string; setMomoNet: (v: string) => void;
+  loading: boolean;
+  country: Country;
+  rateFor: (cur: string) => number;
+  minLocal: (cur: string) => number;
+  quickAmts: (cur: string) => number[];
+  localToGhs: (amt: number, cur: string) => number;
+  onSubmit: () => void;
+}
+function MoolreForm({ error, amount, setAmount, phone, setPhone, momoNet, setMomoNet, loading, country, rateFor, minLocal, quickAmts, localToGhs, onSubmit }: MoolreFormProps) {
+  return (
+    <div>
+      {error && <ErrBox msg={error} />}
+      <AmountField amount={amount} setAmount={setAmount} country={country} rateFor={rateFor} minLocal={minLocal} quickAmts={quickAmts} localToGhs={localToGhs} />
+      <div style={{ marginBottom: 18 }}>
+        <label style={lbl}>MoMo Phone Number</label>
+        <div style={{ display: "flex", alignItems: "center", background: T.raised, border: `1px solid ${T.border}`, borderRadius: 10, overflow: "hidden" }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 18, color: T.dim, padding: "0 12px", borderRight: `1px solid ${T.border}`, height: "100%", display: "flex", alignItems: "center" }}>phone</span>
+          <input type="tel" placeholder="0244123456" value={phone} maxLength={10} onChange={e => setPhone(e.target.value)}
+            style={{ ...inp, border: "none", borderRadius: 0, background: "none" }} />
+        </div>
+        <div style={{ fontSize: 11, color: T.dim, marginTop: 5 }}>10 digits starting with 0</div>
+      </div>
+      <div style={{ marginBottom: 18 }}>
+        <label style={lbl}>Network</label>
+        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+          {MOMO_NETWORKS.map(n => (
+            <button key={n.id} onClick={() => setMomoNet(n.id)} style={{ display: "flex", alignItems: "center", gap: 11, background: momoNet === n.id ? T.redLow : T.raised, border: `1px solid ${momoNet === n.id ? T.red : T.border}`, borderRadius: 9, padding: "10px 13px", cursor: "pointer", transition: "all 0.12s", fontFamily: "inherit" }}>
+              <NetworkLogo network={n} size={30} />
+              <span style={{ color: momoNet === n.id ? "#f87171" : T.dim, fontSize: 13, fontWeight: 600, flex: 1, textAlign: "left" }}>{n.label}</span>
+              {momoNet === n.id && <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#f87171" }}>check_circle</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{ background: T.faint, border: `1px solid ${T.border}`, borderRadius: 9, padding: "10px 13px", marginBottom: 18, fontSize: 12, color: T.dim, lineHeight: 1.55, display: "flex", alignItems: "flex-start", gap: 8 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 16, marginTop: 1, flexShrink: 0 }}>smartphone</span>
+        A USSD prompt will be sent to your phone. Approve it within 2 mins.
+      </div>
+      <button onClick={onSubmit} disabled={loading || !amount || !phone}
+        style={{ ...btnPrimary, opacity: loading || !amount || !phone ? 0.38 : 1, marginBottom: 8 }}>
+        {loading ? <><Spin /> Initiating…</> : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>send_to_mobile</span>Send MoMo Prompt · GH₵{parseFloat(amount) || "0.00"}</>}
+      </button>
+    </div>
+  );
+}
+
+/* ── Moolre Approve ── */
+interface MoolreApproveProps {
+  error: string; info: string;
+  sub: "wait" | "sms" | "verify";
+  setSub: (v: "wait" | "sms" | "verify") => void;
+  phone: string; amount: string;
+  countdown: number;
+  smsCode: string; setSmsCode: (v: string) => void;
+  loading: boolean;
+  onSmsSubmit: () => void;
+  onVerify: () => void;
+  onStartOver: () => void;
+  fmt: (s: number) => string;
+}
+function MoolreApprove({ error, info, sub, setSub, phone, amount, countdown, smsCode, setSmsCode, loading, onSmsSubmit, onVerify, onStartOver, fmt }: MoolreApproveProps) {
+  return (
+    <div>
+      {error && <ErrBox msg={error} />}
+      {sub === "sms" && (
+        <>
+          <div style={{ background: "rgba(212,168,67,0.07)", border: "1px solid rgba(212,168,67,0.22)", borderRadius: 10, padding: 16, marginBottom: 16, textAlign: "center" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 36, color: T.gold, display: "block", marginBottom: 8 }}>sms</span>
+            <div style={{ fontWeight: 700, fontSize: 13, color: T.gold, marginBottom: 5 }}>Check your SMS</div>
+            <div style={{ fontSize: 12, color: T.dim, lineHeight: 1.6 }}>MTN sent a code to <strong style={{ color: T.white }}>{phone}</strong>. Enter it below.</div>
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={lbl}>SMS Code</label>
+            <input type="text" inputMode="numeric" placeholder="······" value={smsCode} maxLength={8} autoFocus
+              onChange={e => setSmsCode(e.target.value.replace(/\D/g, ""))}
+              style={{ ...inp, fontSize: 24, fontWeight: 700, letterSpacing: 10, textAlign: "center", border: `1.5px solid ${T.red}` }} />
+          </div>
+          <button onClick={onSmsSubmit} disabled={loading || smsCode.length < 4}
+            style={{ ...btnPrimary, opacity: loading || smsCode.length < 4 ? 0.38 : 1, marginBottom: 8 }}>
+            {loading ? <><Spin /> Verifying…</> : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>verified</span>Submit Code</>}
+          </button>
+          <button onClick={onStartOver} style={btnGhost}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>Start Over
+          </button>
+        </>
+      )}
+      {sub === "wait" && (
+        <>
+          <div style={{ background: T.faint, border: `1px solid ${T.border}`, borderRadius: 10, padding: 18, marginBottom: 14, textAlign: "center" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 40, color: T.dim, display: "block", marginBottom: 8 }}>vibration</span>
+            <div style={{ fontWeight: 700, fontSize: 14, color: T.white, marginBottom: 5 }}>Check your phone</div>
+            <div style={{ fontSize: 12, color: T.dim, lineHeight: 1.65 }}>
+              USSD prompt sent to <strong style={{ color: T.white }}>{phone}</strong>.<br />
+              Approve <strong style={{ color: "#f87171" }}>GH₵{parseFloat(amount).toFixed(2)}</strong>.
+            </div>
+            {countdown > 0
+              ? <div style={{ marginTop: 10, fontSize: 12, color: T.dim, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>timer</span>
+                  Expires in <strong style={{ color: T.white }}>{fmt(countdown)}</strong>
+                </div>
+              : <div style={{ marginTop: 10, fontSize: 12, color: "#f87171" }}>May have expired — verify below</div>
+            }
+          </div>
+          <button onClick={() => { setSub("verify"); }} style={{ ...btnPrimary, marginBottom: 8 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>task_alt</span>I've Approved — Verify
+          </button>
+          <button onClick={onStartOver} style={btnGhost}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>Start Over
+          </button>
+        </>
+      )}
+      {sub === "verify" && (
+        <>
+          <div style={{ textAlign: "center", marginBottom: 18 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 40, color: T.dim, display: "block", marginBottom: 8 }}>manage_search</span>
+            <div style={{ fontWeight: 700, fontSize: 14, color: T.white, marginBottom: 4 }}>Verify Payment</div>
+            <div style={{ fontSize: 12, color: T.dim }}>Checking GH₵{parseFloat(amount).toFixed(2)}</div>
+          </div>
+          {info && <InfoBox msg={info} />}
+          <button onClick={onVerify} disabled={loading} style={{ ...btnPrimary, opacity: loading ? 0.38 : 1, marginBottom: 8 }}>
+            {loading ? <><Spin /> Verifying…</> : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>search_check</span>Verify Payment</>}
+          </button>
+          <button onClick={() => setSub("wait")} style={{ ...btnGhost, marginBottom: 8 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>hourglass_empty</span>Still Waiting
+          </button>
+          <button onClick={onStartOver} style={{ ...btnGhost, border: "none", color: "rgba(245,245,240,0.18)" }}>Start Over</button>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ── Binance Info ── */
+interface BinanceInfoProps {
+  error: string;
+  onNext: () => void;
+}
+function BinanceInfo({ error, onNext }: BinanceInfoProps) {
+  return (
+    <div>
+      {error && <ErrBox msg={error} />}
+      <div style={{ background: T.raised, border: `1px solid ${T.border}`, borderRadius: 10, padding: 16, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 8, background: T.red, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span className="material-symbols-outlined" style={{ color: "#fff", fontSize: 18 }}>currency_bitcoin</span>
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 13, color: T.white }}>Send USDT to this address</div>
+            <div style={{ fontSize: 11, color: T.dim }}>Network: <strong style={{ color: "#f87171" }}>TRC20 (TRON)</strong></div>
+          </div>
+        </div>
+        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "11px 13px", marginBottom: 10 }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 5 }}>Wallet Address</div>
+          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: T.white, wordBreak: "break-all", lineHeight: 1.7, marginBottom: 10 }}>{BINANCE_ADDRESS}</div>
+          <CopyBtn text={BINANCE_ADDRESS} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 10 }}>
+          {[["Network", "TRC20"], ["Coin", "USDT"], ["Min.", "≈ GH₵200"]].map(([l, v]) => (
+            <div key={l} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 7, padding: "7px 5px", textAlign: "center" }}>
+              <div style={{ fontSize: 9, color: T.dim, marginBottom: 2 }}>{l}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: T.white }}>{v}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ background: "rgba(224,32,32,0.07)", border: `1px solid ${T.redMid}`, borderRadius: 7, padding: "8px 11px", fontSize: 11, color: "#f87171", lineHeight: 1.55, display: "flex", gap: 7 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>warning</span>
+          Only send <strong>USDT via TRC20</strong>. Wrong network = <strong>permanent loss of funds</strong>.
+        </div>
+      </div>
+      <div style={{ background: T.faint, border: `1px solid ${T.border}`, borderRadius: 10, padding: "11px 14px", marginBottom: 14 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>Also Accepted</div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {CRYPTO_COINS.map(c => (
+            <span key={c} style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: T.goldLow, color: T.gold, border: "1px solid rgba(212,168,67,0.25)" }}>{c}</span>
+          ))}
+        </div>
+      </div>
+      <div style={{ background: T.goldLow, border: "1px solid rgba(212,168,67,0.2)", borderRadius: 10, padding: "12px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 12 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 28, color: T.gold, flexShrink: 0 }}>account_balance_wallet</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 12, color: T.gold }}>New to Binance?</div>
+          <div style={{ fontSize: 11, color: T.dim, marginTop: 2, lineHeight: 1.4 }}>Create a free account to buy &amp; send crypto in minutes.</div>
+        </div>
+        <a href="https://www.binance.com/en/register" target="_blank" rel="noopener noreferrer"
+          style={{ fontSize: 11, fontWeight: 800, padding: "7px 13px", borderRadius: 8, background: T.gold, color: "#0a0a0a", textDecoration: "none", flexShrink: 0, display: "flex", alignItems: "center", gap: 4 }}>
+          Sign Up <span className="material-symbols-outlined" style={{ fontSize: 13 }}>open_in_new</span>
+        </a>
+      </div>
+      <button onClick={onNext} style={{ ...btnPrimary, marginBottom: 8 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>receipt_long</span>I've Sent — Submit Proof
+      </button>
+      <div style={{ textAlign: "center", fontSize: 11, color: T.dim, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 13 }}>manage_search</span>
+        Reviewed &amp; credited within 1–5 mins
+      </div>
+    </div>
+  );
+}
+
+/* ── Binance Proof ── */
+interface BinanceProofProps {
+  error: string;
+  txid: string; setTxid: (v: string) => void;
+  cryptoAmt: string; setCryptoAmt: (v: string) => void;
+  coin: string; setCoin: (v: string) => void;
+  cryptoNet: string; setCryptoNet: (v: string) => void;
+  expectedGhs: string; setExpectedGhs: (v: string) => void;
+  senderAddr: string; setSenderAddr: (v: string) => void;
+  userNote: string; setUserNote: (v: string) => void;
+  bErrs: Record<string, string>; setBErrs: (fn: (p: Record<string, string>) => Record<string, string>) => void;
+  loading: boolean;
+  onSubmit: () => void;
+  onBack: () => void;
+}
+function BinanceProof({ error, txid, setTxid, cryptoAmt, setCryptoAmt, coin, setCoin, cryptoNet, setCryptoNet, expectedGhs, setExpectedGhs, senderAddr, setSenderAddr, userNote, setUserNote, bErrs, setBErrs, loading, onSubmit, onBack }: BinanceProofProps) {
+  const fe = (k: string) => bErrs[k] ? <div style={{ fontSize: 11, color: "#f87171", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}><span className="material-symbols-outlined" style={{ fontSize: 12 }}>error</span>{bErrs[k]}</div> : null;
+  const fi = (k: string): React.CSSProperties => ({ ...inp, border: `1px solid ${bErrs[k] ? "rgba(224,32,32,0.5)" : T.border}` });
+  return (
+    <div>
+      {error && <ErrBox msg={error} />}
+      <div style={{ marginBottom: 14 }}>
+        <label style={lbl}>Transaction Hash (TXID) <span style={{ color: T.red }}>*</span></label>
+        <input type="text" value={txid} onChange={e => { setTxid(e.target.value); setBErrs(p => ({ ...p, txid: "" })); }} placeholder="Paste blockchain TXID" style={fi("txid")} />
+        {fe("txid")}
+        <div style={{ fontSize: 11, color: T.dim, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 12 }}>info</span>Find in your Binance withdrawal history.
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+        <div>
+          <label style={lbl}>Coin <span style={{ color: T.red }}>*</span></label>
+          <select value={coin} onChange={e => setCoin(e.target.value)} style={{ ...inp, appearance: "none" as const }}>
+            {CRYPTO_COINS.map(c => <option key={c} style={{ background: "#141414" }}>{c}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={lbl}>Network <span style={{ color: T.red }}>*</span></label>
+          <select value={cryptoNet} onChange={e => setCryptoNet(e.target.value)} style={{ ...inp, appearance: "none" as const }}>
+            {CRYPTO_NETWORKS.map(n => <option key={n} style={{ background: "#141414" }}>{n}</option>)}
+          </select>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+        <div>
+          <label style={lbl}>Amount Sent ({coin}) <span style={{ color: T.red }}>*</span></label>
+          <input type="number" value={cryptoAmt} placeholder="0.00" min="0" step="any"
+            onChange={e => { setCryptoAmt(e.target.value); setBErrs(p => ({ ...p, cryptoAmt: "" })); }} style={fi("cryptoAmt")} />
+          {fe("cryptoAmt")}
+        </div>
+        <div>
+          <label style={lbl}>Expected GH₵ Credit <span style={{ color: T.red }}>*</span></label>
+          <input type="number" value={expectedGhs} placeholder="0.00" min="0" step="any"
+            onChange={e => { setExpectedGhs(e.target.value); setBErrs(p => ({ ...p, expectedGhs: "" })); }} style={fi("expectedGhs")} />
+          {fe("expectedGhs")}
+        </div>
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <label style={lbl}>Sender Wallet <span style={{ color: T.dim, textTransform: "none", fontSize: 10 }}>(optional)</span></label>
+        <input type="text" value={senderAddr} placeholder="Address you sent from" onChange={e => setSenderAddr(e.target.value)} style={inp} />
+      </div>
+      <div style={{ marginBottom: 18 }}>
+        <label style={lbl}>Note to Admin <span style={{ color: T.dim, textTransform: "none", fontSize: 10 }}>(optional)</span></label>
+        <textarea value={userNote} onChange={e => setUserNote(e.target.value)} placeholder="Any extra info" rows={3}
+          style={{ ...inp, resize: "vertical", lineHeight: 1.6 } as React.CSSProperties} />
+      </div>
+      <button onClick={onSubmit} disabled={loading} style={{ ...btnPrimary, opacity: loading ? 0.38 : 1, marginBottom: 8 }}>
+        {loading ? <><Spin /> Submitting…</> : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>upload_file</span>Submit Deposit Proof</>}
+      </button>
+      <button onClick={onBack} style={btnGhost}>
+        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>Back
+      </button>
+    </div>
+  );
+}
+
+/* ── Bank NG Info ── */
+interface BankNgInfoProps {
+  error: string;
+  onNext: () => void;
+}
+function BankNgInfo({ error, onNext }: BankNgInfoProps) {
+  return (
+    <div>
+      {error && <ErrBox msg={error} />}
+      <div style={{ background: T.greenLow, border: `1px solid ${T.greenMid}`, borderRadius: 9, padding: "9px 13px", marginBottom: 14, fontSize: 12, color: T.green, lineHeight: 1.55, display: "flex", alignItems: "center", gap: 8 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 15, flexShrink: 0 }}>info</span>
+        Minimum deposit: <strong>₦{MIN_DEPOSIT_NGN.toLocaleString()}</strong>
+      </div>
+      <div style={{ background: T.raised, border: `1px solid ${T.greenMid}`, borderRadius: 12, padding: 16, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 8, background: T.greenLow, border: `1px solid ${T.greenMid}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span className="material-symbols-outlined" style={{ color: T.green, fontSize: 18 }}>account_balance</span>
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 13, color: T.white }}>Transfer to this account</div>
+            <div style={{ fontSize: 11, color: T.dim }}>Then submit your payment proof</div>
+          </div>
+        </div>
+        {[
+          { icon: "corporate_fare", label: "Bank Name",      value: BANK_NAME,        mono: false },
+          { icon: "person",         label: "Account Name",   value: BANK_ACCT_NAME,   mono: false },
+          { icon: "tag",            label: "Account Number", value: BANK_ACCT_NUMBER, mono: true  },
+        ].map(row => (
+          <div key={row.label} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 9, padding: "11px 13px", marginBottom: 8 }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 5, display: "flex", alignItems: "center", gap: 4 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 12 }}>{row.icon}</span>{row.label}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <span style={{ fontFamily: row.mono ? "'DM Mono', monospace" : "inherit", fontSize: row.mono ? 22 : 13, fontWeight: 700, color: T.white, letterSpacing: row.mono ? 3 : 0 }}>{row.value}</span>
+              <CopyBtn text={row.value} />
+            </div>
+          </div>
+        ))}
+        <div style={{ background: "rgba(212,168,67,0.07)", border: "1px solid rgba(212,168,67,0.22)", borderRadius: 8, padding: "9px 12px", fontSize: 11, color: T.gold, lineHeight: 1.6, display: "flex", gap: 7 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>warning</span>
+          Always include your <strong>username or phone number</strong> in the transfer narration so we can identify your payment.
+        </div>
+      </div>
+      <button onClick={onNext} style={{ ...btnGreen, marginBottom: 8 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>task_alt</span>I've Sent the Money — Submit Proof
+      </button>
+      <div style={{ textAlign: "center", fontSize: 11, color: T.dim, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 13 }}>manage_search</span>
+        Verified within 5–10 minutes
+      </div>
+    </div>
+  );
+}
+
+/* ── Bank NG Form ── */
+interface BankNgFormProps {
+  error: string;
+  bankRef: string; setBankRef: (v: string) => void;
+  bankAmtSent: string; setBankAmtSent: (v: string) => void;
+  bankExpected: string; setBankExpected: (v: string) => void;
+  bankSender: string; setBankSender: (v: string) => void;
+  bankNote: string; setBankNote: (v: string) => void;
+  bankScreenshot: string; setBankScreenshot: (v: string) => void;
+  bankCompressing: boolean;
+  bankErrs: Record<string, string>; setBankErrs: (fn: (p: Record<string, string>) => Record<string, string>) => void;
+  loading: boolean;
+  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onSubmit: () => void;
+  onBack: () => void;
+}
+function BankNgForm({ error, bankRef, setBankRef, bankAmtSent, setBankAmtSent, bankExpected, setBankExpected, bankSender, setBankSender, bankNote, setBankNote, bankScreenshot, setBankScreenshot, bankCompressing, bankErrs, setBankErrs, loading, onFileChange, onSubmit, onBack }: BankNgFormProps) {
+  const fe = (k: string) => bankErrs[k]
+    ? <div style={{ fontSize: 11, color: "#f87171", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}><span className="material-symbols-outlined" style={{ fontSize: 12 }}>error</span>{bankErrs[k]}</div>
+    : null;
+  const fi = (k: string): React.CSSProperties => ({ ...inp, border: `1px solid ${bankErrs[k] ? "rgba(224,32,32,0.5)" : T.border}` });
+  const QUICK_NGN = [5000, 10000, 20000, 50000, 100000, 200000];
+
+  return (
+    <div>
+      {error && <ErrBox msg={error} />}
+      <div style={{ marginBottom: 14 }}>
+        <label style={lbl}>Transfer Reference / Narration <span style={{ color: T.red }}>*</span></label>
+        <div style={{ display: "flex", alignItems: "center", background: T.raised, border: `1px solid ${bankErrs.ref ? "rgba(224,32,32,0.5)" : T.border}`, borderRadius: 10, overflow: "hidden" }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 18, color: T.dim, padding: "0 12px", borderRight: `1px solid ${T.border}`, display: "flex", alignItems: "center", height: "100%" }}>tag</span>
+          <input type="text" value={bankRef}
+            onChange={e => { setBankRef(e.target.value); setBankErrs(p => ({ ...p, ref: "" })); }}
+            placeholder="Your name, username, or receipt reference"
+            style={{ ...inp, border: "none", borderRadius: 0, background: "none" }} />
+        </div>
+        {fe("ref")}
+        <div style={{ fontSize: 11, color: T.dim, marginTop: 4 }}>Use the exact narration you entered during the transfer.</div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+        <div>
+          <label style={lbl}>Amount Sent (₦) <span style={{ color: T.red }}>*</span></label>
+          <input type="number" value={bankAmtSent} placeholder={`Min ₦${MIN_DEPOSIT_NGN.toLocaleString()}`}
+            onChange={e => { setBankAmtSent(e.target.value); setBankErrs(p => ({ ...p, amt: "" })); }}
+            style={fi("amt")} />
+          {fe("amt")}
+        </div>
+        <div>
+          <label style={lbl}>Expected ₦ Credit <span style={{ color: T.red }}>*</span></label>
+          <input type="number" value={bankExpected} placeholder="0.00"
+            onChange={e => { setBankExpected(e.target.value); setBankErrs(p => ({ ...p, exp: "" })); }}
+            style={fi("exp")} />
+          {fe("exp")}
+        </div>
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 7 }}>Quick fill</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6 }}>
+          {QUICK_NGN.map(q => (
+            <button key={q} onClick={() => { setBankAmtSent(String(q)); setBankExpected(String(q)); setBankErrs(p => ({ ...p, amt: "", exp: "" })); }}
+              style={{ background: bankAmtSent === String(q) ? T.redLow : T.faint, border: `1px solid ${bankAmtSent === String(q) ? T.red : T.border}`, borderRadius: 8, padding: "7px 0", color: bankAmtSent === String(q) ? "#f87171" : T.dim, fontSize: 11, fontWeight: 700, cursor: "pointer", transition: "all 0.12s", fontFamily: "inherit" }}>
+              {q >= 1000000 ? `${q / 1000000}M` : q >= 1000 ? `${q / 1000}k` : q}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <label style={lbl}>Sender Account Name <span style={{ color: T.dim, textTransform: "none", fontSize: 10 }}>(optional)</span></label>
+        <input type="text" value={bankSender} placeholder="Name on your bank account"
+          onChange={e => setBankSender(e.target.value)} style={inp} />
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <label style={lbl}>Payment Screenshot <span style={{ color: T.red }}>*</span></label>
+        {bankScreenshot ? (
+          <div style={{ position: "relative", borderRadius: 10, overflow: "hidden", border: `1px solid ${T.greenMid}`, background: "#0a0f0b" }}>
+            <img src={bankScreenshot} alt="Payment screenshot" style={{ width: "100%", maxHeight: 200, objectFit: "contain", display: "block" }} />
+            {bankCompressing && (
+              <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Spin />
+              </div>
+            )}
+            {!bankCompressing && (
+              <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 6 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 700, padding: "4px 9px", borderRadius: 6, cursor: "pointer", background: "rgba(0,0,0,0.7)", color: T.dim, fontFamily: "inherit" }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 13 }}>upload</span>Change
+                  <input type="file" accept="image/*" style={{ display: "none" }} onChange={onFileChange} />
+                </label>
+                <button onClick={() => setBankScreenshot("")}
+                  style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 700, padding: "4px 9px", borderRadius: 6, cursor: "pointer", border: "none", background: "rgba(224,32,32,0.7)", color: "#fff", fontFamily: "inherit" }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 13 }}>close</span>Remove
+                </button>
+              </div>
+            )}
+            {!bankCompressing && (
+              <div style={{ position: "absolute", bottom: 8, left: 8, fontSize: 9, fontWeight: 800, padding: "3px 8px", borderRadius: 20, background: "rgba(34,197,94,0.85)", color: "#fff", display: "flex", alignItems: "center", gap: 3 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 11 }}>check_circle</span>Ready
+              </div>
+            )}
+          </div>
+        ) : (
+          <label style={{
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+            height: 100, border: `2px dashed ${bankErrs.screenshot ? "rgba(224,32,32,0.5)" : T.border}`,
+            borderRadius: 10, cursor: bankCompressing ? "wait" : "pointer",
+            background: T.faint, transition: "all 0.2s",
+          }}>
+            {bankCompressing
+              ? <><Spin /><span style={{ fontSize: 11, color: T.dim, marginTop: 8 }}>Processing…</span></>
+              : <>
+                  <span className="material-symbols-outlined" style={{ fontSize: 30, color: T.dim, marginBottom: 6 }}>add_photo_alternate</span>
+                  <span style={{ fontSize: 12, color: T.dim, fontWeight: 600 }}>Tap or drag screenshot here</span>
+                  <span style={{ fontSize: 10, color: "rgba(245,245,240,0.2)", marginTop: 3 }}>JPG · PNG · WEBP · Max 8 MB</span>
+                </>
+            }
+            <input type="file" accept="image/*" style={{ display: "none" }} onChange={onFileChange} />
+          </label>
+        )}
+        {fe("screenshot")}
+        {!bankErrs.screenshot && !bankScreenshot && (
+          <div style={{ fontSize: 11, color: T.dim, marginTop: 4 }}>Upload a photo of your payment receipt or confirmation screen.</div>
+        )}
+        {!bankErrs.screenshot && bankScreenshot && (
+          <div style={{ fontSize: 11, color: T.green, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>check_circle</span>
+            Screenshot attached — will be sent with your deposit proof
+          </div>
+        )}
+      </div>
+      <div style={{ marginBottom: 18 }}>
+        <label style={lbl}>Note to Admin <span style={{ color: T.dim, textTransform: "none", fontSize: 10 }}>(optional)</span></label>
+        <textarea value={bankNote} onChange={e => setBankNote(e.target.value)} placeholder="Any extra info" rows={3}
+          style={{ ...inp, resize: "vertical", lineHeight: 1.6 } as React.CSSProperties} />
+      </div>
+      <button onClick={onSubmit} disabled={loading || bankCompressing}
+        style={{ ...btnGreen, opacity: loading || bankCompressing ? 0.38 : 1, marginBottom: 8 }}>
+        {loading ? <><Spin /> Submitting…</> : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>upload_file</span>Submit Transfer Proof</>}
+      </button>
+      <button onClick={onBack} style={btnGhost}>
+        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>Back
+      </button>
+    </div>
+  );
+}
+
+/* ── Bank NG Success ── */
+interface BankNgSuccessProps { onHome: () => void; onReset: () => void; }
+function BankNgSuccess({ onHome, onReset }: BankNgSuccessProps) {
+  return (
+    <div style={{ textAlign: "center", padding: "12px 0 8px" }}>
+      <div style={{ width: 64, height: 64, borderRadius: "50%", margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", background: T.greenLow, border: `2px solid ${T.greenMid}` }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 32, color: T.green }}>hourglass_top</span>
+      </div>
+      <div style={{ fontWeight: 800, fontSize: 20, color: T.white, marginBottom: 6 }}>Proof Submitted!</div>
+      <div style={{ fontSize: 13, color: T.dim, lineHeight: 1.7, marginBottom: 22 }}>
+        Your bank transfer is under review.<br />
+        Admin will verify and credit your wallet within <strong style={{ color: T.white }}>5–10 minutes</strong>.
+      </div>
+      <button onClick={onHome} style={{ ...btnGreen, marginBottom: 8 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>home</span>Back to Home
+      </button>
+      <button onClick={onReset} style={btnGhost}>
+        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add_circle</span>Make Another Deposit
+      </button>
+    </div>
+  );
+}
+
+/* ── Success Screen ── */
+interface SuccessScreenProps {
+  type: "momo" | "crypto";
+  amount: string; momoNet: string; phone: string;
+  onHome: () => void; onReset: () => void;
+}
+function SuccessScreen({ type, amount, momoNet, phone, onHome, onReset }: SuccessScreenProps) {
+  return (
+    <div style={{ textAlign: "center", padding: "12px 0 8px" }}>
+      <div style={{ width: 64, height: 64, borderRadius: "50%", margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", background: type === "momo" ? "rgba(34,197,94,0.12)" : T.goldLow, border: `2px solid ${type === "momo" ? "rgba(34,197,94,0.35)" : "rgba(212,168,67,0.35)"}` }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 32, color: type === "momo" ? "#4ade80" : T.gold }}>{type === "momo" ? "check_circle" : "hourglass_top"}</span>
+      </div>
+      {type === "momo" ? (
+        <>
+          <div style={{ fontWeight: 800, fontSize: 26, color: "#4ade80", marginBottom: 4 }}>GH₵{parseFloat(amount).toFixed(2)}</div>
+          <div style={{ fontSize: 13, color: T.dim, marginBottom: 20 }}>Added to your Bet 360 wallet</div>
+          <div style={{ background: T.raised, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 14px", marginBottom: 18, textAlign: "left" }}>
+            {[["Amount", `GH₵ ${parseFloat(amount).toFixed(2)}`], ["Network", MOMO_NETWORKS.find(n => n.id === momoNet)?.label ?? momoNet], ["Phone", phone]].map(([k, v]) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
+                <span style={{ color: T.dim, fontSize: 12 }}>{k}</span>
+                <span style={{ color: T.white, fontSize: 12, fontWeight: 600 }}>{v}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          <div style={{ fontWeight: 800, fontSize: 20, color: T.white, marginBottom: 6 }}>Proof Submitted</div>
+          <div style={{ fontSize: 13, color: T.dim, lineHeight: 1.65, marginBottom: 20 }}>
+            Your crypto deposit is under review.<br />
+            Admin will credit your Bet 360 wallet within <strong style={{ color: T.white }}>1–5 minutes</strong>.
+          </div>
+        </>
+      )}
+      <button onClick={onHome} style={{ ...btnPrimary, marginBottom: 8 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>home</span>Back to Home
+      </button>
+      <button onClick={onReset} style={btnGhost}>
+        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add_circle</span>Make Another Deposit
+      </button>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
    MAIN COMPONENT
-══════════════════════════════════════════════════════════════ */
+══════════════════════════════════════════════════════════════════════════════ */
 export default function DepositPage() {
   const navigate = useNavigate();
 
@@ -116,7 +986,7 @@ export default function DepositPage() {
 
   const tok = () => localStorage.getItem("accessToken") || sessionStorage.getItem("accessToken") || "";
 
-  /* ── country / gateway state ── */
+  /* ── country / gateway ── */
   const [country,     setCountry]     = useState<Country | null>(null);
   const [gateway,     setGateway]     = useState<"moolre" | "binance" | "bank_ng" | null>(null);
   const [ipDetecting, setIpDetecting] = useState(true);
@@ -144,10 +1014,10 @@ export default function DepositPage() {
       .then(r => r.json()).then(d => { if (d?.rates) setRates(d.rates); }).catch(() => {});
   }, []);
 
-  const rateFor    = (cur: string) => cur === "GHS" ? 1 : (rates[cur] ?? 1);
-  const minLocal   = (cur: string) => +(MIN_DEPOSIT_GHS * rateFor(cur)).toFixed(2);
-  const localToGhs = (amt: number, cur: string) => cur === "GHS" ? amt : amt / rateFor(cur);
-  const quickAmts  = (cur: string) => [200, 500, 1000, 2000, 5000, 10000, 20000, 50000].map(v => +(v * rateFor(cur)).toFixed(0));
+  const rateFor    = useCallback((cur: string) => cur === "GHS" ? 1 : (rates[cur] ?? 1), [rates]);
+  const minLocal   = useCallback((cur: string) => +(MIN_DEPOSIT_GHS * rateFor(cur)).toFixed(2), [rateFor]);
+  const localToGhs = useCallback((amt: number, cur: string) => cur === "GHS" ? amt : amt / rateFor(cur), [rateFor]);
+  const quickAmts  = useCallback((cur: string) => [200, 500, 1000, 2000, 5000, 10000, 20000, 50000].map(v => +(v * rateFor(cur)).toFixed(0)), [rateFor]);
 
   /* ── shared state ── */
   const [amount,  setAmount]  = useState("");
@@ -185,9 +1055,6 @@ export default function DepositPage() {
   const [bankCompressing, setBankCompressing] = useState(false);
   const [bankErrs,        setBankErrs]        = useState<Record<string, string>>({});
 
-  /* ── support panel ── */
-  const [supportOpen, setSupportOpen] = useState(false);
-
   /* ── countdown ── */
   useEffect(() => {
     if (step === "approve" && sub === "wait") {
@@ -211,15 +1078,15 @@ export default function DepositPage() {
     return data;
   };
 
-  const handleSelectCountry = (c: Country) => {
+  const handleSelectCountry = useCallback((c: Country) => {
     setCountry(c); setGateway(null); setError(""); setAmount(""); setStep("form");
     if (c.gateways.length === 1) setGateway(c.gateways[0]);
-  };
+  }, []);
 
-  const selectGateway = (gw: "moolre" | "binance" | "bank_ng") => {
+  const selectGateway = useCallback((gw: "moolre" | "binance" | "bank_ng") => {
     setGateway(gw); setError(""); setAmount("");
     setStep(gw === "bank_ng" ? "bank_info" : "form");
-  };
+  }, []);
 
   /* ── moolre handlers ── */
   const handleMoolreInit = async () => {
@@ -329,7 +1196,7 @@ export default function DepositPage() {
   };
 
   /* ── reset ── */
-  const reset = () => {
+  const reset = useCallback(() => {
     setCountry(null); setGateway(null); setAmount(""); setPhone(""); setMomoNet("MTN");
     setError(""); setInfo(""); setExtRef(""); setSmsCode(""); setSub("wait");
     setTxid(""); setCryptoAmt(""); setCoin("USDT"); setCryptoNet("TRC20");
@@ -338,842 +1205,9 @@ export default function DepositPage() {
     setBankNote(""); setBankScreenshot(""); setBankErrs({});
     setStep("form");
     if (timerRef.current) clearInterval(timerRef.current);
-  };
-
-  /* ══════════════════════════════════════════════════════════════
-     DESIGN TOKENS
-  ══════════════════════════════════════════════════════════════ */
-  const T = {
-    bg:       "#0a0a0a",
-    surface:  "#141414",
-    raised:   "#1c1c1c",
-    border:   "rgba(255,255,255,0.07)",
-    red:      "#e02020",
-    redLow:   "rgba(224,32,32,0.1)",
-    redMid:   "rgba(224,32,32,0.25)",
-    gold:     "#d4a843",
-    goldLow:  "rgba(212,168,67,0.1)",
-    green:    "#22c55e",
-    greenLow: "rgba(34,197,94,0.1)",
-    greenMid: "rgba(34,197,94,0.22)",
-    white:    "#f5f5f0",
-    dim:      "rgba(245,245,240,0.38)",
-    faint:    "rgba(245,245,240,0.06)",
-  };
-
-  const inp: React.CSSProperties = {
-    width: "100%", boxSizing: "border-box",
-    background: T.raised, border: `1px solid ${T.border}`,
-    borderRadius: 10, padding: "11px 14px",
-    color: T.white, fontSize: 14, outline: "none", fontFamily: "inherit",
-    transition: "border 0.15s",
-  };
-
-  const btnPrimary: React.CSSProperties = {
-    width: "100%", padding: "13px", border: "none", borderRadius: 10,
-    fontSize: 13, fontWeight: 700, cursor: "pointer", letterSpacing: "0.02em",
-    background: T.red, color: "#fff",
-    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-    transition: "opacity 0.15s", fontFamily: "inherit",
-  };
-
-  const btnGreen: React.CSSProperties = {
-    ...btnPrimary, background: "linear-gradient(135deg,#16a34a,#15803d)",
-  };
-
-  const btnGhost: React.CSSProperties = {
-    width: "100%", padding: "12px",
-    background: "transparent", border: `1px solid ${T.border}`,
-    borderRadius: 10, color: T.dim, fontSize: 12, fontWeight: 600,
-    cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.02em",
-    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-  };
-
-  const lbl: React.CSSProperties = {
-    display: "block", fontSize: 10, fontWeight: 700,
-    color: T.dim, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 6,
-  };
-
-  const ErrBox = ({ msg }: { msg: string }) => (
-    <div style={{ background: "rgba(224,32,32,0.08)", border: "1px solid rgba(224,32,32,0.28)", borderRadius: 10, padding: "10px 14px", color: "#f87171", fontSize: 12, marginBottom: 16, lineHeight: 1.55, display: "flex", alignItems: "flex-start", gap: 8 }}>
-      <span className="material-symbols-outlined" style={{ fontSize: 16, marginTop: 1, flexShrink: 0 }}>warning</span>
-      {msg}
-    </div>
-  );
-
-  const InfoBox = ({ msg }: { msg: string }) => (
-    <div style={{ background: T.faint, border: `1px solid ${T.border}`, borderRadius: 10, padding: "10px 14px", color: T.dim, fontSize: 12, marginBottom: 16, lineHeight: 1.55, display: "flex", alignItems: "flex-start", gap: 8 }}>
-      <span className="material-symbols-outlined" style={{ fontSize: 16, marginTop: 1, flexShrink: 0 }}>info</span>
-      {msg}
-    </div>
-  );
-
-  /* ══════════════════════════════════════════════════════════════
-     AMOUNT FIELD
-  ══════════════════════════════════════════════════════════════ */
-  const AmountField = () => {
-    const cur   = country!.currency;
-    const sym   = country!.symbol;
-    const min   = minLocal(cur);
-    const qa    = quickAmts(cur);
-    const local = parseFloat(amount);
-    const ghsEq = local > 0 && cur !== "GHS" ? localToGhs(local, cur) : null;
-    const rate  = rateFor(cur);
-    return (
-      <div style={{ marginBottom: 20 }}>
-        <label style={lbl}>Amount ({cur})</label>
-        {cur !== "GHS" && rate !== 1 && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, background: T.faint, border: `1px solid ${T.border}`, borderRadius: 7, padding: "5px 10px", width: "fit-content" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 13, color: T.gold }}>currency_exchange</span>
-            <span style={{ fontSize: 9, color: T.dim, textTransform: "uppercase", letterSpacing: "0.5px" }}>Live Rate</span>
-            <span style={{ fontSize: 11, color: T.gold, fontWeight: 700 }}>1 GH₵ = {sym}{rate.toFixed(4)}</span>
-            <span style={{ fontSize: 9, color: T.dim }}>· Min: {sym}{min.toLocaleString()}</span>
-          </div>
-        )}
-        <div style={{ display: "flex", alignItems: "stretch", background: T.raised, border: `1px solid ${T.border}`, borderRadius: 10, overflow: "hidden", marginBottom: 6 }}>
-          <span style={{ padding: "0 14px", display: "flex", alignItems: "center", color: T.dim, fontSize: 12, fontWeight: 700, borderRight: `1px solid ${T.border}`, background: "rgba(255,255,255,0.03)", flexShrink: 0, letterSpacing: "0.05em" }}>{sym}</span>
-          <input type="number" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)}
-            style={{ flex: 1, background: "none", border: "none", outline: "none", color: T.white, fontSize: 22, fontWeight: 700, padding: "11px 14px", fontFamily: "inherit" }} />
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <span style={{ fontSize: 11, color: T.dim }}>Min: {sym}{min.toLocaleString()}{cur !== "GHS" ? ` ≈ GH₵${MIN_DEPOSIT_GHS}` : ""}</span>
-          {ghsEq && <span style={{ fontSize: 11, color: "rgba(245,245,240,0.22)" }}>≈ GH₵{ghsEq.toFixed(2)}</span>}
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
-          {qa.map((q, i) => (
-            <button key={i} onClick={() => setAmount(String(q))} style={{
-              background: parseFloat(amount) === q ? T.redLow : T.faint,
-              border: `1px solid ${parseFloat(amount) === q ? T.red : T.border}`,
-              borderRadius: 8, padding: "7px 0",
-              color: parseFloat(amount) === q ? "#f87171" : T.dim,
-              fontSize: 11, fontWeight: 700, cursor: "pointer", transition: "all 0.12s", fontFamily: "inherit",
-            }}>
-              {q >= 1000000 ? `${(q / 1000000).toFixed(1)}M` : q >= 1000 ? `${(q / 1000).toFixed(0)}k` : q}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  /* ══════════════════════════════════════════════════════════════
-     COUNTRY DROPDOWN
-  ══════════════════════════════════════════════════════════════ */
-  const [dropOpen, setDropOpen] = useState(false);
-  const [search,   setSearch]   = useState("");
-  const dropRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => { if (dropRef.current && !dropRef.current.contains(e.target as Node)) setDropOpen(false); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const filtered = COUNTRIES.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) || c.currency.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const CountryDropdown = () => (
-    <div ref={dropRef} style={{ position: "relative", marginBottom: 22 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <div style={{ width: 20, height: 20, borderRadius: "50%", background: T.red, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <span style={{ fontSize: 10, fontWeight: 800, color: "#fff" }}>1</span>
-        </div>
-        <span style={{ fontSize: 13, fontWeight: 700, color: T.white }}>Select your country</span>
-        {ipDetecting && <span style={{ fontSize: 10, color: T.dim, display: "flex", alignItems: "center", gap: 4 }}><Spin /> detecting…</span>}
-        {!ipDetecting && country && <span style={{ fontSize: 10, color: T.green, display: "flex", alignItems: "center", gap: 3 }}><span className="material-symbols-outlined" style={{ fontSize: 13 }}>my_location</span>auto-detected</span>}
-      </div>
-      <button onClick={() => setDropOpen(o => !o)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: T.raised, border: `1px solid ${dropOpen ? T.red : T.border}`, borderRadius: 10, padding: "11px 14px", cursor: "pointer", fontFamily: "inherit", transition: "border 0.15s" }}>
-        {country ? (
-          <><FlagImg country={country} size={24} /><span style={{ flex: 1, textAlign: "left", color: T.white, fontSize: 14, fontWeight: 600 }}>{country.name}</span><span style={{ fontSize: 11, color: T.dim, marginRight: 6 }}>{country.currency}</span></>
-        ) : (
-          <span style={{ flex: 1, textAlign: "left", color: T.dim, fontSize: 13 }}>Choose a country…</span>
-        )}
-        <span className="material-symbols-outlined" style={{ color: T.dim, fontSize: 18, transform: dropOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }}>expand_more</span>
-      </button>
-
-      {dropOpen && (
-        <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, zIndex: 100, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, boxShadow: "0 12px 40px rgba(0,0,0,0.7)", overflow: "hidden" }}>
-          <div style={{ padding: "10px 12px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 8 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16, color: T.dim }}>search</span>
-            <input autoFocus type="text" placeholder="Search country or currency…" value={search} onChange={e => setSearch(e.target.value)}
-              style={{ ...inp, padding: "6px 0", fontSize: 13, marginBottom: 0, background: "none", border: "none", flex: 1 }} />
-          </div>
-          <div style={{ maxHeight: 260, overflowY: "auto" }}>
-            {filtered.map(c => {
-              const hasInstant = c.gateways.includes("moolre");
-              const hasBank    = c.gateways.includes("bank_ng");
-              const badge = hasInstant ? { label: "INSTANT", bg: T.redLow, color: "#f87171", border: T.redMid }
-                          : hasBank   ? { label: "BANK",    bg: T.greenLow, color: T.green, border: T.greenMid }
-                          :             { label: "CRYPTO",  bg: T.goldLow, color: T.gold, border: "rgba(212,168,67,0.3)" };
-              return (
-                <button key={c.code} onClick={() => { handleSelectCountry(c); setDropOpen(false); setSearch(""); }}
-                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: country?.code === c.code ? T.redLow : "none", border: "none", borderBottom: `1px solid ${T.border}`, cursor: "pointer", fontFamily: "inherit", transition: "background 0.1s" }}>
-                  <FlagImg country={c} size={22} />
-                  <span style={{ flex: 1, textAlign: "left", color: T.white, fontSize: 13, fontWeight: 600 }}>{c.name}</span>
-                  <span style={{ fontSize: 10, color: T.dim, marginRight: 8 }}>{c.currency}</span>
-                  <span style={{ fontSize: 9, fontWeight: 800, padding: "2px 8px", borderRadius: 20, letterSpacing: "0.05em", background: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>
-                    {badge.label}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  /* ══════════════════════════════════════════════════════════════
-     GATEWAY TABS  (updated to support bank_ng)
-  ══════════════════════════════════════════════════════════════ */
-  const GatewayTabs = () => {
-    if (!country || country.gateways.length <= 1) return null;
-
-    type TabDef = { id: "moolre" | "binance" | "bank_ng"; matIcon: string; label: string; sub: string };
-    const allTabs: TabDef[] = [
-      { id: "moolre",  matIcon: "phone_android",   label: "Mobile Money", sub: "MTN · Telecel · AirtelTigo" },
-      { id: "bank_ng", matIcon: "account_balance",  label: "Bank Transfer", sub: "Paystack-Titan · Nigeria" },
-      { id: "binance", matIcon: "currency_bitcoin", label: "Crypto",       sub: "USDT · BTC · ETH · BNB" },
-    ];
-    const tabs = allTabs.filter(t => country.gateways.includes(t.id));
-
-    return (
-      <div style={{ marginBottom: 22 }}>
-        <label style={lbl}>Payment method</label>
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${tabs.length}, 1fr)`, gap: 8 }}>
-          {tabs.map(t => {
-            const active    = gateway === t.id;
-            const isCrypto  = t.id === "binance";
-            const isBank    = t.id === "bank_ng";
-            const accentClr = isCrypto ? T.gold : isBank ? T.green : "#f87171";
-            const accentBg  = isCrypto ? T.goldLow : isBank ? T.greenLow : T.redLow;
-            const accentBd  = isCrypto ? "rgba(212,168,67,0.5)" : isBank ? T.greenMid : T.red;
-            return (
-              <button key={t.id} onClick={() => selectGateway(t.id)}
-                style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, padding: "13px 14px", background: active ? accentBg : T.raised, border: `1.5px solid ${active ? accentBd : T.border}`, borderRadius: 10, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s" }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 22, color: active ? accentClr : T.dim }}>{t.matIcon}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: T.white, lineHeight: 1.2 }}>{t.label}</span>
-                <span style={{ fontSize: 9, color: T.dim, lineHeight: 1.4 }}>{t.sub}</span>
-                {active && (
-                  <span style={{ fontSize: 9, fontWeight: 800, color: accentClr, marginTop: 2, display: "flex", alignItems: "center", gap: 3 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 11 }}>check_circle</span>SELECTED
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  /* ══════════════════════════════════════════════════════════════
-     TRUST BADGES
-  ══════════════════════════════════════════════════════════════ */
-  const TrustBadges = () => (
-    <div style={{ marginBottom: 20 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8 }}>Trusted Payment Partners</div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {[
-          { label: "Moolre",  matIcon: "phone_android",   desc: "MoMo" },
-          { label: "Bank",    matIcon: "account_balance",  desc: "Transfer" },
-          { label: "Binance", matIcon: "currency_bitcoin", desc: "Crypto" },
-        ].map(b => (
-          <div key={b.label} style={{ display: "flex", alignItems: "center", gap: 6, background: T.faint, border: `1px solid ${T.border}`, borderRadius: 8, padding: "6px 10px" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 18, color: T.dim }}>{b.matIcon}</span>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: T.white }}>{b.label}</div>
-              <div style={{ fontSize: 9, color: T.dim }}>{b.desc}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  /* ══════════════════════════════════════════════════════════════
-     MOOLRE PANELS (unchanged)
-  ══════════════════════════════════════════════════════════════ */
-  const MoolreForm = () => (
-    <div>
-      {error && <ErrBox msg={error} />}
-      <AmountField />
-      <div style={{ marginBottom: 18 }}>
-        <label style={lbl}>MoMo Phone Number</label>
-        <div style={{ display: "flex", alignItems: "center", background: T.raised, border: `1px solid ${T.border}`, borderRadius: 10, overflow: "hidden" }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 18, color: T.dim, padding: "0 12px", borderRight: `1px solid ${T.border}`, height: "100%", display: "flex", alignItems: "center" }}>phone</span>
-          <input type="tel" placeholder="0244123456" value={phone} maxLength={10} onChange={e => setPhone(e.target.value)}
-            style={{ ...inp, border: "none", borderRadius: 0, background: "none" }} />
-        </div>
-        <div style={{ fontSize: 11, color: T.dim, marginTop: 5 }}>10 digits starting with 0</div>
-      </div>
-      <div style={{ marginBottom: 18 }}>
-        <label style={lbl}>Network</label>
-        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-          {MOMO_NETWORKS.map(n => (
-            <button key={n.id} onClick={() => setMomoNet(n.id)} style={{ display: "flex", alignItems: "center", gap: 11, background: momoNet === n.id ? T.redLow : T.raised, border: `1px solid ${momoNet === n.id ? T.red : T.border}`, borderRadius: 9, padding: "10px 13px", cursor: "pointer", transition: "all 0.12s", fontFamily: "inherit" }}>
-              <NetworkLogo network={n} size={30} />
-              <span style={{ color: momoNet === n.id ? "#f87171" : T.dim, fontSize: 13, fontWeight: 600, flex: 1, textAlign: "left" }}>{n.label}</span>
-              {momoNet === n.id && <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#f87171" }}>check_circle</span>}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div style={{ background: T.faint, border: `1px solid ${T.border}`, borderRadius: 9, padding: "10px 13px", marginBottom: 18, fontSize: 12, color: T.dim, lineHeight: 1.55, display: "flex", alignItems: "flex-start", gap: 8 }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 16, marginTop: 1, flexShrink: 0 }}>smartphone</span>
-        A USSD prompt will be sent to your phone. Approve it within 2 mins.
-      </div>
-      <button onClick={handleMoolreInit} disabled={loading || !amount || !phone}
-        style={{ ...btnPrimary, opacity: loading || !amount || !phone ? 0.38 : 1, marginBottom: 8 }}>
-        {loading ? <><Spin /> Initiating…</> : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>send_to_mobile</span>Send MoMo Prompt · GH₵{parseFloat(amount) || "0.00"}</>}
-      </button>
-    </div>
-  );
-
-  const MoolreApprove = () => (
-    <div>
-      {error && <ErrBox msg={error} />}
-      {sub === "sms" && (
-        <>
-          <div style={{ background: "rgba(212,168,67,0.07)", border: "1px solid rgba(212,168,67,0.22)", borderRadius: 10, padding: 16, marginBottom: 16, textAlign: "center" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 36, color: T.gold, display: "block", marginBottom: 8 }}>sms</span>
-            <div style={{ fontWeight: 700, fontSize: 13, color: T.gold, marginBottom: 5 }}>Check your SMS</div>
-            <div style={{ fontSize: 12, color: T.dim, lineHeight: 1.6 }}>MTN sent a code to <strong style={{ color: T.white }}>{phone}</strong>. Enter it below.</div>
-          </div>
-          <div style={{ marginBottom: 14 }}>
-            <label style={lbl}>SMS Code</label>
-            <input type="text" inputMode="numeric" placeholder="······" value={smsCode} maxLength={8} autoFocus
-              onChange={e => setSmsCode(e.target.value.replace(/\D/g, ""))}
-              style={{ ...inp, fontSize: 24, fontWeight: 700, letterSpacing: 10, textAlign: "center", border: `1.5px solid ${T.red}` }} />
-          </div>
-          <button onClick={handleSmsSubmit} disabled={loading || smsCode.length < 4}
-            style={{ ...btnPrimary, opacity: loading || smsCode.length < 4 ? 0.38 : 1, marginBottom: 8 }}>
-            {loading ? <><Spin /> Verifying…</> : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>verified</span>Submit Code</>}
-          </button>
-          <button onClick={() => { setSub("wait"); setError(""); setStep("form"); }} style={btnGhost}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>Start Over
-          </button>
-        </>
-      )}
-      {sub === "wait" && (
-        <>
-          <div style={{ background: T.faint, border: `1px solid ${T.border}`, borderRadius: 10, padding: 18, marginBottom: 14, textAlign: "center" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 40, color: T.dim, display: "block", marginBottom: 8 }}>vibration</span>
-            <div style={{ fontWeight: 700, fontSize: 14, color: T.white, marginBottom: 5 }}>Check your phone</div>
-            <div style={{ fontSize: 12, color: T.dim, lineHeight: 1.65 }}>
-              USSD prompt sent to <strong style={{ color: T.white }}>{phone}</strong>.<br />
-              Approve <strong style={{ color: "#f87171" }}>GH₵{parseFloat(amount).toFixed(2)}</strong>.
-            </div>
-            {countdown > 0
-              ? <div style={{ marginTop: 10, fontSize: 12, color: T.dim, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>timer</span>
-                  Expires in <strong style={{ color: T.white }}>{fmt(countdown)}</strong>
-                </div>
-              : <div style={{ marginTop: 10, fontSize: 12, color: "#f87171" }}>May have expired — verify below</div>
-            }
-          </div>
-          <button onClick={() => { setSub("verify"); setError(""); setInfo(""); }} style={{ ...btnPrimary, marginBottom: 8 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>task_alt</span>I've Approved — Verify
-          </button>
-          <button onClick={() => { setStep("form"); setError(""); }} style={btnGhost}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>Start Over
-          </button>
-        </>
-      )}
-      {sub === "verify" && (
-        <>
-          <div style={{ textAlign: "center", marginBottom: 18 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 40, color: T.dim, display: "block", marginBottom: 8 }}>manage_search</span>
-            <div style={{ fontWeight: 700, fontSize: 14, color: T.white, marginBottom: 4 }}>Verify Payment</div>
-            <div style={{ fontSize: 12, color: T.dim }}>Checking GH₵{parseFloat(amount).toFixed(2)}</div>
-          </div>
-          {info && <InfoBox msg={info} />}
-          <button onClick={handleVerify} disabled={loading} style={{ ...btnPrimary, opacity: loading ? 0.38 : 1, marginBottom: 8 }}>
-            {loading ? <><Spin /> Verifying…</> : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>search_check</span>Verify Payment</>}
-          </button>
-          <button onClick={() => { setSub("wait"); setError(""); setInfo(""); }} style={{ ...btnGhost, marginBottom: 8 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>hourglass_empty</span>Still Waiting
-          </button>
-          <button onClick={() => { setStep("form"); setError(""); }} style={{ ...btnGhost, border: "none", color: "rgba(245,245,240,0.18)" }}>Start Over</button>
-        </>
-      )}
-    </div>
-  );
-
-  /* ══════════════════════════════════════════════════════════════
-     BINANCE PANELS (unchanged)
-  ══════════════════════════════════════════════════════════════ */
-  const BinanceInfo = () => (
-    <div>
-      {error && <ErrBox msg={error} />}
-      <div style={{ background: T.raised, border: `1px solid ${T.border}`, borderRadius: 10, padding: 16, marginBottom: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 8, background: T.red, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span className="material-symbols-outlined" style={{ color: "#fff", fontSize: 18 }}>currency_bitcoin</span>
-          </div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 13, color: T.white }}>Send USDT to this address</div>
-            <div style={{ fontSize: 11, color: T.dim }}>Network: <strong style={{ color: "#f87171" }}>TRC20 (TRON)</strong></div>
-          </div>
-        </div>
-        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "11px 13px", marginBottom: 10 }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 5 }}>Wallet Address</div>
-          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: T.white, wordBreak: "break-all", lineHeight: 1.7, marginBottom: 10 }}>{BINANCE_ADDRESS}</div>
-          <CopyBtn text={BINANCE_ADDRESS} />
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 10 }}>
-          {[["Network", "TRC20"], ["Coin", "USDT"], ["Min.", "≈ GH₵200"]].map(([l, v]) => (
-            <div key={l} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 7, padding: "7px 5px", textAlign: "center" }}>
-              <div style={{ fontSize: 9, color: T.dim, marginBottom: 2 }}>{l}</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: T.white }}>{v}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{ background: "rgba(224,32,32,0.07)", border: `1px solid ${T.redMid}`, borderRadius: 7, padding: "8px 11px", fontSize: 11, color: "#f87171", lineHeight: 1.55, display: "flex", gap: 7 }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>warning</span>
-          Only send <strong>USDT via TRC20</strong>. Wrong network = <strong>permanent loss of funds</strong>.
-        </div>
-      </div>
-      <div style={{ background: T.faint, border: `1px solid ${T.border}`, borderRadius: 10, padding: "11px 14px", marginBottom: 14 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>Also Accepted</div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {CRYPTO_COINS.map(c => (
-            <span key={c} style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: T.goldLow, color: T.gold, border: "1px solid rgba(212,168,67,0.25)" }}>{c}</span>
-          ))}
-        </div>
-      </div>
-      <div style={{ background: T.goldLow, border: "1px solid rgba(212,168,67,0.2)", borderRadius: 10, padding: "12px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 12 }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 28, color: T.gold, flexShrink: 0 }}>account_balance_wallet</span>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, fontSize: 12, color: T.gold }}>New to Binance?</div>
-          <div style={{ fontSize: 11, color: T.dim, marginTop: 2, lineHeight: 1.4 }}>Create a free account to buy &amp; send crypto in minutes.</div>
-        </div>
-        <a href="https://www.binance.com/en/register" target="_blank" rel="noopener noreferrer"
-          style={{ fontSize: 11, fontWeight: 800, padding: "7px 13px", borderRadius: 8, background: T.gold, color: "#0a0a0a", textDecoration: "none", flexShrink: 0, display: "flex", alignItems: "center", gap: 4 }}>
-          Sign Up <span className="material-symbols-outlined" style={{ fontSize: 13 }}>open_in_new</span>
-        </a>
-      </div>
-      <button onClick={() => setStep("proof")} style={{ ...btnPrimary, marginBottom: 8 }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>receipt_long</span>I've Sent — Submit Proof
-      </button>
-      <div style={{ textAlign: "center", fontSize: 11, color: T.dim, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 13 }}>manage_search</span>
-        Reviewed &amp; credited within 1–5 mins
-      </div>
-    </div>
-  );
-
-  const BinanceProof = () => {
-    const fe = (k: string) => bErrs[k] ? <div style={{ fontSize: 11, color: "#f87171", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}><span className="material-symbols-outlined" style={{ fontSize: 12 }}>error</span>{bErrs[k]}</div> : null;
-    const fi = (k: string): React.CSSProperties => ({ ...inp, border: `1px solid ${bErrs[k] ? "rgba(224,32,32,0.5)" : T.border}` });
-    return (
-      <div>
-        {error && <ErrBox msg={error} />}
-        <div style={{ marginBottom: 14 }}>
-          <label style={lbl}>Transaction Hash (TXID) <span style={{ color: T.red }}>*</span></label>
-          <input type="text" value={txid} onChange={e => { setTxid(e.target.value); setBErrs(p => ({ ...p, txid: "" })); }} placeholder="Paste blockchain TXID" style={fi("txid")} />
-          {fe("txid")}
-          <div style={{ fontSize: 11, color: T.dim, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>info</span>Find in your Binance withdrawal history.
-          </div>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-          <div>
-            <label style={lbl}>Coin <span style={{ color: T.red }}>*</span></label>
-            <select value={coin} onChange={e => setCoin(e.target.value)} style={{ ...inp, appearance: "none" as const }}>
-              {CRYPTO_COINS.map(c => <option key={c} style={{ background: "#141414" }}>{c}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={lbl}>Network <span style={{ color: T.red }}>*</span></label>
-            <select value={cryptoNet} onChange={e => setCryptoNet(e.target.value)} style={{ ...inp, appearance: "none" as const }}>
-              {CRYPTO_NETWORKS.map(n => <option key={n} style={{ background: "#141414" }}>{n}</option>)}
-            </select>
-          </div>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-          <div>
-            <label style={lbl}>Amount Sent ({coin}) <span style={{ color: T.red }}>*</span></label>
-            <input type="number" value={cryptoAmt} placeholder="0.00" min="0" step="any"
-              onChange={e => { setCryptoAmt(e.target.value); setBErrs(p => ({ ...p, cryptoAmt: "" })); }} style={fi("cryptoAmt")} />
-            {fe("cryptoAmt")}
-          </div>
-          <div>
-            <label style={lbl}>Expected GH₵ Credit <span style={{ color: T.red }}>*</span></label>
-            <input type="number" value={expectedGhs} placeholder="0.00" min="0" step="any"
-              onChange={e => { setExpectedGhs(e.target.value); setBErrs(p => ({ ...p, expectedGhs: "" })); }} style={fi("expectedGhs")} />
-            {fe("expectedGhs")}
-          </div>
-        </div>
-        <div style={{ marginBottom: 14 }}>
-          <label style={lbl}>Sender Wallet <span style={{ color: T.dim, textTransform: "none", fontSize: 10 }}>(optional)</span></label>
-          <input type="text" value={senderAddr} placeholder="Address you sent from" onChange={e => setSenderAddr(e.target.value)} style={inp} />
-        </div>
-        <div style={{ marginBottom: 18 }}>
-          <label style={lbl}>Note to Admin <span style={{ color: T.dim, textTransform: "none", fontSize: 10 }}>(optional)</span></label>
-          <textarea value={userNote} onChange={e => setUserNote(e.target.value)} placeholder="Any extra info" rows={3}
-            style={{ ...inp, resize: "vertical", lineHeight: 1.6 } as React.CSSProperties} />
-        </div>
-        <button onClick={handleBinanceSubmit} disabled={loading} style={{ ...btnPrimary, opacity: loading ? 0.38 : 1, marginBottom: 8 }}>
-          {loading ? <><Spin /> Submitting…</> : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>upload_file</span>Submit Deposit Proof</>}
-        </button>
-        <button onClick={() => setStep("form")} style={btnGhost}>
-          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>Back
-        </button>
-      </div>
-    );
-  };
-
-  /* ══════════════════════════════════════════════════════════════
-     BANK TRANSFER (NG) PANELS  ← NEW
-  ══════════════════════════════════════════════════════════════ */
-
-  // ── Step 1: Account info ────────────────────────────────────────────────
-  const BankNgInfo = () => (
-    <div>
-      {error && <ErrBox msg={error} />}
-
-      {/* Minimum info */}
-      <div style={{ background: T.greenLow, border: `1px solid ${T.greenMid}`, borderRadius: 9, padding: "9px 13px", marginBottom: 14, fontSize: 12, color: T.green, lineHeight: 1.55, display: "flex", alignItems: "center", gap: 8 }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 15, flexShrink: 0 }}>info</span>
-        Minimum deposit: <strong>₦{MIN_DEPOSIT_NGN.toLocaleString()}</strong>
-      </div>
-
-      {/* Account card */}
-      <div style={{ background: T.raised, border: `1px solid ${T.greenMid}`, borderRadius: 12, padding: 16, marginBottom: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 8, background: T.greenLow, border: `1px solid ${T.greenMid}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span className="material-symbols-outlined" style={{ color: T.green, fontSize: 18 }}>account_balance</span>
-          </div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 13, color: T.white }}>Transfer to this account</div>
-            <div style={{ fontSize: 11, color: T.dim }}>Then submit your payment proof</div>
-          </div>
-        </div>
-
-        {/* Bank Name */}
-        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 9, padding: "11px 13px", marginBottom: 8 }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 5, display: "flex", alignItems: "center", gap: 4 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>corporate_fare</span>Bank Name
-          </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: T.white }}>{BANK_NAME}</span>
-            <CopyBtn text={BANK_NAME} />
-          </div>
-        </div>
-
-        {/* Account Name */}
-        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 9, padding: "11px 13px", marginBottom: 8 }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 5, display: "flex", alignItems: "center", gap: 4 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>person</span>Account Name
-          </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: T.white }}>{BANK_ACCT_NAME}</span>
-            <CopyBtn text={BANK_ACCT_NAME} />
-          </div>
-        </div>
-
-        {/* Account Number */}
-        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 9, padding: "11px 13px", marginBottom: 12 }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 5, display: "flex", alignItems: "center", gap: 4 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>tag</span>Account Number
-          </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 22, fontWeight: 700, color: T.white, letterSpacing: 3 }}>{BANK_ACCT_NUMBER}</span>
-            <CopyBtn text={BANK_ACCT_NUMBER} />
-          </div>
-        </div>
-
-        {/* Narration warning */}
-        <div style={{ background: "rgba(212,168,67,0.07)", border: "1px solid rgba(212,168,67,0.22)", borderRadius: 8, padding: "9px 12px", fontSize: 11, color: T.gold, lineHeight: 1.6, display: "flex", gap: 7 }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>warning</span>
-          Always include your <strong>username or phone number</strong> in the transfer narration so we can identify your payment.
-        </div>
-      </div>
-
-      <button onClick={() => setStep("bank_form")} style={{ ...btnGreen, marginBottom: 8 }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>task_alt</span>I've Sent the Money — Submit Proof
-      </button>
-      <div style={{ textAlign: "center", fontSize: 11, color: T.dim, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 13 }}>manage_search</span>
-        Verified within 5–10 minutes
-      </div>
-    </div>
-  );
-
-  // ── Step 2: Proof form ──────────────────────────────────────────────────
-  const BankNgForm = () => {
-    const fe = (k: string) => bankErrs[k]
-      ? <div style={{ fontSize: 11, color: "#f87171", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}><span className="material-symbols-outlined" style={{ fontSize: 12 }}>error</span>{bankErrs[k]}</div>
-      : null;
-    const fi = (k: string): React.CSSProperties => ({ ...inp, border: `1px solid ${bankErrs[k] ? "rgba(224,32,32,0.5)" : T.border}` });
-
-    const QUICK_NGN = [5000, 10000, 20000, 50000, 100000, 200000];
-
-    return (
-      <div>
-        {error && <ErrBox msg={error} />}
-
-        {/* Transfer reference */}
-        <div style={{ marginBottom: 14 }}>
-          <label style={lbl}>Transfer Reference / Narration <span style={{ color: T.red }}>*</span></label>
-          <div style={{ display: "flex", alignItems: "center", background: T.raised, border: `1px solid ${bankErrs.ref ? "rgba(224,32,32,0.5)" : T.border}`, borderRadius: 10, overflow: "hidden" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 18, color: T.dim, padding: "0 12px", borderRight: `1px solid ${T.border}`, display: "flex", alignItems: "center", height: "100%" }}>tag</span>
-            <input type="text" value={bankRef}
-              onChange={e => { setBankRef(e.target.value); setBankErrs(p => ({ ...p, ref: "" })); }}
-              placeholder="Your name, username, or receipt reference"
-              style={{ ...inp, border: "none", borderRadius: 0, background: "none" }} />
-          </div>
-          {fe("ref")}
-          <div style={{ fontSize: 11, color: T.dim, marginTop: 4 }}>Use the exact narration you entered during the transfer.</div>
-        </div>
-
-        {/* Amounts */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-          <div>
-            <label style={lbl}>Amount Sent (₦) <span style={{ color: T.red }}>*</span></label>
-            <input type="number" value={bankAmtSent} placeholder={`Min ₦${MIN_DEPOSIT_NGN.toLocaleString()}`}
-              onChange={e => { setBankAmtSent(e.target.value); setBankErrs(p => ({ ...p, amt: "" })); }}
-              style={fi("amt")} />
-            {fe("amt")}
-          </div>
-          <div>
-            <label style={lbl}>Expected ₦ Credit <span style={{ color: T.red }}>*</span></label>
-            <input type="number" value={bankExpected} placeholder="0.00"
-              onChange={e => { setBankExpected(e.target.value); setBankErrs(p => ({ ...p, exp: "" })); }}
-              style={fi("exp")} />
-            {fe("exp")}
-          </div>
-        </div>
-
-        {/* Quick amounts */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 7 }}>Quick fill</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6 }}>
-            {QUICK_NGN.map(q => (
-              <button key={q} onClick={() => { setBankAmtSent(String(q)); setBankExpected(String(q)); setBankErrs(p => ({ ...p, amt: "", exp: "" })); }}
-                style={{ background: bankAmtSent === String(q) ? T.redLow : T.faint, border: `1px solid ${bankAmtSent === String(q) ? T.red : T.border}`, borderRadius: 8, padding: "7px 0", color: bankAmtSent === String(q) ? "#f87171" : T.dim, fontSize: 11, fontWeight: 700, cursor: "pointer", transition: "all 0.12s", fontFamily: "inherit" }}>
-                {q >= 1000000 ? `${q / 1000000}M` : q >= 1000 ? `${q / 1000}k` : q}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Sender name */}
-        <div style={{ marginBottom: 14 }}>
-          <label style={lbl}>Sender Account Name <span style={{ color: T.dim, textTransform: "none", fontSize: 10 }}>(optional)</span></label>
-          <input type="text" value={bankSender} placeholder="Name on your bank account"
-            onChange={e => setBankSender(e.target.value)} style={inp} />
-        </div>
-
-        {/* Screenshot — required */}
-        <div style={{ marginBottom: 14 }}>
-          <label style={lbl}>Payment Screenshot <span style={{ color: T.red }}>*</span></label>
-          {bankScreenshot ? (
-            <div style={{ position: "relative", borderRadius: 10, overflow: "hidden", border: `1px solid ${T.greenMid}`, background: "#0a0f0b" }}>
-              <img src={bankScreenshot} alt="Payment screenshot" style={{ width: "100%", maxHeight: 200, objectFit: "contain", display: "block" }} />
-              {bankCompressing && (
-                <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Spin />
-                </div>
-              )}
-              {!bankCompressing && (
-                <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 6 }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 700, padding: "4px 9px", borderRadius: 6, cursor: "pointer", background: "rgba(0,0,0,0.7)", color: T.dim, fontFamily: "inherit" }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>upload</span>Change
-                    <input type="file" accept="image/*" style={{ display: "none" }} onChange={handleBankScreenshot} />
-                  </label>
-                  <button onClick={() => setBankScreenshot("")}
-                    style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, fontWeight: 700, padding: "4px 9px", borderRadius: 6, cursor: "pointer", border: "none", background: "rgba(224,32,32,0.7)", color: "#fff", fontFamily: "inherit" }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>close</span>Remove
-                  </button>
-                </div>
-              )}
-              {!bankCompressing && (
-                <div style={{ position: "absolute", bottom: 8, left: 8, fontSize: 9, fontWeight: 800, padding: "3px 8px", borderRadius: 20, background: "rgba(34,197,94,0.85)", color: "#fff", display: "flex", alignItems: "center", gap: 3 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 11 }}>check_circle</span>Ready
-                </div>
-              )}
-            </div>
-          ) : (
-            <label style={{
-              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-              height: 100, border: `2px dashed ${bankErrs.screenshot ? "rgba(224,32,32,0.5)" : T.border}`,
-              borderRadius: 10, cursor: bankCompressing ? "wait" : "pointer",
-              background: T.faint, transition: "all 0.2s",
-            }}>
-              {bankCompressing
-                ? <><Spin /><span style={{ fontSize: 11, color: T.dim, marginTop: 8 }}>Processing…</span></>
-                : <>
-                    <span className="material-symbols-outlined" style={{ fontSize: 30, color: T.dim, marginBottom: 6 }}>add_photo_alternate</span>
-                    <span style={{ fontSize: 12, color: T.dim, fontWeight: 600 }}>Tap or drag screenshot here</span>
-                    <span style={{ fontSize: 10, color: "rgba(245,245,240,0.2)", marginTop: 3 }}>JPG · PNG · WEBP · Max 8 MB</span>
-                  </>
-              }
-              <input type="file" accept="image/*" style={{ display: "none" }} onChange={handleBankScreenshot} />
-            </label>
-          )}
-          {fe("screenshot")}
-          {!bankErrs.screenshot && !bankScreenshot && (
-            <div style={{ fontSize: 11, color: T.dim, marginTop: 4 }}>Upload a photo of your payment receipt or confirmation screen.</div>
-          )}
-          {!bankErrs.screenshot && bankScreenshot && (
-            <div style={{ fontSize: 11, color: T.green, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>check_circle</span>
-              Screenshot attached — will be sent with your deposit proof
-            </div>
-          )}
-        </div>
-
-        {/* Note */}
-        <div style={{ marginBottom: 18 }}>
-          <label style={lbl}>Note to Admin <span style={{ color: T.dim, textTransform: "none", fontSize: 10 }}>(optional)</span></label>
-          <textarea value={bankNote} onChange={e => setBankNote(e.target.value)} placeholder="Any extra info" rows={3}
-            style={{ ...inp, resize: "vertical", lineHeight: 1.6 } as React.CSSProperties} />
-        </div>
-
-        <button onClick={handleBankSubmit} disabled={loading || bankCompressing}
-          style={{ ...btnGreen, opacity: loading || bankCompressing ? 0.38 : 1, marginBottom: 8 }}>
-          {loading ? <><Spin /> Submitting…</> : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>upload_file</span>Submit Transfer Proof</>}
-        </button>
-        <button onClick={() => setStep("bank_info")} style={btnGhost}>
-          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>Back
-        </button>
-      </div>
-    );
-  };
-
-  // ── Step 3: Success ─────────────────────────────────────────────────────
-  const BankNgSuccess = () => (
-    <div style={{ textAlign: "center", padding: "12px 0 8px" }}>
-      <div style={{ width: 64, height: 64, borderRadius: "50%", margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", background: T.greenLow, border: `2px solid ${T.greenMid}` }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 32, color: T.green }}>hourglass_top</span>
-      </div>
-      <div style={{ fontWeight: 800, fontSize: 20, color: T.white, marginBottom: 6 }}>Proof Submitted!</div>
-      <div style={{ fontSize: 13, color: T.dim, lineHeight: 1.7, marginBottom: 22 }}>
-        Your bank transfer is under review.<br />
-        Admin will verify and credit your wallet within <strong style={{ color: T.white }}>5–10 minutes</strong>.
-      </div>
-      <button onClick={() => window.location.href = "/"} style={{ ...btnGreen, marginBottom: 8 }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>home</span>Back to Home
-      </button>
-      <button onClick={reset} style={btnGhost}>
-        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add_circle</span>Make Another Deposit
-      </button>
-    </div>
-  );
-
-  /* ══════════════════════════════════════════════════════════════
-     SUCCESS / DONE SCREENS
-  ══════════════════════════════════════════════════════════════ */
-  const SuccessScreen = ({ type }: { type: "momo" | "crypto" }) => (
-    <div style={{ textAlign: "center", padding: "12px 0 8px" }}>
-      <div style={{ width: 64, height: 64, borderRadius: "50%", margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", background: type === "momo" ? "rgba(34,197,94,0.12)" : T.goldLow, border: `2px solid ${type === "momo" ? "rgba(34,197,94,0.35)" : "rgba(212,168,67,0.35)"}` }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 32, color: type === "momo" ? "#4ade80" : T.gold }}>{type === "momo" ? "check_circle" : "hourglass_top"}</span>
-      </div>
-      {type === "momo" ? (
-        <>
-          <div style={{ fontWeight: 800, fontSize: 26, color: "#4ade80", marginBottom: 4 }}>GH₵{parseFloat(amount).toFixed(2)}</div>
-          <div style={{ fontSize: 13, color: T.dim, marginBottom: 20 }}>Added to your Bet 360 wallet</div>
-          <div style={{ background: T.raised, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 14px", marginBottom: 18, textAlign: "left" }}>
-            {[["Amount", `GH₵ ${parseFloat(amount).toFixed(2)}`], ["Network", MOMO_NETWORKS.find(n => n.id === momoNet)?.label ?? momoNet], ["Phone", phone]].map(([k, v]) => (
-              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                <span style={{ color: T.dim, fontSize: 12 }}>{k}</span>
-                <span style={{ color: T.white, fontSize: 12, fontWeight: 600 }}>{v}</span>
-              </div>
-            ))}
-          </div>
-        </>
-      ) : (
-        <>
-          <div style={{ fontWeight: 800, fontSize: 20, color: T.white, marginBottom: 6 }}>Proof Submitted</div>
-          <div style={{ fontSize: 13, color: T.dim, lineHeight: 1.65, marginBottom: 20 }}>
-            Your crypto deposit is under review.<br />
-            Admin will credit your Bet 360 wallet within <strong style={{ color: T.white }}>1–5 minutes</strong>.
-          </div>
-        </>
-      )}
-      <button onClick={() => window.location.href = "/"} style={{ ...btnPrimary, marginBottom: 8 }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>home</span>Back to Home
-      </button>
-      <button onClick={reset} style={btnGhost}>
-        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add_circle</span>Make Another Deposit
-      </button>
-    </div>
-  );
-
-  /* ══════════════════════════════════════════════════════════════
-     SUPPORT PANEL
-  ══════════════════════════════════════════════════════════════ */
-  const SupportPanel = () => (
-    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, overflow: "hidden", marginTop: 16, animation: "_fadeUp 0.3s ease" }}>
-      <button onClick={() => setSupportOpen(o => !o)}
-        style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "14px 20px", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
-        <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 18, color: T.green }}>support_agent</span>
-        </div>
-        <div style={{ flex: 1, textAlign: "left" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: T.white }}>Need help? Contact Support</div>
-          <div style={{ fontSize: 11, color: T.dim }}>We're online 24/7 — response in under 5 mins</div>
-        </div>
-        <span className="material-symbols-outlined" style={{ color: T.dim, fontSize: 18, transform: supportOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }}>expand_more</span>
-      </button>
-      {supportOpen && (
-        <div style={{ borderTop: `1px solid ${T.border}`, padding: "16px 20px" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {[
-              { matIcon: "chat",  label: "Live Chat",     desc: "Chat with us on WhatsApp", href: "https://wa.me/233000000000", color: "#25D366" },
-              { matIcon: "mail",  label: "Email Support", desc: "bet360support11@gmail.com",  href: "mailto:bet360support11@gmail.com", color: "#60a5fa" },
-              { matIcon: "send",  label: "Telegram",      desc: "@Bet360Support",            href: "https://t.me/Bet360Support",  color: "#2AABEE" },
-            ].map(ch => (
-              <a key={ch.label} href={ch.href} target="_blank" rel="noopener noreferrer"
-                style={{ display: "flex", alignItems: "center", gap: 12, background: T.raised, border: `1px solid ${T.border}`, borderRadius: 10, padding: "11px 13px", textDecoration: "none", transition: "border 0.15s" }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 22, color: ch.color, flexShrink: 0 }}>{ch.matIcon}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: T.white }}>{ch.label}</div>
-                  <div style={{ fontSize: 11, color: T.dim }}>{ch.desc}</div>
-                </div>
-                <span className="material-symbols-outlined" style={{ fontSize: 16, color: ch.color }}>arrow_forward</span>
-              </a>
-            ))}
-          </div>
-          <div style={{ marginTop: 14, background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.15)", borderRadius: 9, padding: "10px 13px", fontSize: 11, color: T.dim, lineHeight: 1.6, display: "flex", gap: 8 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 15, color: T.green, flexShrink: 0, marginTop: 1 }}>schedule</span>
-            <span><strong style={{ color: T.white }}>Support hours:</strong> 24 hours, 7 days a week.<br />For deposit issues, have your <strong style={{ color: T.white }}>TXID / phone number</strong> ready.</span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  /* ══════════════════════════════════════════════════════════════
-     PANEL ROUTER (updated)
-  ══════════════════════════════════════════════════════════════ */
-  const renderPanel = () => {
-    if (!country || !gateway) return null;
-
-    if (gateway === "moolre") {
-      if (step === "approve") return <MoolreApprove />;
-      if (step === "done")    return <SuccessScreen type="momo" />;
-      return <MoolreForm />;
-    }
-
-    if (gateway === "binance") {
-      if (step === "proof")   return <BinanceProof />;
-      if (step === "success") return <SuccessScreen type="crypto" />;
-      return <BinanceInfo />;
-    }
-
-    if (gateway === "bank_ng") {
-      if (step === "bank_form")    return <BankNgForm />;
-      if (step === "bank_success") return <BankNgSuccess />;
-      return <BankNgInfo />;
-    }
-
-    return null;
-  };
-
+  /* ── panel title ── */
   const panelTitle = () => {
     if (!gateway) return null;
     if (gateway === "moolre") {
@@ -1194,9 +1228,91 @@ export default function DepositPage() {
     return null;
   };
 
-  /* ══════════════════════════════════════════════════════════════
-     ROOT RENDER
-  ══════════════════════════════════════════════════════════════ */
+  /* ── panel router ── */
+  const renderPanel = () => {
+    if (!country || !gateway) return null;
+
+    if (gateway === "moolre") {
+      if (step === "approve") return (
+        <MoolreApprove
+          error={error} info={info}
+          sub={sub} setSub={setSub}
+          phone={phone} amount={amount}
+          countdown={countdown}
+          smsCode={smsCode} setSmsCode={setSmsCode}
+          loading={loading}
+          onSmsSubmit={handleSmsSubmit}
+          onVerify={handleVerify}
+          onStartOver={() => { setStep("form"); setError(""); setSub("wait"); }}
+          fmt={fmt}
+        />
+      );
+      if (step === "done") return (
+        <SuccessScreen type="momo" amount={amount} momoNet={momoNet} phone={phone} onHome={() => window.location.href = "/"} onReset={reset} />
+      );
+      return (
+        <MoolreForm
+          error={error} amount={amount} setAmount={setAmount}
+          phone={phone} setPhone={setPhone}
+          momoNet={momoNet} setMomoNet={setMomoNet}
+          loading={loading} country={country}
+          rateFor={rateFor} minLocal={minLocal} quickAmts={quickAmts} localToGhs={localToGhs}
+          onSubmit={handleMoolreInit}
+        />
+      );
+    }
+
+    if (gateway === "binance") {
+      if (step === "proof") return (
+        <BinanceProof
+          error={error}
+          txid={txid} setTxid={setTxid}
+          cryptoAmt={cryptoAmt} setCryptoAmt={setCryptoAmt}
+          coin={coin} setCoin={setCoin}
+          cryptoNet={cryptoNet} setCryptoNet={setCryptoNet}
+          expectedGhs={expectedGhs} setExpectedGhs={setExpectedGhs}
+          senderAddr={senderAddr} setSenderAddr={setSenderAddr}
+          userNote={userNote} setUserNote={setUserNote}
+          bErrs={bErrs} setBErrs={setBErrs}
+          loading={loading}
+          onSubmit={handleBinanceSubmit}
+          onBack={() => setStep("form")}
+        />
+      );
+      if (step === "success") return (
+        <SuccessScreen type="crypto" amount={amount} momoNet={momoNet} phone={phone} onHome={() => window.location.href = "/"} onReset={reset} />
+      );
+      return <BinanceInfo error={error} onNext={() => setStep("proof")} />;
+    }
+
+    if (gateway === "bank_ng") {
+      if (step === "bank_form") return (
+        <BankNgForm
+          error={error}
+          bankRef={bankRef} setBankRef={setBankRef}
+          bankAmtSent={bankAmtSent} setBankAmtSent={setBankAmtSent}
+          bankExpected={bankExpected} setBankExpected={setBankExpected}
+          bankSender={bankSender} setBankSender={setBankSender}
+          bankNote={bankNote} setBankNote={setBankNote}
+          bankScreenshot={bankScreenshot} setBankScreenshot={setBankScreenshot}
+          bankCompressing={bankCompressing}
+          bankErrs={bankErrs} setBankErrs={setBankErrs}
+          loading={loading}
+          onFileChange={handleBankScreenshot}
+          onSubmit={handleBankSubmit}
+          onBack={() => setStep("bank_info")}
+        />
+      );
+      if (step === "bank_success") return (
+        <BankNgSuccess onHome={() => window.location.href = "/"} onReset={reset} />
+      );
+      return <BankNgInfo error={error} onNext={() => setStep("bank_form")} />;
+    }
+
+    return null;
+  };
+
+  /* ── root render ── */
   return (
     <>
       <style>{`
@@ -1244,8 +1360,12 @@ export default function DepositPage() {
           {/* Main card */}
           <div style={{ background: "#141414", borderRadius: 16, overflow: "visible", border: "1px solid rgba(255,255,255,0.07)", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", animation: "_fadeUp 0.5s ease" }}>
             <div style={{ padding: "20px 20px 24px" }}>
-              <CountryDropdown />
-              {country && country.gateways.length > 1 && <GatewayTabs />}
+
+              <CountryDropdown country={country} ipDetecting={ipDetecting} onSelect={handleSelectCountry} />
+
+              {country && country.gateways.length > 1 && (
+                <GatewayTabs country={country} gateway={gateway} onSelect={selectGateway} />
+              )}
 
               {country && gateway && (
                 <div style={{ marginBottom: 18 }}>
@@ -1290,6 +1410,7 @@ export default function DepositPage() {
             {" · "}
             <a href="/privacy" style={{ color: "rgba(245,245,240,0.28)", textDecoration: "underline" }}>Privacy Policy</a>
           </div>
+
         </div>
       </div>
     </>
