@@ -30,7 +30,7 @@ import VisibilityIcon         from '@mui/icons-material/Visibility';
 import VisibilityOffIcon      from '@mui/icons-material/VisibilityOff';
 
 // ---------------------------------------------------------------------------
-// Currency detection
+// Currency detection — symbol only, no exchange rate
 // ---------------------------------------------------------------------------
 
 interface CurrencyInfo {
@@ -38,37 +38,36 @@ interface CurrencyInfo {
   symbol: string;
   countryCode: string;
   name: string;
-  rateFromGhs: number;
+  // NO rateFromGhs — symbol only, amounts always displayed as-is
 }
 
 const COUNTRY_CURRENCY: Record<string, { code: string; symbol: string; name: string }> = {
-  GH: { code: 'GHS', symbol: 'GH₵', name: 'Ghanaian Cedi' },
-  NG: { code: 'NGN', symbol: '₦',   name: 'Nigerian Naira' },
-  KE: { code: 'KES', symbol: 'KSh', name: 'Kenyan Shilling' },
-  TZ: { code: 'TZS', symbol: 'TSh', name: 'Tanzanian Shilling' },
-  UG: { code: 'UGX', symbol: 'USh', name: 'Ugandan Shilling' },
-  ZA: { code: 'ZAR', symbol: 'R',   name: 'South African Rand' },
-  EG: { code: 'EGP', symbol: 'E£',  name: 'Egyptian Pound' },
-  ET: { code: 'ETB', symbol: 'Br',  name: 'Ethiopian Birr' },
-  SN: { code: 'XOF', symbol: 'CFA', name: 'West African CFA Franc' },
-  CI: { code: 'XOF', symbol: 'CFA', name: 'West African CFA Franc' },
+  GH: { code: 'GHS', symbol: 'GH₵',  name: 'Ghanaian Cedi' },
+  NG: { code: 'NGN', symbol: '₦',    name: 'Nigerian Naira' },
+  KE: { code: 'KES', symbol: 'KSh',  name: 'Kenyan Shilling' },
+  TZ: { code: 'TZS', symbol: 'TSh',  name: 'Tanzanian Shilling' },
+  UG: { code: 'UGX', symbol: 'USh',  name: 'Ugandan Shilling' },
+  ZA: { code: 'ZAR', symbol: 'R',    name: 'South African Rand' },
+  EG: { code: 'EGP', symbol: 'E£',   name: 'Egyptian Pound' },
+  ET: { code: 'ETB', symbol: 'Br',   name: 'Ethiopian Birr' },
+  SN: { code: 'XOF', symbol: 'CFA',  name: 'West African CFA Franc' },
+  CI: { code: 'XOF', symbol: 'CFA',  name: 'West African CFA Franc' },
   CM: { code: 'XAF', symbol: 'FCFA', name: 'Central African CFA Franc' },
-  ZM: { code: 'ZMW', symbol: 'ZK',  name: 'Zambian Kwacha' },
-  ZW: { code: 'ZWL', symbol: 'Z$',  name: 'Zimbabwean Dollar' },
-  RW: { code: 'RWF', symbol: 'FRw', name: 'Rwandan Franc' },
-  MW: { code: 'MWK', symbol: 'MK',  name: 'Malawian Kwacha' },
-  MZ: { code: 'MZN', symbol: 'MT',  name: 'Mozambican Metical' },
-  GB: { code: 'GBP', symbol: '£',   name: 'British Pound' },
-  DE: { code: 'EUR', symbol: '€',   name: 'Euro' },
-  FR: { code: 'EUR', symbol: '€',   name: 'Euro' },
-  US: { code: 'USD', symbol: '$',   name: 'US Dollar' },
-  CA: { code: 'CAD', symbol: 'CA$', name: 'Canadian Dollar' },
-  AU: { code: 'AUD', symbol: 'A$',  name: 'Australian Dollar' },
+  ZM: { code: 'ZMW', symbol: 'ZK',   name: 'Zambian Kwacha' },
+  ZW: { code: 'ZWL', symbol: 'Z$',   name: 'Zimbabwean Dollar' },
+  RW: { code: 'RWF', symbol: 'FRw',  name: 'Rwandan Franc' },
+  MW: { code: 'MWK', symbol: 'MK',   name: 'Malawian Kwacha' },
+  MZ: { code: 'MZN', symbol: 'MT',   name: 'Mozambican Metical' },
+  GB: { code: 'GBP', symbol: '£',    name: 'British Pound' },
+  DE: { code: 'EUR', symbol: '€',    name: 'Euro' },
+  FR: { code: 'EUR', symbol: '€',    name: 'Euro' },
+  US: { code: 'USD', symbol: '$',    name: 'US Dollar' },
+  CA: { code: 'CAD', symbol: 'CA$',  name: 'Canadian Dollar' },
+  AU: { code: 'AUD', symbol: 'A$',   name: 'Australian Dollar' },
 };
 
 const DEFAULT_CURRENCY: CurrencyInfo = {
-  code: 'GHS', symbol: 'GH₵', name: 'Ghanaian Cedi',
-  countryCode: 'GH', rateFromGhs: 1,
+  code: 'GHS', symbol: 'GH₵', name: 'Ghanaian Cedi', countryCode: 'GH',
 };
 
 let _currencyCache: CurrencyInfo | null = null;
@@ -94,33 +93,14 @@ async function detectCurrencyInfo(): Promise<CurrencyInfo> {
   }
   const localCurrency = countryCode ? COUNTRY_CURRENCY[countryCode] : undefined;
   if (!localCurrency) { _currencyCache = DEFAULT_CURRENCY; return DEFAULT_CURRENCY; }
-  let rateFromGhs = 1;
-  if (localCurrency.code !== 'GHS') {
-    try {
-      const res = await fetch('https://open.er-api.com/v6/latest/GHS', { signal: AbortSignal.timeout(5000) });
-      if (res.ok) { const d = await res.json(); rateFromGhs = d.rates?.[localCurrency.code] ?? 1; }
-    } catch { /* fall through */ }
-    if (rateFromGhs === 1) {
-      try {
-        const res = await fetch(`https://api.exchangerate.host/convert?from=GHS&to=${localCurrency.code}&amount=1`, { signal: AbortSignal.timeout(5000) });
-        if (res.ok) { const d = await res.json(); if (d.success && d.result) rateFromGhs = d.result; }
-      } catch { /* fall through */ }
-    }
-  }
-  _currencyCache = { code: localCurrency.code, symbol: localCurrency.symbol, name: localCurrency.name, countryCode, rateFromGhs };
+  // No exchange rate fetch — just return symbol info
+  _currencyCache = { code: localCurrency.code, symbol: localCurrency.symbol, name: localCurrency.name, countryCode };
   return _currencyCache;
 }
 
+// Display raw GHS amount with the local currency symbol — no conversion math
 function formatCurrency(amountInGhs: number, currency: CurrencyInfo): string {
-  const converted = amountInGhs * currency.rateFromGhs;
-  try {
-    return new Intl.NumberFormat('en', {
-      style: 'currency', currency: currency.code,
-      minimumFractionDigits: 2, maximumFractionDigits: 2,
-    }).format(converted);
-  } catch {
-    return `${currency.symbol} ${converted.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  }
+  return `${currency.symbol} ${amountInGhs.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -316,10 +296,10 @@ export default function AccountPage() {
       ? (walletData.availableBalance as number)
       : 0;
 
-  const affBalanceGhs         = affiliateBalance?.balance ?? 0;
-  const affLifetimeGhs        = affiliateBalance?.lifetimeCommission ?? 0;
-  const affTotalReferrals     = affiliateBalance?.totalReferrals ?? 0;
-  const balanceReady          = !currencyLoading;
+  const affBalanceGhs     = affiliateBalance?.balance ?? 0;
+  const affLifetimeGhs    = affiliateBalance?.lifetimeCommission ?? 0;
+  const affTotalReferrals = affiliateBalance?.totalReferrals ?? 0;
+  const balanceReady      = !currencyLoading;
 
   // Handlers
   const saveProfile = async () => {
@@ -352,7 +332,6 @@ export default function AccountPage() {
     navigate('/');
   };
 
-  // Shared input style matching WalletPage
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '12px 16px', borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
@@ -371,7 +350,6 @@ export default function AccountPage() {
 
           {/* Profile identity row */}
           <div className="flex items-center gap-3.5 px-4 pt-5 pb-4">
-            {/* Avatar */}
             <div className="relative shrink-0">
               <div
                 className="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-lg font-bold select-none"
@@ -379,9 +357,7 @@ export default function AccountPage() {
               >
                 {getUserInitials(displayName)}
               </div>
-              <span
-                className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-black bg-red-600"
-              />
+              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-black bg-red-600" />
             </div>
 
             <div className="flex-1 min-w-0">
@@ -393,9 +369,7 @@ export default function AccountPage() {
               ) : (
                 <>
                   <div className="flex items-center gap-2">
-                    <h1 className="font-bold text-base leading-tight truncate text-white">
-                      {displayName}
-                    </h1>
+                    <h1 className="font-bold text-base leading-tight truncate text-white">{displayName}</h1>
                     <ChevronRightIcon sx={{ fontSize: 14 }} className="text-white/30" />
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
@@ -405,15 +379,10 @@ export default function AccountPage() {
               )}
             </div>
 
-            {/* Loyalty + refresh */}
             <div className="flex items-center gap-2 shrink-0">
               <span
                 className="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider"
-                style={{
-                  backgroundColor: 'rgba(220,38,38,0.15)',
-                  color: '#ef4444',
-                  border: '1px solid rgba(220,38,38,0.3)',
-                }}
+                style={{ backgroundColor: 'rgba(220,38,38,0.15)', color: '#ef4444', border: '1px solid rgba(220,38,38,0.3)' }}
               >
                 {loyaltyTier ?? roleLabel}
               </span>
@@ -456,10 +425,7 @@ export default function AccountPage() {
             {/* Main Balance Card */}
             <div
               className="rounded-3xl p-5 overflow-hidden relative"
-              style={{
-                background: 'linear-gradient(135deg, #1a0000 0%, #2d0000 50%, #440000 100%)',
-                border: '1px solid rgba(220,38,38,0.25)',
-              }}
+              style={{ background: 'linear-gradient(135deg, #1a0000 0%, #2d0000 50%, #440000 100%)', border: '1px solid rgba(220,38,38,0.25)' }}
             >
               <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full opacity-10" style={{ backgroundColor: '#dc2626' }} />
               <div className="absolute -bottom-12 -left-4 w-32 h-32 rounded-full opacity-5" style={{ backgroundColor: '#dc2626' }} />
@@ -509,15 +475,10 @@ export default function AccountPage() {
 
             {/* Affiliate / Referral Card — ADMIN ONLY */}
             {isAdmin && (
-              <div
-                className="rounded-3xl p-5"
-                style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.08)' }}
-              >
+              <div className="rounded-3xl p-5" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-white/40 mb-0.5">
-                      Referral Earnings
-                    </p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-white/40 mb-0.5">Referral Earnings</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button onClick={() => setShowAffBalance(v => !v)} className="text-white/30 hover:text-white transition-colors">
@@ -543,11 +504,8 @@ export default function AccountPage() {
                     { icon: <PeopleAltIcon sx={{ fontSize: 18 }} style={{ color: '#ef4444' }} />, label: 'Referrals', val: walletLoading ? '…' : String(affTotalReferrals), color: '#ef4444' },
                     { icon: <AccountBalanceWalletIcon sx={{ fontSize: 18 }} style={{ color: '#ffffff' }} />, label: 'Available', val: walletLoading || !balanceReady ? '…' : formatCurrency(affBalanceGhs, currency), color: '#ffffff' },
                   ].map(stat => (
-                    <div
-                      key={stat.label}
-                      className="rounded-2xl p-3 text-center"
-                      style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-                    >
+                    <div key={stat.label} className="rounded-2xl p-3 text-center"
+                      style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
                       <div className="flex justify-center mb-1">{stat.icon}</div>
                       <p className="text-[9px] text-white/30 mb-0.5">{stat.label}</p>
                       <p className="text-[11px] font-bold" style={{ color: stat.color }}>{stat.val}</p>
@@ -567,14 +525,9 @@ export default function AccountPage() {
             )}
 
             {/* Recent Transactions */}
-            <div
-              className="rounded-3xl p-5"
-              style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.08)' }}
-            >
+            <div className="rounded-3xl p-5" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.08)' }}>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-[10px] font-black uppercase tracking-widest text-white/30">
-                  Recent Transactions
-                </h2>
+                <h2 className="text-[10px] font-black uppercase tracking-widest text-white/30">Recent Transactions</h2>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={fetchWallet}
@@ -583,11 +536,7 @@ export default function AccountPage() {
                   >
                     <RefreshIcon sx={{ fontSize: 15 }} />
                   </button>
-                  <Link
-                    to="/wallet"
-                    className="text-[11px] font-bold hover:underline"
-                    style={{ color: '#ef4444' }}
-                  >
+                  <Link to="/wallet" className="text-[11px] font-bold hover:underline" style={{ color: '#ef4444' }}>
                     View all
                   </Link>
                 </div>
@@ -595,11 +544,7 @@ export default function AccountPage() {
 
               {walletLoading || !balanceReady ? (
                 [1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3 py-3.5"
-                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-                  >
+                  <div key={i} className="flex items-center gap-3 py-3.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                     <Skeleton w="w-9 h-9 rounded-full shrink-0" h="h-9" />
                     <div className="flex-1 space-y-2">
                       <Skeleton w="w-28" h="h-4" />
@@ -618,15 +563,10 @@ export default function AccountPage() {
                   const credit = isCredit(tx.kind);
                   const isLast = idx === transactions.length - 1;
                   return (
-                    <div
-                      key={tx.id}
-                      className="flex items-center gap-3 py-3.5"
-                      style={!isLast ? { borderBottom: '1px solid rgba(255,255,255,0.04)' } : {}}
-                    >
-                      <div
-                        className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: credit ? 'rgba(255,255,255,0.08)' : 'rgba(220,38,38,0.15)' }}
-                      >
+                    <div key={tx.id} className="flex items-center gap-3 py-3.5"
+                      style={!isLast ? { borderBottom: '1px solid rgba(255,255,255,0.04)' } : {}}>
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: credit ? 'rgba(255,255,255,0.08)' : 'rgba(220,38,38,0.15)' }}>
                         {credit
                           ? <SouthWestIcon sx={{ fontSize: 16 }} style={{ color: '#ffffff' }} />
                           : <NorthEastIcon sx={{ fontSize: 16 }} style={{ color: '#ef4444' }} />}
@@ -636,10 +576,7 @@ export default function AccountPage() {
                         <p className="text-xs text-white/30 mt-0.5">{formatDate(tx.createdAt)}</p>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <p
-                          className="text-sm font-bold tabular-nums"
-                          style={{ color: credit ? '#ffffff' : '#ef4444' }}
-                        >
+                        <p className="text-sm font-bold tabular-nums" style={{ color: credit ? '#ffffff' : '#ef4444' }}>
                           {credit ? '+' : '-'}{formatCurrency(tx.amount, currency)}
                         </p>
                         <p className="text-[11px] text-white/25 mt-0.5">
@@ -653,10 +590,7 @@ export default function AccountPage() {
             </div>
 
             {/* KYC */}
-            <div
-              className="rounded-3xl p-5"
-              style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.08)' }}
-            >
+            <div className="rounded-3xl p-5" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.08)' }}>
               <div className="flex items-center gap-2 mb-4">
                 <VerifiedUserIcon sx={{ fontSize: 16 }} style={{ color: '#ef4444' }} />
                 <h2 className="text-[10px] font-black uppercase tracking-widest text-white/30">KYC Verification</h2>
@@ -713,25 +647,14 @@ export default function AccountPage() {
 
         {/* ─── PROFILE TAB ─── */}
         {activeTab === 'profile' && (
-          <div
-            className="rounded-3xl overflow-hidden"
-            style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.08)' }}
-          >
-            {/* Header */}
-            <div
-              className="flex items-center justify-between px-5 py-4"
-              style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
-            >
+          <div className="rounded-3xl overflow-hidden" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
               <div className="flex items-center gap-2">
                 <PersonIcon sx={{ fontSize: 16 }} style={{ color: '#ef4444' }} />
                 <span className="text-[10px] font-black uppercase tracking-widest text-white/30">Personal Info</span>
               </div>
               {!editMode && (
-                <button
-                  onClick={() => setEditMode(true)}
-                  className="flex items-center gap-1 text-xs font-bold"
-                  style={{ color: '#ef4444' }}
-                >
+                <button onClick={() => setEditMode(true)} className="flex items-center gap-1 text-xs font-bold" style={{ color: '#ef4444' }}>
                   <EditIcon sx={{ fontSize: 13 }} />
                   Edit
                 </button>
@@ -758,9 +681,7 @@ export default function AccountPage() {
                   ))}
                 </div>
                 <div>
-                  <label className="block text-xs font-bold mb-1.5 uppercase tracking-wider text-white/40">
-                    Phone Number
-                  </label>
+                  <label className="block text-xs font-bold mb-1.5 uppercase tracking-wider text-white/40">Phone Number</label>
                   <input
                     type="tel"
                     value={editForm.phone}
@@ -771,9 +692,7 @@ export default function AccountPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold mb-1.5 uppercase tracking-wider text-white/40">
-                    Country
-                  </label>
+                  <label className="block text-xs font-bold mb-1.5 uppercase tracking-wider text-white/40">Country</label>
                   <input
                     type="text"
                     value={editForm.country}
@@ -808,11 +727,8 @@ export default function AccountPage() {
               <div>
                 {profileLoading
                   ? [1, 2, 3, 4, 5].map((i) => (
-                      <div
-                        key={i}
-                        className="flex justify-between items-center px-5 py-3.5"
-                        style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-                      >
+                      <div key={i} className="flex justify-between items-center px-5 py-3.5"
+                        style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                         <Skeleton w="w-20" h="h-3.5" />
                         <Skeleton w="w-28" h="h-3.5" />
                       </div>
@@ -826,11 +742,8 @@ export default function AccountPage() {
                         { label: 'Country',   value: apiCountry  || '—' },
                         { label: 'Role',      value: roleLabel },
                       ].map(({ label, value }, idx, arr) => (
-                        <div
-                          key={label}
-                          className="flex items-center justify-between px-5 py-3.5"
-                          style={idx < arr.length - 1 ? { borderBottom: '1px solid rgba(255,255,255,0.04)' } : {}}
-                        >
+                        <div key={label} className="flex items-center justify-between px-5 py-3.5"
+                          style={idx < arr.length - 1 ? { borderBottom: '1px solid rgba(255,255,255,0.04)' } : {}}>
                           <span className="text-sm text-white/40">{label}</span>
                           <span className="text-sm font-semibold text-white ml-4 truncate">{value}</span>
                         </div>
@@ -846,14 +759,8 @@ export default function AccountPage() {
         {activeTab === 'preferences' && (
           <>
             {/* Notifications */}
-            <div
-              className="rounded-3xl overflow-hidden"
-              style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.08)' }}
-            >
-              <div
-                className="flex items-center gap-2 px-5 py-4"
-                style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
-              >
+            <div className="rounded-3xl overflow-hidden" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div className="flex items-center gap-2 px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <NotificationsIcon sx={{ fontSize: 16 }} style={{ color: '#ef4444' }} />
                 <span className="text-[10px] font-black uppercase tracking-widest text-white/30">Notifications</span>
               </div>
@@ -864,28 +771,19 @@ export default function AccountPage() {
                   { key: 'email', label: 'Email Notifications', sub: 'Updates sent to your inbox' },
                 ] as const
               ).map(({ key, label, sub }, idx, arr) => (
-                <div
-                  key={key}
-                  className="flex items-center justify-between px-5 py-3.5 gap-3"
-                  style={idx < arr.length - 1 ? { borderBottom: '1px solid rgba(255,255,255,0.04)' } : {}}
-                >
+                <div key={key} className="flex items-center justify-between px-5 py-3.5 gap-3"
+                  style={idx < arr.length - 1 ? { borderBottom: '1px solid rgba(255,255,255,0.04)' } : {}}>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-white">{label}</p>
                     <p className="text-xs mt-0.5 text-white/40">{sub}</p>
                   </div>
-                  <Toggle
-                    checked={notifications[key]}
-                    onChange={() => setNotifications((p) => ({ ...p, [key]: !p[key] }))}
-                  />
+                  <Toggle checked={notifications[key]} onChange={() => setNotifications((p) => ({ ...p, [key]: !p[key] }))} />
                 </div>
               ))}
             </div>
 
             {/* Responsible Gambling */}
-            <div
-              className="rounded-3xl p-5"
-              style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.08)' }}
-            >
+            <div className="rounded-3xl p-5" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.08)' }}>
               <div className="flex items-center gap-2 mb-5">
                 <VerifiedUserIcon sx={{ fontSize: 16 }} style={{ color: '#ef4444' }} />
                 <span className="text-[10px] font-black uppercase tracking-widest text-white/30">Responsible Gambling</span>
@@ -927,11 +825,7 @@ export default function AccountPage() {
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.75rem' }}>
                   <button
                     className="w-full py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.97]"
-                    style={{
-                      color: '#ef4444',
-                      backgroundColor: 'rgba(220,38,38,0.08)',
-                      border: '1px solid rgba(220,38,38,0.25)',
-                    }}
+                    style={{ color: '#ef4444', backgroundColor: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)' }}
                   >
                     Self-Exclusion
                   </button>
@@ -943,11 +837,7 @@ export default function AccountPage() {
             <button
               onClick={handleLogout}
               className="w-full py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.97]"
-              style={{
-                color: '#ef4444',
-                backgroundColor: 'rgba(220,38,38,0.08)',
-                border: '1px solid rgba(220,38,38,0.25)',
-              }}
+              style={{ color: '#ef4444', backgroundColor: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)' }}
             >
               <LogoutIcon fontSize="small" />
               Sign Out
