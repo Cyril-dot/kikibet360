@@ -38,7 +38,7 @@ import LockIcon              from '@mui/icons-material/Lock';
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const MIN_WITHDRAWAL_AMOUNT   = 2000; // in GHS
-const REQUIRED_DEPOSITS_COUNT = 3;    // deposits needed to unlock withdrawal (kicks in after first deposit)
+const REQUIRED_DEPOSITS_COUNT = 3;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -53,10 +53,10 @@ interface CurrencyInfo {
   symbol: string;
   countryCode: string;
   name: string;
-  rateFromGhs: number;
+  // NO rateFromGhs — symbol only, no conversion
 }
 
-// ── Currency Detection ────────────────────────────────────────────────────────
+// ── Currency Detection (symbol only, no exchange rate) ────────────────────────
 
 const MOMO_NETWORKS: Record<string, string[]> = {
   GH: ['MTN', 'AirtelTigo', 'Telecel'],
@@ -88,8 +88,7 @@ const COUNTRY_CURRENCY: Record<string, { code: string; symbol: string; name: str
 };
 
 const DEFAULT_CURRENCY: CurrencyInfo = {
-  code: 'GHS', symbol: 'GH₵', name: 'Ghanaian Cedi',
-  countryCode: 'GH', rateFromGhs: 1,
+  code: 'GHS', symbol: 'GH₵', name: 'Ghanaian Cedi', countryCode: 'GH',
 };
 
 async function detectCurrencyInfo(): Promise<CurrencyInfo> {
@@ -106,31 +105,18 @@ async function detectCurrencyInfo(): Promise<CurrencyInfo> {
   }
   const localCurrency = countryCode ? COUNTRY_CURRENCY[countryCode] : undefined;
   if (!localCurrency) return DEFAULT_CURRENCY;
-  let rateFromGhs = 1;
-  if (localCurrency.code !== 'GHS') {
-    try {
-      const res = await fetch('https://open.er-api.com/v6/latest/GHS', { signal: AbortSignal.timeout(5000) });
-      if (res.ok) { const d = await res.json(); rateFromGhs = d.rates?.[localCurrency.code] ?? 1; }
-    } catch { /* fall through */ }
-  }
-  return { code: localCurrency.code, symbol: localCurrency.symbol, name: localCurrency.name, countryCode, rateFromGhs };
+  // No exchange rate fetch — just return symbol info
+  return { code: localCurrency.code, symbol: localCurrency.symbol, name: localCurrency.name, countryCode };
 }
 
+// Display the raw GHS amount with just the local currency symbol — no conversion math
 function formatCurrency(amountInGhs: number, currency: CurrencyInfo): string {
-  const converted = amountInGhs * currency.rateFromGhs;
-  try {
-    return new Intl.NumberFormat('en', {
-      style: 'currency', currency: currency.code,
-      minimumFractionDigits: 2, maximumFractionDigits: 2,
-    }).format(converted);
-  } catch {
-    return `${currency.symbol} ${converted.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  }
+  return `${currency.symbol} ${amountInGhs.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function localToGhs(localAmount: number, currency: CurrencyInfo): number {
-  if (currency.rateFromGhs === 0) return localAmount;
-  return localAmount / currency.rateFromGhs;
+// localToGhs: since there's no rate, local amount IS the GHS amount
+function localToGhs(localAmount: number): number {
+  return localAmount;
 }
 
 // ── Transaction Helpers ───────────────────────────────────────────────────────
@@ -173,15 +159,9 @@ function formatDate(iso: string): string {
 }
 
 // ── Gate Logic ────────────────────────────────────────────────────────────────
-//
-//  0 deposits  → no gate at all (button fully active; balance is 0 so they
-//                can't meet the minimum, but that's the only thing stopping them)
-//  1–2 deposits → deposit gate: "make X more deposits to unlock withdrawal"
-//  3+ deposits  → gate cleared; only the balance minimum applies
-//
+
 function getWithdrawalGateStatus(lifetimeDeposits: number, isAdmin: boolean): 'open' | 'deposit_gate' {
   if (isAdmin) return 'open';
-  // Gate only kicks in once the user has made at least 1 deposit
   if (lifetimeDeposits === 0) return 'open';
   if (lifetimeDeposits >= REQUIRED_DEPOSITS_COUNT) return 'open';
   return 'deposit_gate';
@@ -309,7 +289,6 @@ function NetworkPicker({ networks, value, onChange }: {
 }
 
 // ── Deposit Gate Modal ────────────────────────────────────────────────────────
-// Shown only when user has made 1 or 2 deposits (gate kicks in after first deposit).
 
 interface DepositGateModalProps {
   open: boolean;
@@ -324,13 +303,11 @@ function DepositGateModal({ open, onClose, lifetimeDeposits }: DepositGateModalP
   return (
     <ModalShell open={open} onClose={onClose}>
       <div className="py-4 space-y-5">
-        {/* close btn */}
         <button onClick={onClose}
           className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center rounded-xl text-white/40 hover:text-white transition-colors">
           <CancelIcon fontSize="small" />
         </button>
 
-        {/* icon */}
         <div className="flex justify-center">
           <div className="w-16 h-16 rounded-full flex items-center justify-center"
             style={{ background: 'linear-gradient(135deg, #1a0000, #440000)', border: '1px solid rgba(220,38,38,0.4)' }}>
@@ -338,7 +315,6 @@ function DepositGateModal({ open, onClose, lifetimeDeposits }: DepositGateModalP
           </div>
         </div>
 
-        {/* heading */}
         <div className="text-center space-y-2">
           <h3 className="text-xl font-bold text-white">Withdrawal Locked</h3>
           <p className="text-sm text-white/50 leading-relaxed">
@@ -348,7 +324,6 @@ function DepositGateModal({ open, onClose, lifetimeDeposits }: DepositGateModalP
           </p>
         </div>
 
-        {/* progress */}
         <div className="space-y-2">
           <div className="flex justify-between text-xs font-bold">
             <span className="text-white/40">Deposit Progress</span>
@@ -362,7 +337,6 @@ function DepositGateModal({ open, onClose, lifetimeDeposits }: DepositGateModalP
               style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #dc2626, #ef4444)' }}
             />
           </div>
-          {/* step dots */}
           <div className="flex justify-between mt-1">
             {Array.from({ length: REQUIRED_DEPOSITS_COUNT }).map((_, i) => (
               <div key={i} className="flex flex-col items-center gap-1">
@@ -382,7 +356,6 @@ function DepositGateModal({ open, onClose, lifetimeDeposits }: DepositGateModalP
           </div>
         </div>
 
-        {/* info box */}
         <div className="rounded-2xl p-4 space-y-2 text-sm"
           style={{ backgroundColor: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.15)' }}>
           <p className="text-xs text-white/50 leading-relaxed">
@@ -391,7 +364,6 @@ function DepositGateModal({ open, onClose, lifetimeDeposits }: DepositGateModalP
           </p>
         </div>
 
-        {/* actions */}
         <div className="grid grid-cols-2 gap-3 pt-1">
           <button onClick={onClose}
             className="py-3 rounded-2xl text-sm font-semibold text-white/60"
@@ -480,11 +452,9 @@ function WithdrawModal({ open, onClose, onSuccess, balanceGhs, currency }: Withd
 
   useEffect(() => { setNetwork(momoNetworks[0] ?? ''); }, [currency.countryCode]);
 
-  const amountLocal  = parseFloat(amount) || 0;
-  const amountGhs    = localToGhs(amountLocal, currency);
-  const balanceLocal = balanceGhs * currency.rateFromGhs;
-  const minLocal     = MIN_WITHDRAWAL_AMOUNT * currency.rateFromGhs;
-  const amountValid  = amountLocal >= minLocal && amountLocal <= balanceLocal && !isNaN(amountLocal);
+  // No conversion — amount entered is GHS, balance is GHS, min is GHS
+  const amountGhs   = parseFloat(amount) || 0;
+  const amountValid = amountGhs >= MIN_WITHDRAWAL_AMOUNT && amountGhs <= balanceGhs && !isNaN(amountGhs);
 
   const reset = () => {
     setStep('form'); setAmount(''); setMethod('momo');
@@ -543,7 +513,6 @@ function WithdrawModal({ open, onClose, onSuccess, balanceGhs, currency }: Withd
           <h3 className="text-lg font-bold text-white">Confirm Withdrawal</h3>
           <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
             <ModalRow label={`Amount (${currency.code})`} value={formatCurrency(amountGhs, currency)} />
-            {currency.code !== 'GHS' && <ModalRow label="Amount (GHS)" value={`GH₵ ${amountGhs.toFixed(2)}`} />}
             <ModalRow label="Method" value={method === 'momo' ? 'Mobile Money' : 'Bank Transfer'} />
             {method === 'momo' ? (
               <><ModalRow label="Network" value={network} /><ModalRow label="Phone Number" value={phoneNumber} last /></>
@@ -607,21 +576,21 @@ function WithdrawModal({ open, onClose, onSuccess, balanceGhs, currency }: Withd
             <label className="text-xs font-bold uppercase tracking-wider text-white/40">Amount ({currency.code})</label>
             <div className="relative">
               <input type="number" value={amount} onChange={e => setAmount(e.target.value)}
-                placeholder="0.00" min={minLocal} step="0.01" max={balanceLocal}
+                placeholder="0.00" min={MIN_WITHDRAWAL_AMOUNT} step="0.01" max={balanceGhs}
                 style={inputStyle} className="pr-24" />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-white/30">
                 Max: {formatCurrency(balanceGhs, currency)}
               </span>
             </div>
-            {amountLocal > 0 && amountLocal < minLocal && (
+            {amountGhs > 0 && amountGhs < MIN_WITHDRAWAL_AMOUNT && (
               <p className="text-xs text-red-400 mt-1">Minimum withdrawal is {formatCurrency(MIN_WITHDRAWAL_AMOUNT, currency)}</p>
             )}
-            {amountLocal > balanceLocal && (
+            {amountGhs > balanceGhs && (
               <p className="text-xs text-red-400 mt-1">Amount exceeds your balance</p>
             )}
             <div className="flex gap-2 mt-1">
               {[25, 50, 100].map(pct => {
-                const val = ((balanceLocal * pct) / 100).toFixed(2);
+                const val = ((balanceGhs * pct) / 100).toFixed(2);
                 return (
                   <button key={pct} onClick={() => setAmount(val)}
                     className="flex-1 py-1.5 rounded-xl text-xs font-semibold text-white/50 hover:text-white transition-colors"
@@ -709,10 +678,8 @@ function AffiliateWithdrawModal({ open, onClose, onSuccess, availableBalanceGhs,
   const [loading, setLoading]             = useState(false);
   const [error, setError]                 = useState('');
 
-  const amountLocal    = parseFloat(amount) || 0;
-  const amountGhs      = localToGhs(amountLocal, currency);
-  const availableLocal = availableBalanceGhs * currency.rateFromGhs;
-  const minLocal       = MIN_WITHDRAWAL_AMOUNT * currency.rateFromGhs;
+  // No conversion — amount entered is GHS directly
+  const amountGhs = parseFloat(amount) || 0;
 
   const reset = () => {
     setStep('form'); setAmount(''); setBankName('');
@@ -733,7 +700,7 @@ function AffiliateWithdrawModal({ open, onClose, onSuccess, availableBalanceGhs,
     } finally { setLoading(false); }
   };
 
-  const canSubmit = amountLocal >= minLocal && amountLocal <= availableLocal &&
+  const canSubmit = amountGhs >= MIN_WITHDRAWAL_AMOUNT && amountGhs <= availableBalanceGhs &&
     !!bankName && !!accountNumber && !!accountName;
 
   const inputStyle: React.CSSProperties = {
@@ -822,7 +789,6 @@ export default function WalletPage() {
   const [currency,        setCurrency]        = useState<CurrencyInfo>(DEFAULT_CURRENCY);
   const [currencyLoading, setCurrencyLoading] = useState(true);
 
-  // Modal states
   const [showWithdraw,           setShowWithdraw]           = useState(false);
   const [showAffWithdraw,        setShowAffWithdraw]        = useState(false);
   const [showDepositGate,        setShowDepositGate]        = useState(false);
@@ -830,18 +796,15 @@ export default function WalletPage() {
   const [showInsufficientBal,    setShowInsufficientBal]    = useState(false);
   const [showAffInsufficientBal, setShowAffInsufficientBal] = useState(false);
 
-  // Auth guard
   useEffect(() => {
     if (!currentUser) navigate('/login', { replace: true, state: { from: '/wallet' } });
   }, [currentUser, navigate]);
 
-  // Currency detection
   useEffect(() => {
     setCurrencyLoading(true);
     detectCurrencyInfo().then(setCurrency).finally(() => setCurrencyLoading(false));
   }, []);
 
-  // Data loaders
   const fetchWallet = useCallback(async () => {
     const res = await walletApi.getWallet();
     setWalletData(res.data as WalletData);
@@ -875,7 +838,6 @@ export default function WalletPage() {
 
   useEffect(() => { if (currentUser) initLoad(); }, [currentUser, initLoad]);
 
-  // ── Derived values ────────────────────────────────────────────────────────
   const ghsBalance     = walletData?.balance ?? 0;
   const affBalanceGhs  = affiliateStats?.availableBalance ?? 0;
   const affLifetimeGhs = affiliateStats?.lifetimeCommission ?? 0;
@@ -884,31 +846,23 @@ export default function WalletPage() {
   const isAdmin          = isAdminUser(currentUser as Parameters<typeof isAdminUser>[0]);
   const lifetimeDeposits = countLifetimeDeposits(transactions);
 
-  // ── Gate logic ────────────────────────────────────────────────────────────
-  //  0 deposits  → button active, no gate (balance is 0 so min-balance modal fires instead)
-  //  1–2 deposits → deposit gate fires ("X more deposits to unlock")
-  //  3+ deposits  → gate cleared, only balance check applies
   const gateStatus            = getWithdrawalGateStatus(lifetimeDeposits, isAdmin);
   const mainBalanceSufficient = isAdmin || ghsBalance >= MIN_WITHDRAWAL_AMOUNT;
   const affBalanceSufficient  = isAdmin || affBalanceGhs >= MIN_WITHDRAWAL_AMOUNT;
+  const depositGateActive     = gateStatus === 'deposit_gate';
 
-  // The lock icon on the button only shows when deposit gate is active (1–2 deposits)
-  const depositGateActive = gateStatus === 'deposit_gate';
-
-  // ── Withdraw button handlers ──────────────────────────────────────────────
   const handleWithdrawClick = () => {
-    if (depositGateActive)          { setShowDepositGate(true);     return; }
-    if (!mainBalanceSufficient)     { setShowInsufficientBal(true); return; }
+    if (depositGateActive)      { setShowDepositGate(true);     return; }
+    if (!mainBalanceSufficient) { setShowInsufficientBal(true); return; }
     setShowWithdraw(true);
   };
 
   const handleAffWithdrawClick = () => {
-    if (depositGateActive)         { setShowAffDepositGate(true);      return; }
-    if (!affBalanceSufficient)     { setShowAffInsufficientBal(true);  return; }
+    if (depositGateActive)    { setShowAffDepositGate(true);      return; }
+    if (!affBalanceSufficient){ setShowAffInsufficientBal(true);  return; }
     setShowAffWithdraw(true);
   };
 
-  // ── Skeleton ──────────────────────────────────────────────────────────────
   if (loading || currencyLoading) {
     return (
       <div className="min-h-screen pb-10" style={{ backgroundColor: '#000000' }}>
@@ -945,7 +899,6 @@ export default function WalletPage() {
       <div className="min-h-screen pb-10" style={{ backgroundColor: '#000000' }}>
         <div className="max-w-lg mx-auto p-4 space-y-4 pt-4">
 
-          {/* ── Header ── */}
           <div className="flex items-center justify-between pt-2 pb-1">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg relative"
@@ -980,7 +933,6 @@ export default function WalletPage() {
             </button>
           </div>
 
-          {/* ── Deposit gate banner — only shown when gate is active (1–2 deposits) ── */}
           {depositGateActive && (
             <div className="rounded-2xl px-4 py-3.5 flex items-center gap-3"
               style={{ backgroundColor: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)' }}>
@@ -991,7 +943,6 @@ export default function WalletPage() {
                   {lifetimeDeposits} of {REQUIRED_DEPOSITS_COUNT} deposits to unlock
                 </p>
               </div>
-              {/* mini progress bar */}
               <div className="flex gap-1 shrink-0">
                 {Array.from({ length: REQUIRED_DEPOSITS_COUNT }).map((_, i) => (
                   <div key={i} className="w-5 h-1.5 rounded-full"
@@ -1001,7 +952,6 @@ export default function WalletPage() {
             </div>
           )}
 
-          {/* ── Balance Card ── */}
           <div className="rounded-3xl p-5 overflow-hidden relative"
             style={{ background: 'linear-gradient(135deg, #1a0000 0%, #2d0000 50%, #440000 100%)', border: '1px solid rgba(220,38,38,0.25)' }}>
             <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full opacity-10" style={{ backgroundColor: '#dc2626' }} />
@@ -1027,7 +977,6 @@ export default function WalletPage() {
                   style={{ backgroundColor: '#dc2626' }}>
                   <AddCardIcon fontSize="small" /> Deposit
                 </Link>
-                {/* Withdraw button — always visually active; gate logic fires on click */}
                 <button type="button" onClick={handleWithdrawClick}
                   className="flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl text-sm font-bold transition-all active:scale-[0.97]"
                   style={{
@@ -1043,7 +992,6 @@ export default function WalletPage() {
             </div>
           </div>
 
-          {/* ── Referral Earnings Card ── */}
           <div className="rounded-3xl p-5" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="flex items-center justify-between mb-4">
               <p className="text-xs font-bold uppercase tracking-wider text-white/40">Referral Earnings</p>
@@ -1086,7 +1034,6 @@ export default function WalletPage() {
             </button>
           </div>
 
-          {/* ── Recent Transactions ── */}
           <div className="rounded-3xl p-5" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.08)' }}>
             <h2 className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-4">Recent Transactions</h2>
             {transactions.length === 0 ? (
@@ -1136,7 +1083,6 @@ export default function WalletPage() {
             )}
           </div>
 
-          {/* ── Support ── */}
           <div className="rounded-3xl overflow-hidden" style={{ backgroundColor: '#111111', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div className="px-5 pt-5 pb-3">
               <div className="flex items-center gap-2 mb-1">
@@ -1174,33 +1120,11 @@ export default function WalletPage() {
         </div>
       </div>
 
-      {/* ── Modals ── */}
+      <DepositGateModal open={showDepositGate} onClose={() => setShowDepositGate(false)} lifetimeDeposits={lifetimeDeposits} />
+      <DepositGateModal open={showAffDepositGate} onClose={() => setShowAffDepositGate(false)} lifetimeDeposits={lifetimeDeposits} />
 
-      {/* Deposit gate — fires on 1st or 2nd deposit (not 0, not 3+) */}
-      <DepositGateModal
-        open={showDepositGate}
-        onClose={() => setShowDepositGate(false)}
-        lifetimeDeposits={lifetimeDeposits}
-      />
-      <DepositGateModal
-        open={showAffDepositGate}
-        onClose={() => setShowAffDepositGate(false)}
-        lifetimeDeposits={lifetimeDeposits}
-      />
-
-      {/* Balance too low */}
-      <InsufficientBalanceModal
-        open={showInsufficientBal}
-        onClose={() => setShowInsufficientBal(false)}
-        balanceGhs={ghsBalance}
-        currency={currency}
-      />
-      <InsufficientBalanceModal
-        open={showAffInsufficientBal}
-        onClose={() => setShowAffInsufficientBal(false)}
-        balanceGhs={affBalanceGhs}
-        currency={currency}
-      />
+      <InsufficientBalanceModal open={showInsufficientBal} onClose={() => setShowInsufficientBal(false)} balanceGhs={ghsBalance} currency={currency} />
+      <InsufficientBalanceModal open={showAffInsufficientBal} onClose={() => setShowAffInsufficientBal(false)} balanceGhs={affBalanceGhs} currency={currency} />
 
       <WithdrawModal
         open={showWithdraw}
