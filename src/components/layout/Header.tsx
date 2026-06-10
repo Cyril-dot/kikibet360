@@ -1,9 +1,9 @@
 // Bet360 — Header.tsx
 // Auth-responsive: shows wallet balance + avatar when logged in, Join/Login when not
-// Currency: backend stores GH₵. Detected country switches display:
-//   Ghana   → GH₵ (no conversion)
-//   Nigeria → ₦ NGN (live GHS→NGN rate)
-//   Others  → $ USD (live GHS→USD rate)
+// Currency: backend stores GH₵. Country detection changes the symbol only — no conversion.
+//   Ghana   → GH₵
+//   Nigeria → ₦
+//   Others  → $
 
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -11,17 +11,15 @@ import { useAppStore } from '../../store';
 import { wallet as walletApi } from '../../utils/api';
 import type { ApiResponse } from '../../utils/api';
 
-// ─── Currency detection + conversion ─────────────────────────────────────────
+// ─── Currency detection (symbol only, no rate) ────────────────────────────────
 
 type CurrencyInfo = {
   code: 'GHS' | 'NGN' | 'USD';
   symbol: string;
-  rate: number; // how many units per 1 GHS
 };
 
 async function detectCurrency(): Promise<CurrencyInfo> {
-  // 1. Detect country via IP
-  let countryCode = 'GH'; // default to Ghana
+  let countryCode = 'GH';
   try {
     const geoRes = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(4000) });
     if (geoRes.ok) {
@@ -32,46 +30,20 @@ async function detectCurrency(): Promise<CurrencyInfo> {
     // fall through to default
   }
 
-  // Ghana — no conversion needed
-  if (countryCode === 'GH') {
-    return { code: 'GHS', symbol: 'GH₵', rate: 1 };
-  }
-
-  // Nigeria — fetch live GHS→NGN rate
-  if (countryCode === 'NG') {
-    try {
-      const fxRes = await fetch('https://open.er-api.com/v6/latest/GHS', { signal: AbortSignal.timeout(5000) });
-      if (fxRes.ok) {
-        const fx = await fxRes.json();
-        const rate = fx?.rates?.NGN;
-        if (typeof rate === 'number' && rate > 0) {
-          return { code: 'NGN', symbol: '₦', rate };
-        }
-      }
-    } catch { /* fall through */ }
-    // Fallback rate if API fails (~realistic as of 2025)
-    return { code: 'NGN', symbol: '₦', rate: 52 };
-  }
-
-  // All other countries — show USD
-  try {
-    const fxRes = await fetch('https://open.er-api.com/v6/latest/GHS', { signal: AbortSignal.timeout(5000) });
-    if (fxRes.ok) {
-      const fx = await fxRes.json();
-      const rate = fx?.rates?.USD;
-      if (typeof rate === 'number' && rate > 0) {
-        return { code: 'USD', symbol: '$', rate };
-      }
-    }
-  } catch { /* fall through */ }
-  return { code: 'USD', symbol: '$', rate: 0.067 };
+  if (countryCode === 'GH') return { code: 'GHS', symbol: 'GH₵' };
+  if (countryCode === 'NG') return { code: 'NGN', symbol: '₦' };
+  return { code: 'USD', symbol: '$' };
 }
 
 function formatAmount(cedis: number, currency: CurrencyInfo): string {
-  const converted = cedis * currency.rate;
-  if (currency.code === 'GHS') return `GH₵ ${converted.toFixed(2)}`;
-  if (currency.code === 'NGN') return `₦ ${converted.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  return `$ ${converted.toFixed(2)}`;
+  // Always display the raw cedi value — only the symbol changes per country
+  if (currency.code === 'NGN') {
+    return `₦ ${cedis.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  if (currency.code === 'USD') {
+    return `$ ${cedis.toFixed(2)}`;
+  }
+  return `GH₵ ${cedis.toFixed(2)}`;
 }
 
 // ─── Logo ─────────────────────────────────────────────────────────────────────
@@ -228,7 +200,7 @@ export default function Header() {
   const { user, modalOpen, setModalOpen } = useAppStore();
   const isLoggedIn = !!user;
 
-  // Detect country + fetch live rate once on mount
+  // Detect country once on mount — for symbol only, no rate fetching
   useEffect(() => {
     detectCurrency().then(setCurrency);
   }, []);
