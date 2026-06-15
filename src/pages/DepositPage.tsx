@@ -38,17 +38,11 @@ const COUNTRIES: Country[] = [
   { code: "FR", name: "France",         flag: "🇫🇷", flagImg: "https://flagcdn.com/w40/fr.png", currency: "EUR", symbol: "€",    gateways: ["binance"] },
 ];
 
-const MOMO_NETWORKS = [
-  { id: "MTN",        label: "MTN MoMo",        logo: "https://upload.wikimedia.org/wikipedia/commons/2/29/MTN-Logo.png",                                                                                              fallbackBg: "#FFCB00", fallbackInitial: "M"  },
-  { id: "VODAFONE",   label: "Telecel Cash",     logo: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRYqBE5Z2TJCiY6TNe5xgJLiOJLgcxnjyddKw&s",                                                               fallbackBg: "#e30613", fallbackInitial: "T"  },
-  { id: "AIRTELTIGO", label: "AirtelTigo Money", logo: "https://www.gsma.com/get-involved/gsma-membership/wp-content/uploads/2014/06/AirtelTigo-Logo-White-background.png",                                            fallbackBg: "#e2001a", fallbackInitial: "AT" },
-];
-
 const BINANCE_ADDRESS = "TWXJ98mLBTu4MVBRS8ZqtBdvk8D8Frdb6Y";
 const CRYPTO_COINS    = ["USDT", "BTC", "ETH", "BNB", "USDC"];
 const CRYPTO_NETWORKS = ["TRC20", "BEP20", "ERC20", "Arbitrum", "Optimism"];
 
-/* ─── Design Tokens (module-level so stable) ────────────────────────────────── */
+/* ─── Design Tokens ─────────────────────────────────────────────────────────── */
 const T = {
   bg:       "#0a0a0a",
   surface:  "#141414",
@@ -67,7 +61,6 @@ const T = {
   faint:    "rgba(245,245,240,0.06)",
 };
 
-/* ─── Stable style objects (module-level) ───────────────────────────────────── */
 const inp: React.CSSProperties = {
   width: "100%", boxSizing: "border-box",
   background: T.raised, border: `1px solid ${T.border}`,
@@ -101,19 +94,11 @@ const lbl: React.CSSProperties = {
   color: T.dim, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 6,
 };
 
-/* ─── Small helpers (stable, outside main component) ───────────────────────── */
+/* ─── Small helpers ─────────────────────────────────────────────────────────── */
 function FlagImg({ country, size = 24 }: { country: Country; size?: number }) {
   const [err, setErr] = useState(false);
   if (err) return <span style={{ fontSize: size * 0.9 }}>{country.flag}</span>;
   return <img src={country.flagImg} alt={country.name} width={size} height={size * 0.67} onError={() => setErr(true)} style={{ borderRadius: 3, objectFit: "cover", flexShrink: 0 }} />;
-}
-
-function NetworkLogo({ network, size = 32 }: { network: typeof MOMO_NETWORKS[0]; size?: number }) {
-  const [err, setErr] = useState(false);
-  if (err) {
-    return <div style={{ width: size, height: size, borderRadius: 6, background: network.fallbackBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.35, fontWeight: 800, color: "#fff", flexShrink: 0, letterSpacing: "-0.5px" }}>{network.fallbackInitial}</div>;
-  }
-  return <img src={network.logo} alt={network.label} width={size} height={size} onError={() => setErr(true)} style={{ borderRadius: 6, objectFit: "contain", background: "#fff", padding: 3, flexShrink: 0 }} />;
 }
 
 function CopyBtn({ text }: { text: string }) {
@@ -175,11 +160,9 @@ function compressImageToBase64(file: File): Promise<string> {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   STABLE SUB-COMPONENTS  (defined outside DepositPage so they never remount)
-   All mutable state is passed down as props / callbacks.
+   STABLE SUB-COMPONENTS
 ═══════════════════════════════════════════════════════════════════════════════ */
 
-/* ── Trust Badges ── */
 function TrustBadges() {
   return (
     <div style={{ marginBottom: 20 }}>
@@ -428,12 +411,10 @@ function SupportPanel() {
   );
 }
 
-/* ── Moolre Form ── */
+/* ── Moolre Form — NEW: hosted checkout flow ── */
 interface MoolreFormProps {
   error: string;
   amount: string; setAmount: (v: string) => void;
-  phone: string; setPhone: (v: string) => void;
-  momoNet: string; setMomoNet: (v: string) => void;
   loading: boolean;
   country: Country;
   rateFor: (cur: string) => number;
@@ -442,126 +423,100 @@ interface MoolreFormProps {
   localToGhs: (amt: number, cur: string) => number;
   onSubmit: () => void;
 }
-function MoolreForm({ error, amount, setAmount, phone, setPhone, momoNet, setMomoNet, loading, country, rateFor, minLocal, quickAmts, localToGhs, onSubmit }: MoolreFormProps) {
+function MoolreForm({ error, amount, setAmount, loading, country, rateFor, minLocal, quickAmts, localToGhs, onSubmit }: MoolreFormProps) {
   return (
     <div>
       {error && <ErrBox msg={error} />}
       <AmountField amount={amount} setAmount={setAmount} country={country} rateFor={rateFor} minLocal={minLocal} quickAmts={quickAmts} localToGhs={localToGhs} />
-      <div style={{ marginBottom: 18 }}>
-        <label style={lbl}>MoMo Phone Number</label>
-        <div style={{ display: "flex", alignItems: "center", background: T.raised, border: `1px solid ${T.border}`, borderRadius: 10, overflow: "hidden" }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 18, color: T.dim, padding: "0 12px", borderRight: `1px solid ${T.border}`, height: "100%", display: "flex", alignItems: "center" }}>phone</span>
-          <input type="tel" placeholder="0244123456" value={phone} maxLength={10} onChange={e => setPhone(e.target.value)}
-            style={{ ...inp, border: "none", borderRadius: 0, background: "none" }} />
-        </div>
-        <div style={{ fontSize: 11, color: T.dim, marginTop: 5 }}>10 digits starting with 0</div>
+
+      {/* How it works */}
+      <div style={{ background: T.faint, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 14px", marginBottom: 18 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 10 }}>How it works</div>
+        {[
+          { icon: "touch_app",      text: "Tap the button below to generate your payment link" },
+          { icon: "open_in_new",    text: "You'll be redirected to Moolre's secure checkout page" },
+          { icon: "phone_android",  text: "Select your MoMo network and enter your number on their page" },
+          { icon: "check_circle",   text: "Approve the prompt — your wallet is credited automatically" },
+        ].map((s, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: i < 3 ? 8 : 0 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#f87171", flexShrink: 0, marginTop: 1 }}>{s.icon}</span>
+            <span style={{ fontSize: 12, color: T.dim, lineHeight: 1.5 }}>{s.text}</span>
+          </div>
+        ))}
       </div>
-      <div style={{ marginBottom: 18 }}>
-        <label style={lbl}>Network</label>
-        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-          {MOMO_NETWORKS.map(n => (
-            <button key={n.id} onClick={() => setMomoNet(n.id)} style={{ display: "flex", alignItems: "center", gap: 11, background: momoNet === n.id ? T.redLow : T.raised, border: `1px solid ${momoNet === n.id ? T.red : T.border}`, borderRadius: 9, padding: "10px 13px", cursor: "pointer", transition: "all 0.12s", fontFamily: "inherit" }}>
-              <NetworkLogo network={n} size={30} />
-              <span style={{ color: momoNet === n.id ? "#f87171" : T.dim, fontSize: 13, fontWeight: 600, flex: 1, textAlign: "left" }}>{n.label}</span>
-              {momoNet === n.id && <span className="material-symbols-outlined" style={{ fontSize: 16, color: "#f87171" }}>check_circle</span>}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div style={{ background: T.faint, border: `1px solid ${T.border}`, borderRadius: 9, padding: "10px 13px", marginBottom: 18, fontSize: 12, color: T.dim, lineHeight: 1.55, display: "flex", alignItems: "flex-start", gap: 8 }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 16, marginTop: 1, flexShrink: 0 }}>smartphone</span>
-        A USSD prompt will be sent to your phone. Approve it within 2 mins.
-      </div>
-      <button onClick={onSubmit} disabled={loading || !amount || !phone}
-        style={{ ...btnPrimary, opacity: loading || !amount || !phone ? 0.38 : 1, marginBottom: 8 }}>
-        {loading ? <><Spin /> Initiating…</> : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>send_to_mobile</span>Send MoMo Prompt · GH₵{parseFloat(amount) || "0.00"}</>}
+
+      <button onClick={onSubmit} disabled={loading || !amount}
+        style={{ ...btnPrimary, opacity: loading || !amount ? 0.38 : 1, marginBottom: 8 }}>
+        {loading
+          ? <><Spin /> Generating link…</>
+          : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>open_in_new</span>Pay GH₵{parseFloat(amount) || "0.00"} with MoMo</>
+        }
       </button>
+
+      <div style={{ textAlign: "center", fontSize: 11, color: T.dim, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 13 }}>lock</span>
+        Secured by Moolre · MTN · Telecel · AirtelTigo
+      </div>
     </div>
   );
 }
 
-/* ── Moolre Approve ── */
-interface MoolreApproveProps {
-  error: string; info: string;
-  sub: "wait" | "sms" | "verify";
-  setSub: (v: "wait" | "sms" | "verify") => void;
-  phone: string; amount: string;
-  countdown: number;
-  smsCode: string; setSmsCode: (v: string) => void;
+/* ── Moolre Await / Verify — NEW: after redirect back from Moolre ── */
+interface MoolreAwaitProps {
+  error: string;
+  info: string;
+  amount: string;
+  checkoutUrl: string;
   loading: boolean;
-  onSmsSubmit: () => void;
+  pollCount: number;
   onVerify: () => void;
+  onReopen: () => void;
   onStartOver: () => void;
-  fmt: (s: number) => string;
 }
-function MoolreApprove({ error, info, sub, setSub, phone, amount, countdown, smsCode, setSmsCode, loading, onSmsSubmit, onVerify, onStartOver, fmt }: MoolreApproveProps) {
+function MoolreAwait({ error, info, amount, checkoutUrl, loading, pollCount, onVerify, onReopen, onStartOver }: MoolreAwaitProps) {
   return (
     <div>
       {error && <ErrBox msg={error} />}
-      {sub === "sms" && (
-        <>
-          <div style={{ background: "rgba(212,168,67,0.07)", border: "1px solid rgba(212,168,67,0.22)", borderRadius: 10, padding: 16, marginBottom: 16, textAlign: "center" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 36, color: T.gold, display: "block", marginBottom: 8 }}>sms</span>
-            <div style={{ fontWeight: 700, fontSize: 13, color: T.gold, marginBottom: 5 }}>Check your SMS</div>
-            <div style={{ fontSize: 12, color: T.dim, lineHeight: 1.6 }}>MTN sent a code to <strong style={{ color: T.white }}>{phone}</strong>. Enter it below.</div>
+
+      {/* Status card */}
+      <div style={{ background: T.faint, border: `1px solid ${T.border}`, borderRadius: 12, padding: 18, marginBottom: 16, textAlign: "center" }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 40, color: T.dim, display: "block", marginBottom: 10 }}>hourglass_top</span>
+        <div style={{ fontWeight: 700, fontSize: 14, color: T.white, marginBottom: 6 }}>Waiting for your payment</div>
+        <div style={{ fontSize: 12, color: T.dim, lineHeight: 1.65 }}>
+          Complete the MoMo payment on Moolre's page for<br />
+          <strong style={{ color: "#f87171", fontSize: 15 }}>GH₵{parseFloat(amount || "0").toFixed(2)}</strong>
+          , then tap verify below.
+        </div>
+        {pollCount > 0 && (
+          <div style={{ marginTop: 10, fontSize: 11, color: T.dim, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>refresh</span>
+            Checked {pollCount} time{pollCount !== 1 ? "s" : ""}
           </div>
-          <div style={{ marginBottom: 14 }}>
-            <label style={lbl}>SMS Code</label>
-            <input type="text" inputMode="numeric" placeholder="······" value={smsCode} maxLength={8} autoFocus
-              onChange={e => setSmsCode(e.target.value.replace(/\D/g, ""))}
-              style={{ ...inp, fontSize: 24, fontWeight: 700, letterSpacing: 10, textAlign: "center", border: `1.5px solid ${T.red}` }} />
-          </div>
-          <button onClick={onSmsSubmit} disabled={loading || smsCode.length < 4}
-            style={{ ...btnPrimary, opacity: loading || smsCode.length < 4 ? 0.38 : 1, marginBottom: 8 }}>
-            {loading ? <><Spin /> Verifying…</> : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>verified</span>Submit Code</>}
-          </button>
-          <button onClick={onStartOver} style={btnGhost}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>Start Over
-          </button>
-        </>
-      )}
-      {sub === "wait" && (
-        <>
-          <div style={{ background: T.faint, border: `1px solid ${T.border}`, borderRadius: 10, padding: 18, marginBottom: 14, textAlign: "center" }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 40, color: T.dim, display: "block", marginBottom: 8 }}>vibration</span>
-            <div style={{ fontWeight: 700, fontSize: 14, color: T.white, marginBottom: 5 }}>Check your phone</div>
-            <div style={{ fontSize: 12, color: T.dim, lineHeight: 1.65 }}>
-              USSD prompt sent to <strong style={{ color: T.white }}>{phone}</strong>.<br />
-              Approve <strong style={{ color: "#f87171" }}>GH₵{parseFloat(amount).toFixed(2)}</strong>.
-            </div>
-            {countdown > 0
-              ? <div style={{ marginTop: 10, fontSize: 12, color: T.dim, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>timer</span>
-                  Expires in <strong style={{ color: T.white }}>{fmt(countdown)}</strong>
-                </div>
-              : <div style={{ marginTop: 10, fontSize: 12, color: "#f87171" }}>May have expired — verify below</div>
-            }
-          </div>
-          <button onClick={() => { setSub("verify"); }} style={{ ...btnPrimary, marginBottom: 8 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>task_alt</span>I've Approved — Verify
-          </button>
-          <button onClick={onStartOver} style={btnGhost}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>Start Over
-          </button>
-        </>
-      )}
-      {sub === "verify" && (
-        <>
-          <div style={{ textAlign: "center", marginBottom: 18 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 40, color: T.dim, display: "block", marginBottom: 8 }}>manage_search</span>
-            <div style={{ fontWeight: 700, fontSize: 14, color: T.white, marginBottom: 4 }}>Verify Payment</div>
-            <div style={{ fontSize: 12, color: T.dim }}>Checking GH₵{parseFloat(amount).toFixed(2)}</div>
-          </div>
-          {info && <InfoBox msg={info} />}
-          <button onClick={onVerify} disabled={loading} style={{ ...btnPrimary, opacity: loading ? 0.38 : 1, marginBottom: 8 }}>
-            {loading ? <><Spin /> Verifying…</> : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>search_check</span>Verify Payment</>}
-          </button>
-          <button onClick={() => setSub("wait")} style={{ ...btnGhost, marginBottom: 8 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>hourglass_empty</span>Still Waiting
-          </button>
-          <button onClick={onStartOver} style={{ ...btnGhost, border: "none", color: "rgba(245,245,240,0.18)" }}>Start Over</button>
-        </>
-      )}
+        )}
+      </div>
+
+      {info && <InfoBox msg={info} />}
+
+      {/* Steps */}
+      <div style={{ background: "rgba(224,32,32,0.05)", border: `1px solid ${T.redMid}`, borderRadius: 10, padding: "11px 14px", marginBottom: 16 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#f87171", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8 }}>If you haven't paid yet</div>
+        <button onClick={onReopen} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: T.redLow, border: `1px solid ${T.redMid}`, borderRadius: 8, padding: "10px 12px", cursor: "pointer", fontFamily: "inherit" }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#f87171" }}>open_in_new</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#f87171" }}>Re-open Moolre payment page</span>
+        </button>
+      </div>
+
+      <button onClick={onVerify} disabled={loading}
+        style={{ ...btnPrimary, opacity: loading ? 0.38 : 1, marginBottom: 8 }}>
+        {loading
+          ? <><Spin /> Checking payment…</>
+          : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>search_check</span>I've Paid — Verify Now</>
+        }
+      </button>
+
+      <button onClick={onStartOver} style={btnGhost}>
+        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>Start Over
+      </button>
     </div>
   );
 }
@@ -618,7 +573,7 @@ function BinanceInfo({ error, onNext }: BinanceInfoProps) {
           <div style={{ fontSize: 11, color: T.dim, marginTop: 2, lineHeight: 1.4 }}>Create a free account to buy &amp; send crypto in minutes.</div>
         </div>
         <a href="https://www.binance.com/en/register" target="_blank" rel="noopener noreferrer"
-          style={{ fontSize: 11, fontWeight: 800, padding: "7px 13px", borderRadius: 8, background: T.gold, color: "#0a0a0a", textDecoration: "none", flexShrink: 0, display: "flex", alignItems: "center", gap: 4 }}>
+          style={{ fontSize: 11, fontWeight: 800, padding: "7px 13px", borderRadius: 8, background: T.gold, color: "#0a0f0a", textDecoration: "none", flexShrink: 0, display: "flex", alignItems: "center", gap: 4 }}>
           Sign Up <span className="material-symbols-outlined" style={{ fontSize: 13 }}>open_in_new</span>
         </a>
       </div>
@@ -932,10 +887,10 @@ function BankNgSuccess({ onHome, onReset }: BankNgSuccessProps) {
 /* ── Success Screen ── */
 interface SuccessScreenProps {
   type: "momo" | "crypto";
-  amount: string; momoNet: string; phone: string;
+  amount: string;
   onHome: () => void; onReset: () => void;
 }
-function SuccessScreen({ type, amount, momoNet, phone, onHome, onReset }: SuccessScreenProps) {
+function SuccessScreen({ type, amount, onHome, onReset }: SuccessScreenProps) {
   return (
     <div style={{ textAlign: "center", padding: "12px 0 8px" }}>
       <div style={{ width: 64, height: 64, borderRadius: "50%", margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", background: type === "momo" ? "rgba(34,197,94,0.12)" : T.goldLow, border: `2px solid ${type === "momo" ? "rgba(34,197,94,0.35)" : "rgba(212,168,67,0.35)"}` }}>
@@ -943,16 +898,8 @@ function SuccessScreen({ type, amount, momoNet, phone, onHome, onReset }: Succes
       </div>
       {type === "momo" ? (
         <>
-          <div style={{ fontWeight: 800, fontSize: 26, color: "#4ade80", marginBottom: 4 }}>GH₵{parseFloat(amount).toFixed(2)}</div>
+          <div style={{ fontWeight: 800, fontSize: 26, color: "#4ade80", marginBottom: 4 }}>GH₵{parseFloat(amount || "0").toFixed(2)}</div>
           <div style={{ fontSize: 13, color: T.dim, marginBottom: 20 }}>Added to your Bet 360 wallet</div>
-          <div style={{ background: T.raised, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 14px", marginBottom: 18, textAlign: "left" }}>
-            {[["Amount", `GH₵ ${parseFloat(amount).toFixed(2)}`], ["Network", MOMO_NETWORKS.find(n => n.id === momoNet)?.label ?? momoNet], ["Phone", phone]].map(([k, v]) => (
-              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.border}` }}>
-                <span style={{ color: T.dim, fontSize: 12 }}>{k}</span>
-                <span style={{ color: T.white, fontSize: 12, fontWeight: 600 }}>{v}</span>
-              </div>
-            ))}
-          </div>
         </>
       ) : (
         <>
@@ -1024,16 +971,16 @@ export default function DepositPage() {
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
   const [info,    setInfo]    = useState("");
-  const [step,    setStep]    = useState<"form" | "approve" | "proof" | "success" | "done" | "bank_info" | "bank_form" | "bank_success">("form");
+  const [step,    setStep]    = useState<"form" | "await" | "proof" | "success" | "done" | "bank_info" | "bank_form" | "bank_success">("form");
 
-  /* ── moolre state ── */
-  const [phone,     setPhone]     = useState("");
-  const [momoNet,   setMomoNet]   = useState("MTN");
-  const [sub,       setSub]       = useState<"wait" | "sms" | "verify">("wait");
-  const [extRef,    setExtRef]    = useState("");
-  const [countdown, setCountdown] = useState(120);
-  const [smsCode,   setSmsCode]   = useState("");
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /* ── moolre state — NEW ── */
+  const [extRef,      setExtRef]      = useState("");
+  const [moolreRef,   setMoolreRef]   = useState(""); // Moolre's internal reference UUID
+  const [checkoutUrl, setCheckoutUrl] = useState(""); // Moolre hosted page URL
+  const [pollCount,   setPollCount]   = useState(0);
+
+  /* ── auto-poll interval ref ── */
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /* ── binance state ── */
   const [txid,        setTxid]        = useState("");
@@ -1055,17 +1002,31 @@ export default function DepositPage() {
   const [bankCompressing, setBankCompressing] = useState(false);
   const [bankErrs,        setBankErrs]        = useState<Record<string, string>>({});
 
-  /* ── countdown ── */
+  /* ── Auto-poll every 10s while on "await" step ── */
   useEffect(() => {
-    if (step === "approve" && sub === "wait") {
-      setCountdown(120);
-      timerRef.current = setInterval(() =>
-        setCountdown(p => { if (p <= 1) { clearInterval(timerRef.current!); return 0; } return p - 1; }), 1000);
+    if (step === "await" && extRef) {
+      pollRef.current = setInterval(async () => {
+        try {
+          const res  = await fetch(`${API_BASE}/api/wallet/deposit/moolre/verify`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok()}` },
+            body: JSON.stringify({ externalref: extRef, ...(moolreRef ? { moolreRef } : {}) }),
+          });
+          const data = await res.json();
+          const d = data?.data;
+          if (d?.credited) {
+            clearInterval(pollRef.current!);
+            setStep("done");
+          } else if (d?.txstatus === 2) {
+            clearInterval(pollRef.current!);
+            setError("Payment was cancelled. Please start a new deposit.");
+          }
+          setPollCount(p => p + 1);
+        } catch { /* silent poll failure */ }
+      }, 10_000);
     }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [step, sub]);
-
-  const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [step, extRef, moolreRef]);
 
   const post = async (path: string, body: object) => {
     const res = await fetch(`${API_BASE}${path}`, {
@@ -1088,46 +1049,68 @@ export default function DepositPage() {
     setStep(gw === "bank_ng" ? "bank_info" : "form");
   }, []);
 
-  /* ── moolre handlers ── */
+  /* ─────────────────────────────────────────────────────────────────────────
+     MOOLRE HANDLERS — updated for hosted checkout flow
+     ───────────────────────────────────────────────────────────────────────── */
+
+  /** Step 1 — call /init, get checkoutUrl, open it in a new tab, show await screen */
   const handleMoolreInit = async () => {
     setError("");
-    const cur = country!.currency;
+    const cur      = country!.currency;
     const localAmt = parseFloat(amount);
-    const min = minLocal(cur);
-    if (!localAmt || localAmt < min) return setError(`Min deposit: ${country!.symbol}${min.toLocaleString()}`);
-    if (!/^0\d{9}$/.test(phone.trim())) return setError("Enter a valid 10-digit number starting with 0.");
+    const min      = minLocal(cur);
+    if (!localAmt || localAmt < min)
+      return setError(`Minimum deposit: ${country!.symbol}${min.toLocaleString()}`);
+
     setLoading(true);
     try {
-      const data = await post("/api/wallet/deposit/moolre/init", { amount: localToGhs(localAmt, cur), phone: phone.trim(), network: momoNet });
-      setExtRef(data?.data?.externalref || "");
-      setSub(data?.data?.actionRequired ? "sms" : "wait");
-      setStep("approve");
-    } catch (e: unknown) { setError((e as Error).message); }
-    finally { setLoading(false); }
+      const ghsAmount = localToGhs(localAmt, cur);
+      const data = await post("/api/wallet/deposit/moolre/init", { amount: ghsAmount });
+
+      const ref        = data?.data?.externalref  ?? "";
+      const mRef       = data?.data?.moolreRef    ?? "";
+      const url        = data?.data?.checkoutUrl  ?? "";
+
+      setExtRef(ref);
+      setMoolreRef(mRef);
+      setCheckoutUrl(url);
+      setPollCount(0);
+      setInfo("");
+
+      if (url) {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+
+      setStep("await");
+    } catch (e: unknown) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSmsSubmit = async () => {
-    setError("");
-    if (!smsCode.trim()) return setError("Enter the SMS code.");
-    setLoading(true);
-    try {
-      await post("/api/wallet/deposit/moolre/otp", { externalref: extRef, otp: smsCode.trim() });
-      setSmsCode(""); setSub("wait");
-    } catch (e: unknown) { setError((e as Error).message); }
-    finally { setLoading(false); }
-  };
-
+  /** Step 2 — manual verify button on the await screen */
   const handleVerify = async () => {
     setError(""); setInfo(""); setLoading(true);
     try {
-      const data = await post("/api/wallet/deposit/moolre/verify", { externalref: extRef });
-      const r = data?.data;
-      if (r?.credited)            setStep("done");
-      else if (r?.txstatus === 0) setInfo("Still pending — approve the prompt then verify again.");
-      else if (r?.txstatus === 2) setError("Payment cancelled. Start a new deposit.");
-      else                        setInfo(r?.message || "Status unclear. Try again.");
-    } catch (e: unknown) { setError((e as Error).message); }
-    finally { setLoading(false); }
+      const data = await post("/api/wallet/deposit/moolre/verify", {
+        externalref: extRef,
+        ...(moolreRef ? { moolreRef } : {}),
+      });
+      const d = data?.data;
+      if (d?.credited) {
+        setStep("done");
+      } else if (d?.txstatus === 2) {
+        setError("Payment cancelled. Please start a new deposit.");
+      } else {
+        setInfo(d?.message || "Payment not found yet — approve the MoMo prompt then try again.");
+        setPollCount(p => p + 1);
+      }
+    } catch (e: unknown) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   /* ── binance handlers ── */
@@ -1197,22 +1180,22 @@ export default function DepositPage() {
 
   /* ── reset ── */
   const reset = useCallback(() => {
-    setCountry(null); setGateway(null); setAmount(""); setPhone(""); setMomoNet("MTN");
-    setError(""); setInfo(""); setExtRef(""); setSmsCode(""); setSub("wait");
+    if (pollRef.current) clearInterval(pollRef.current);
+    setCountry(null); setGateway(null); setAmount(""); setError(""); setInfo("");
+    setExtRef(""); setMoolreRef(""); setCheckoutUrl(""); setPollCount(0);
     setTxid(""); setCryptoAmt(""); setCoin("USDT"); setCryptoNet("TRC20");
     setExpectedGhs(""); setSenderAddr(""); setUserNote(""); setBErrs({});
     setBankRef(""); setBankAmtSent(""); setBankExpected(""); setBankSender("");
     setBankNote(""); setBankScreenshot(""); setBankErrs({});
     setStep("form");
-    if (timerRef.current) clearInterval(timerRef.current);
   }, []);
 
   /* ── panel title ── */
   const panelTitle = () => {
     if (!gateway) return null;
     if (gateway === "moolre") {
-      if (step === "approve") return "Approve Payment";
-      if (step === "done")    return "Deposit Successful";
+      if (step === "await") return "Complete Your Payment";
+      if (step === "done")  return "Deposit Successful";
       return "Mobile Money";
     }
     if (gateway === "binance") {
@@ -1233,29 +1216,28 @@ export default function DepositPage() {
     if (!country || !gateway) return null;
 
     if (gateway === "moolre") {
-      if (step === "approve") return (
-        <MoolreApprove
-          error={error} info={info}
-          sub={sub} setSub={setSub}
-          phone={phone} amount={amount}
-          countdown={countdown}
-          smsCode={smsCode} setSmsCode={setSmsCode}
+      if (step === "await") return (
+        <MoolreAwait
+          error={error}
+          info={info}
+          amount={amount}
+          checkoutUrl={checkoutUrl}
           loading={loading}
-          onSmsSubmit={handleSmsSubmit}
+          pollCount={pollCount}
           onVerify={handleVerify}
-          onStartOver={() => { setStep("form"); setError(""); setSub("wait"); }}
-          fmt={fmt}
+          onReopen={() => { if (checkoutUrl) window.open(checkoutUrl, "_blank", "noopener,noreferrer"); }}
+          onStartOver={() => { if (pollRef.current) clearInterval(pollRef.current); setStep("form"); setError(""); setInfo(""); setPollCount(0); }}
         />
       );
       if (step === "done") return (
-        <SuccessScreen type="momo" amount={amount} momoNet={momoNet} phone={phone} onHome={() => window.location.href = "/"} onReset={reset} />
+        <SuccessScreen type="momo" amount={amount} onHome={() => window.location.href = "/"} onReset={reset} />
       );
       return (
         <MoolreForm
-          error={error} amount={amount} setAmount={setAmount}
-          phone={phone} setPhone={setPhone}
-          momoNet={momoNet} setMomoNet={setMomoNet}
-          loading={loading} country={country}
+          error={error}
+          amount={amount} setAmount={setAmount}
+          loading={loading}
+          country={country}
           rateFor={rateFor} minLocal={minLocal} quickAmts={quickAmts} localToGhs={localToGhs}
           onSubmit={handleMoolreInit}
         />
@@ -1280,7 +1262,7 @@ export default function DepositPage() {
         />
       );
       if (step === "success") return (
-        <SuccessScreen type="crypto" amount={amount} momoNet={momoNet} phone={phone} onHome={() => window.location.href = "/"} onReset={reset} />
+        <SuccessScreen type="crypto" amount={amount} onHome={() => window.location.href = "/"} onReset={reset} />
       );
       return <BinanceInfo error={error} onNext={() => setStep("proof")} />;
     }
