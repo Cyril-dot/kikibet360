@@ -931,7 +931,7 @@ function unwrapAdminMatches(raw: unknown): Match[] {
 }
 
 async function fetchAdminMatchOdds(matchId: string): Promise<unknown[]> {
-  try { return safeUnwrapOddsArray(await fetch(`https://futballbackend-production-2b7e.up.railway.app/api/public/admin-matches/${matchId}/odds`).then((r) => r.json())); }
+  try { return safeUnwrapOddsArray(await fetch(`https://futballbackend-production-be71.up.railway.app/api/public/admin-matches/${matchId}/odds`).then((r) => r.json())); }
   catch { return []; }
 }
 
@@ -1189,7 +1189,7 @@ function SpecialGamesSection({ onAdminFingerprintsChange, hasDraw, globalIndexSt
     const alive = () => myGen === genRef.current;
     async function load() {
       try {
-        const raw = await fetch('https://futballbackend-production-2b7e.up.railway.app/api/public/admin-matches?ngrok-skip-browser-warning=true').then((r) => r.json());
+        const raw = await fetch('https://futballbackend-production-be71.up.railway.app/api/public/admin-matches?ngrok-skip-browser-warning=true').then((r) => r.json());
         if (!alive()) return;
         const matches = unwrapAdminMatches(raw);
         if (matches.length === 0) { setAdminMatches([]); onAdminFingerprintsChange(new Set()); return; }
