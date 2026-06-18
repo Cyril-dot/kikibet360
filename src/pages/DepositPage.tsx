@@ -22,7 +22,8 @@ interface Country {
 }
 
 const COUNTRIES: Country[] = [
-  { code: "GH", name: "Ghana",         flag: "🇬🇭", flagImg: "https://flagcdn.com/w40/gh.png", currency: "GHS", symbol: "GH₵",  gateways: ["moolre", "binance"] },
+  // Moolre disabled for Ghana — only Binance (crypto) remains active. Uncomment "moolre" below to re-enable.
+  { code: "GH", name: "Ghana",         flag: "🇬🇭", flagImg: "https://flagcdn.com/w40/gh.png", currency: "GHS", symbol: "GH₵",  gateways: [/* "moolre", */ "binance"] },
   { code: "NG", name: "Nigeria",        flag: "🇳🇬", flagImg: "https://flagcdn.com/w40/ng.png", currency: "NGN", symbol: "₦",    gateways: ["bank_ng", "binance"] },
   { code: "KE", name: "Kenya",          flag: "🇰🇪", flagImg: "https://flagcdn.com/w40/ke.png", currency: "KES", symbol: "KSh",  gateways: ["binance"] },
   { code: "TZ", name: "Tanzania",       flag: "🇹🇿", flagImg: "https://flagcdn.com/w40/tz.png", currency: "TZS", symbol: "TSh",  gateways: ["binance"] },
@@ -330,7 +331,7 @@ function GatewayTabs({ country, gateway, onSelect }: GatewayTabsProps) {
 
   type TabDef = { id: "moolre" | "binance" | "bank_ng"; matIcon: string; label: string; sub: string };
   const allTabs: TabDef[] = [
-    { id: "moolre",  matIcon: "phone_android",   label: "Mobile Money",  sub: "MTN · Telecel · AirtelTigo" },
+    // { id: "moolre",  matIcon: "phone_android",   label: "Mobile Money",  sub: "MTN · Telecel · AirtelTigo" }, // Moolre disabled — uncomment to re-enable
     { id: "bank_ng", matIcon: "account_balance",  label: "Bank Transfer", sub: "Paystack-Titan · Nigeria" },
     { id: "binance", matIcon: "currency_bitcoin", label: "Crypto",        sub: "USDT · BTC · ETH · BNB" },
   ];
@@ -411,7 +412,7 @@ function SupportPanel() {
   );
 }
 
-/* ── Moolre Form — NEW: hosted checkout flow ── */
+/* ── Moolre Form — DISABLED (Moolre payment method turned off). Uncomment everything below to re-enable. ──
 interface MoolreFormProps {
   error: string;
   amount: string; setAmount: (v: string) => void;
@@ -429,7 +430,7 @@ function MoolreForm({ error, amount, setAmount, loading, country, rateFor, minLo
       {error && <ErrBox msg={error} />}
       <AmountField amount={amount} setAmount={setAmount} country={country} rateFor={rateFor} minLocal={minLocal} quickAmts={quickAmts} localToGhs={localToGhs} />
 
-      {/* How it works */}
+      How it works
       <div style={{ background: T.faint, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 14px", marginBottom: 18 }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 10 }}>How it works</div>
         {[
@@ -460,8 +461,9 @@ function MoolreForm({ error, amount, setAmount, loading, country, rateFor, minLo
     </div>
   );
 }
+── end Moolre Form ── */
 
-/* ── Moolre Await / Verify — NEW: after redirect back from Moolre ── */
+/* ── Moolre Await / Verify — DISABLED (Moolre payment method turned off). Uncomment everything below to re-enable. ──
 interface MoolreAwaitProps {
   error: string;
   info: string;
@@ -478,7 +480,7 @@ function MoolreAwait({ error, info, amount, checkoutUrl, loading, pollCount, onV
     <div>
       {error && <ErrBox msg={error} />}
 
-      {/* Status card */}
+      Status card
       <div style={{ background: T.faint, border: `1px solid ${T.border}`, borderRadius: 12, padding: 18, marginBottom: 16, textAlign: "center" }}>
         <span className="material-symbols-outlined" style={{ fontSize: 40, color: T.dim, display: "block", marginBottom: 10 }}>hourglass_top</span>
         <div style={{ fontWeight: 700, fontSize: 14, color: T.white, marginBottom: 6 }}>Waiting for your payment</div>
@@ -497,7 +499,7 @@ function MoolreAwait({ error, info, amount, checkoutUrl, loading, pollCount, onV
 
       {info && <InfoBox msg={info} />}
 
-      {/* Steps */}
+      Steps
       <div style={{ background: "rgba(224,32,32,0.05)", border: `1px solid ${T.redMid}`, borderRadius: 10, padding: "11px 14px", marginBottom: 16 }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: "#f87171", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8 }}>If you haven't paid yet</div>
         <button onClick={onReopen} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: T.redLow, border: `1px solid ${T.redMid}`, borderRadius: 8, padding: "10px 12px", cursor: "pointer", fontFamily: "inherit" }}>
@@ -520,6 +522,7 @@ function MoolreAwait({ error, info, amount, checkoutUrl, loading, pollCount, onV
     </div>
   );
 }
+── end Moolre Await ── */
 
 /* ── Binance Info ── */
 interface BinanceInfoProps {
@@ -973,14 +976,13 @@ export default function DepositPage() {
   const [info,    setInfo]    = useState("");
   const [step,    setStep]    = useState<"form" | "await" | "proof" | "success" | "done" | "bank_info" | "bank_form" | "bank_success">("form");
 
-  /* ── moolre state — NEW ── */
-  const [extRef,      setExtRef]      = useState("");
+  /* ── Moolre state — DISABLED (Moolre payment method turned off). Uncomment to re-enable.
+  const [extRef,      setExtRef]      = useState(""); // Moolre external reference
   const [moolreRef,   setMoolreRef]   = useState(""); // Moolre's internal reference UUID
   const [checkoutUrl, setCheckoutUrl] = useState(""); // Moolre hosted page URL
   const [pollCount,   setPollCount]   = useState(0);
-
-  /* ── auto-poll interval ref ── */
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null); // Moolre auto-poll interval ref
+  ── end Moolre state ── */
 
   /* ── binance state ── */
   const [txid,        setTxid]        = useState("");
@@ -1002,7 +1004,7 @@ export default function DepositPage() {
   const [bankCompressing, setBankCompressing] = useState(false);
   const [bankErrs,        setBankErrs]        = useState<Record<string, string>>({});
 
-  /* ── Auto-poll every 10s while on "await" step ── */
+  /* ── Auto-poll every 10s while on "await" step — DISABLED along with Moolre. Uncomment to re-enable.
   useEffect(() => {
     if (step === "await" && extRef) {
       pollRef.current = setInterval(async () => {
@@ -1022,11 +1024,12 @@ export default function DepositPage() {
             setError("Payment was cancelled. Please start a new deposit.");
           }
           setPollCount(p => p + 1);
-        } catch { /* silent poll failure */ }
+        } catch { }
       }, 10_000);
     }
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [step, extRef, moolreRef]);
+  ── end Moolre auto-poll ── */
 
   const post = async (path: string, body: object) => {
     const res = await fetch(`${API_BASE}${path}`, {
@@ -1050,10 +1053,12 @@ export default function DepositPage() {
   }, []);
 
   /* ─────────────────────────────────────────────────────────────────────────
-     MOOLRE HANDLERS — updated for hosted checkout flow
-     ───────────────────────────────────────────────────────────────────────── */
+     MOOLRE HANDLERS — DISABLED. Both functions below are commented out;
+     uncomment together with the Moolre state, components, and render
+     branches above/below to fully restore the Moolre payment method.
+     ─────────────────────────────────────────────────────────────────────────
 
-  /** Step 1 — call /init, get checkoutUrl, open it in a new tab, show await screen */
+  // Step 1 — call /init, get checkoutUrl, open it in a new tab, show await screen
   const handleMoolreInit = async () => {
     setError("");
     const cur      = country!.currency;
@@ -1089,7 +1094,7 @@ export default function DepositPage() {
     }
   };
 
-  /** Step 2 — manual verify button on the await screen */
+  // Step 2 — manual verify button on the await screen
   const handleVerify = async () => {
     setError(""); setInfo(""); setLoading(true);
     try {
@@ -1112,6 +1117,7 @@ export default function DepositPage() {
       setLoading(false);
     }
   };
+  ── end Moolre handlers ── */
 
   /* ── binance handlers ── */
   const validateBinance = () => {
@@ -1180,9 +1186,9 @@ export default function DepositPage() {
 
   /* ── reset ── */
   const reset = useCallback(() => {
-    if (pollRef.current) clearInterval(pollRef.current);
+    // if (pollRef.current) clearInterval(pollRef.current); // Moolre disabled
     setCountry(null); setGateway(null); setAmount(""); setError(""); setInfo("");
-    setExtRef(""); setMoolreRef(""); setCheckoutUrl(""); setPollCount(0);
+    // setExtRef(""); setMoolreRef(""); setCheckoutUrl(""); setPollCount(0); // Moolre disabled
     setTxid(""); setCryptoAmt(""); setCoin("USDT"); setCryptoNet("TRC20");
     setExpectedGhs(""); setSenderAddr(""); setUserNote(""); setBErrs({});
     setBankRef(""); setBankAmtSent(""); setBankExpected(""); setBankSender("");
@@ -1193,11 +1199,12 @@ export default function DepositPage() {
   /* ── panel title ── */
   const panelTitle = () => {
     if (!gateway) return null;
-    if (gateway === "moolre") {
-      if (step === "await") return "Complete Your Payment";
-      if (step === "done")  return "Deposit Successful";
-      return "Mobile Money";
-    }
+    // Moolre disabled — title branch commented out, uncomment to re-enable
+    // if (gateway === "moolre") {
+    //   if (step === "await") return "Complete Your Payment";
+    //   if (step === "done")  return "Deposit Successful";
+    //   return "Mobile Money";
+    // }
     if (gateway === "binance") {
       if (step === "proof")   return "Payment Proof";
       if (step === "success") return "Under Review";
@@ -1215,34 +1222,36 @@ export default function DepositPage() {
   const renderPanel = () => {
     if (!country || !gateway) return null;
 
-    if (gateway === "moolre") {
-      if (step === "await") return (
-        <MoolreAwait
-          error={error}
-          info={info}
-          amount={amount}
-          checkoutUrl={checkoutUrl}
-          loading={loading}
-          pollCount={pollCount}
-          onVerify={handleVerify}
-          onReopen={() => { if (checkoutUrl) window.open(checkoutUrl, "_blank", "noopener,noreferrer"); }}
-          onStartOver={() => { if (pollRef.current) clearInterval(pollRef.current); setStep("form"); setError(""); setInfo(""); setPollCount(0); }}
-        />
-      );
-      if (step === "done") return (
-        <SuccessScreen type="momo" amount={amount} onHome={() => window.location.href = "/"} onReset={reset} />
-      );
-      return (
-        <MoolreForm
-          error={error}
-          amount={amount} setAmount={setAmount}
-          loading={loading}
-          country={country}
-          rateFor={rateFor} minLocal={minLocal} quickAmts={quickAmts} localToGhs={localToGhs}
-          onSubmit={handleMoolreInit}
-        />
-      );
-    }
+    // Moolre disabled — selection branch commented out, uncomment together with the
+    // Moolre state/handlers/components above to fully restore mobile money checkout.
+    // if (gateway === "moolre") {
+    //   if (step === "await") return (
+    //     <MoolreAwait
+    //       error={error}
+    //       info={info}
+    //       amount={amount}
+    //       checkoutUrl={checkoutUrl}
+    //       loading={loading}
+    //       pollCount={pollCount}
+    //       onVerify={handleVerify}
+    //       onReopen={() => { if (checkoutUrl) window.open(checkoutUrl, "_blank", "noopener,noreferrer"); }}
+    //       onStartOver={() => { if (pollRef.current) clearInterval(pollRef.current); setStep("form"); setError(""); setInfo(""); setPollCount(0); }}
+    //     />
+    //   );
+    //   if (step === "done") return (
+    //     <SuccessScreen type="momo" amount={amount} onHome={() => window.location.href = "/"} onReset={reset} />
+    //   );
+    //   return (
+    //     <MoolreForm
+    //       error={error}
+    //       amount={amount} setAmount={setAmount}
+    //       loading={loading}
+    //       country={country}
+    //       rateFor={rateFor} minLocal={minLocal} quickAmts={quickAmts} localToGhs={localToGhs}
+    //       onSubmit={handleMoolreInit}
+    //     />
+    //   );
+    // }
 
     if (gateway === "binance") {
       if (step === "proof") return (
@@ -1378,7 +1387,7 @@ export default function DepositPage() {
                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>lock</span>
                 256-bit encrypted · Bet 360
               </span>
-              <span style={{ fontSize: 10, color: "rgba(245,245,240,0.14)" }}>Moolre · Bank · Binance</span>
+              <span style={{ fontSize: 10, color: "rgba(245,245,240,0.14)" }}>Bank · Binance</span>
             </div>
           </div>
 
