@@ -22,7 +22,7 @@ interface Country {
 }
 
 const COUNTRIES: Country[] = [
-  // Moolre disabled for Ghana — only Binance (crypto) remains active. Uncomment "moolre" below to re-enable.
+  // Moolre disabled for Ghana — only Binance (crypto) remains active. Uncomment "moolre" below to re‑enable.
   { code: "GH", name: "Ghana",         flag: "🇬🇭", flagImg: "https://flagcdn.com/w40/gh.png", currency: "GHS", symbol: "GH₵",  gateways: [/* "moolre", */ "binance"] },
   { code: "NG", name: "Nigeria",        flag: "🇳🇬", flagImg: "https://flagcdn.com/w40/ng.png", currency: "NGN", symbol: "₦",    gateways: ["bank_ng", "binance"] },
   { code: "KE", name: "Kenya",          flag: "🇰🇪", flagImg: "https://flagcdn.com/w40/ke.png", currency: "KES", symbol: "KSh",  gateways: ["binance"] },
@@ -99,13 +99,18 @@ const lbl: React.CSSProperties = {
 function FlagImg({ country, size = 24 }: { country: Country; size?: number }) {
   const [err, setErr] = useState(false);
   if (err) return <span style={{ fontSize: size * 0.9 }}>{country.flag}</span>;
-  return <img src={country.flagImg} alt={country.name} width={size} height={size * 0.67} onError={() => setErr(true)} style={{ borderRadius: 3, objectFit: "cover", flexShrink: 0 }} />;
+  return <img src={country.flagImg} alt={country.name} width={size} height={size * 0.67}
+    onError={() => setErr(true)} style={{ borderRadius: 3, objectFit: "cover", flexShrink: 0 }} />;
 }
 
 function CopyBtn({ text }: { text: string }) {
   const [ok, setOk] = useState(false);
   return (
-    <button onClick={() => { navigator.clipboard.writeText(text).catch(() => {}); setOk(true); setTimeout(() => setOk(false), 2000); }}
+    <button onClick={() => {
+      navigator.clipboard.writeText(text).catch(() => {});
+      setOk(true);
+      setTimeout(() => setOk(false), 2000);
+    }}
       style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, padding: "5px 13px", borderRadius: 6, cursor: "pointer", border: "none", background: ok ? "rgba(255,255,255,0.12)" : "rgba(220,38,38,0.18)", color: ok ? "#fff" : "#ef4444", transition: "all 0.2s", fontFamily: "inherit" }}>
       <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{ok ? "check_circle" : "content_copy"}</span>
       {ok ? "Copied" : "Copy"}
@@ -135,7 +140,7 @@ function InfoBox({ msg }: { msg: string }) {
   );
 }
 
-/* ─── Client-side image compressor ──────────────────────────────────────────── */
+/* ─── Client‑side image compressor ──────────────────────────────────────────── */
 function compressImageToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -161,7 +166,7 @@ function compressImageToBase64(file: File): Promise<string> {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   STABLE SUB-COMPONENTS
+   STABLE SUB‑COMPONENTS
 ═══════════════════════════════════════════════════════════════════════════════ */
 
 function TrustBadges() {
@@ -331,8 +336,8 @@ function GatewayTabs({ country, gateway, onSelect }: GatewayTabsProps) {
 
   type TabDef = { id: "moolre" | "binance" | "bank_ng"; matIcon: string; label: string; sub: string };
   const allTabs: TabDef[] = [
-    // { id: "moolre",  matIcon: "phone_android",   label: "Mobile Money",  sub: "MTN · Telecel · AirtelTigo" }, // Moolre disabled — uncomment to re-enable
-    { id: "bank_ng", matIcon: "account_balance",  label: "Bank Transfer", sub: "Paystack-Titan · Nigeria" },
+    { id: "moolre",  matIcon: "phone_android",   label: "Mobile Money",  sub: "MTN · Telecel · AirtelTigo" },
+    { id: "bank_ng", matIcon: "account_balance",  label: "Bank Transfer", sub: "Paystack‑Titan · Nigeria" },
     { id: "binance", matIcon: "currency_bitcoin", label: "Crypto",        sub: "USDT · BTC · ETH · BNB" },
   ];
   const tabs = allTabs.filter(t => country.gateways.includes(t.id));
@@ -412,7 +417,7 @@ function SupportPanel() {
   );
 }
 
-/* ── Moolre Form — DISABLED (Moolre payment method turned off). Uncomment everything below to re-enable. ──
+/* ── Moolre Form (re‑enabled) ── */
 interface MoolreFormProps {
   error: string;
   amount: string; setAmount: (v: string) => void;
@@ -428,9 +433,9 @@ function MoolreForm({ error, amount, setAmount, loading, country, rateFor, minLo
   return (
     <div>
       {error && <ErrBox msg={error} />}
-      <AmountField amount={amount} setAmount={setAmount} country={country} rateFor={rateFor} minLocal={minLocal} quickAmts={quickAmts} localToGhs={localToGhs} />
+      <AmountField amount={amount} setAmount={setAmount} country={country}
+        rateFor={rateFor} minLocal={minLocal} quickAmts={quickAmts} localToGhs={localToGhs} />
 
-      How it works
       <div style={{ background: T.faint, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 14px", marginBottom: 18 }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 10 }}>How it works</div>
         {[
@@ -461,9 +466,8 @@ function MoolreForm({ error, amount, setAmount, loading, country, rateFor, minLo
     </div>
   );
 }
-── end Moolre Form ── */
 
-/* ── Moolre Await / Verify — DISABLED (Moolre payment method turned off). Uncomment everything below to re-enable. ──
+/* ── Moolre Await / Verify (re‑enabled) ── */
 interface MoolreAwaitProps {
   error: string;
   info: string;
@@ -480,7 +484,7 @@ function MoolreAwait({ error, info, amount, checkoutUrl, loading, pollCount, onV
     <div>
       {error && <ErrBox msg={error} />}
 
-      Status card
+      {/* Status card */}
       <div style={{ background: T.faint, border: `1px solid ${T.border}`, borderRadius: 12, padding: 18, marginBottom: 16, textAlign: "center" }}>
         <span className="material-symbols-outlined" style={{ fontSize: 40, color: T.dim, display: "block", marginBottom: 10 }}>hourglass_top</span>
         <div style={{ fontWeight: 700, fontSize: 14, color: T.white, marginBottom: 6 }}>Waiting for your payment</div>
@@ -499,12 +503,12 @@ function MoolreAwait({ error, info, amount, checkoutUrl, loading, pollCount, onV
 
       {info && <InfoBox msg={info} />}
 
-      Steps
+      {/* Steps */}
       <div style={{ background: "rgba(224,32,32,0.05)", border: `1px solid ${T.redMid}`, borderRadius: 10, padding: "11px 14px", marginBottom: 16 }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: "#f87171", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8 }}>If you haven't paid yet</div>
         <button onClick={onReopen} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: T.redLow, border: `1px solid ${T.redMid}`, borderRadius: 8, padding: "10px 12px", cursor: "pointer", fontFamily: "inherit" }}>
           <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#f87171" }}>open_in_new</span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: "#f87171" }}>Re-open Moolre payment page</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#f87171" }}>Re‑open Moolre payment page</span>
         </button>
       </div>
 
@@ -522,7 +526,6 @@ function MoolreAwait({ error, info, amount, checkoutUrl, loading, pollCount, onV
     </div>
   );
 }
-── end Moolre Await ── */
 
 /* ── Binance Info ── */
 interface BinanceInfoProps {
@@ -561,6 +564,7 @@ function BinanceInfo({ error, onNext }: BinanceInfoProps) {
           Only send <strong>USDT via TRC20</strong>. Wrong network = <strong>permanent loss of funds</strong>.
         </div>
       </div>
+
       <div style={{ background: T.faint, border: `1px solid ${T.border}`, borderRadius: 10, padding: "11px 14px", marginBottom: 14 }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>Also Accepted</div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -569,6 +573,7 @@ function BinanceInfo({ error, onNext }: BinanceInfoProps) {
           ))}
         </div>
       </div>
+
       <div style={{ background: T.goldLow, border: "1px solid rgba(212,168,67,0.2)", borderRadius: 10, padding: "12px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 12 }}>
         <span className="material-symbols-outlined" style={{ fontSize: 28, color: T.gold, flexShrink: 0 }}>account_balance_wallet</span>
         <div style={{ flex: 1 }}>
@@ -580,9 +585,11 @@ function BinanceInfo({ error, onNext }: BinanceInfoProps) {
           Sign Up <span className="material-symbols-outlined" style={{ fontSize: 13 }}>open_in_new</span>
         </a>
       </div>
+
       <button onClick={onNext} style={{ ...btnPrimary, marginBottom: 8 }}>
         <span className="material-symbols-outlined" style={{ fontSize: 18 }}>receipt_long</span>I've Sent — Submit Proof
       </button>
+
       <div style={{ textAlign: "center", fontSize: 11, color: T.dim, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
         <span className="material-symbols-outlined" style={{ fontSize: 13 }}>manage_search</span>
         Reviewed &amp; credited within 1–5 mins
@@ -620,6 +627,7 @@ function BinanceProof({ error, txid, setTxid, cryptoAmt, setCryptoAmt, coin, set
           <span className="material-symbols-outlined" style={{ fontSize: 12 }}>info</span>Find in your Binance withdrawal history.
         </div>
       </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
         <div>
           <label style={lbl}>Coin <span style={{ color: T.red }}>*</span></label>
@@ -634,6 +642,7 @@ function BinanceProof({ error, txid, setTxid, cryptoAmt, setCryptoAmt, coin, set
           </select>
         </div>
       </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
         <div>
           <label style={lbl}>Amount Sent ({coin}) <span style={{ color: T.red }}>*</span></label>
@@ -648,18 +657,22 @@ function BinanceProof({ error, txid, setTxid, cryptoAmt, setCryptoAmt, coin, set
           {fe("expectedGhs")}
         </div>
       </div>
+
       <div style={{ marginBottom: 14 }}>
         <label style={lbl}>Sender Wallet <span style={{ color: T.dim, textTransform: "none", fontSize: 10 }}>(optional)</span></label>
         <input type="text" value={senderAddr} placeholder="Address you sent from" onChange={e => setSenderAddr(e.target.value)} style={inp} />
       </div>
+
       <div style={{ marginBottom: 18 }}>
         <label style={lbl}>Note to Admin <span style={{ color: T.dim, textTransform: "none", fontSize: 10 }}>(optional)</span></label>
         <textarea value={userNote} onChange={e => setUserNote(e.target.value)} placeholder="Any extra info" rows={3}
           style={{ ...inp, resize: "vertical", lineHeight: 1.6 } as React.CSSProperties} />
       </div>
+
       <button onClick={onSubmit} disabled={loading} style={{ ...btnPrimary, opacity: loading ? 0.38 : 1, marginBottom: 8 }}>
         {loading ? <><Spin /> Submitting…</> : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>upload_file</span>Submit Deposit Proof</>}
       </button>
+
       <button onClick={onBack} style={btnGhost}>
         <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>Back
       </button>
@@ -680,6 +693,7 @@ function BankNgInfo({ error, onNext }: BankNgInfoProps) {
         <span className="material-symbols-outlined" style={{ fontSize: 15, flexShrink: 0 }}>info</span>
         Minimum deposit: <strong>₦{MIN_DEPOSIT_NGN.toLocaleString()}</strong>
       </div>
+
       <div style={{ background: T.raised, border: `1px solid ${T.greenMid}`, borderRadius: 12, padding: 16, marginBottom: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
           <div style={{ width: 34, height: 34, borderRadius: 8, background: T.greenLow, border: `1px solid ${T.greenMid}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -690,6 +704,7 @@ function BankNgInfo({ error, onNext }: BankNgInfoProps) {
             <div style={{ fontSize: 11, color: T.dim }}>Then submit your payment proof</div>
           </div>
         </div>
+
         {[
           { icon: "corporate_fare", label: "Bank Name",      value: BANK_NAME,        mono: false },
           { icon: "person",         label: "Account Name",   value: BANK_ACCT_NAME,   mono: false },
@@ -705,14 +720,17 @@ function BankNgInfo({ error, onNext }: BankNgInfoProps) {
             </div>
           </div>
         ))}
+
         <div style={{ background: "rgba(212,168,67,0.07)", border: "1px solid rgba(212,168,67,0.22)", borderRadius: 8, padding: "9px 12px", fontSize: 11, color: T.gold, lineHeight: 1.6, display: "flex", gap: 7 }}>
           <span className="material-symbols-outlined" style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>warning</span>
           Always include your <strong>username or phone number</strong> in the transfer narration so we can identify your payment.
         </div>
       </div>
+
       <button onClick={onNext} style={{ ...btnGreen, marginBottom: 8 }}>
         <span className="material-symbols-outlined" style={{ fontSize: 18 }}>task_alt</span>I've Sent the Money — Submit Proof
       </button>
+
       <div style={{ textAlign: "center", fontSize: 11, color: T.dim, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
         <span className="material-symbols-outlined" style={{ fontSize: 13 }}>manage_search</span>
         Verified within 5–10 minutes
@@ -759,6 +777,7 @@ function BankNgForm({ error, bankRef, setBankRef, bankAmtSent, setBankAmtSent, b
         {fe("ref")}
         <div style={{ fontSize: 11, color: T.dim, marginTop: 4 }}>Use the exact narration you entered during the transfer.</div>
       </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
         <div>
           <label style={lbl}>Amount Sent (₦) <span style={{ color: T.red }}>*</span></label>
@@ -775,6 +794,7 @@ function BankNgForm({ error, bankRef, setBankRef, bankAmtSent, setBankAmtSent, b
           {fe("exp")}
         </div>
       </div>
+
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 7 }}>Quick fill</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6 }}>
@@ -786,11 +806,13 @@ function BankNgForm({ error, bankRef, setBankRef, bankAmtSent, setBankAmtSent, b
           ))}
         </div>
       </div>
+
       <div style={{ marginBottom: 14 }}>
         <label style={lbl}>Sender Account Name <span style={{ color: T.dim, textTransform: "none", fontSize: 10 }}>(optional)</span></label>
         <input type="text" value={bankSender} placeholder="Name on your bank account"
           onChange={e => setBankSender(e.target.value)} style={inp} />
       </div>
+
       <div style={{ marginBottom: 14 }}>
         <label style={lbl}>Payment Screenshot <span style={{ color: T.red }}>*</span></label>
         {bankScreenshot ? (
@@ -848,15 +870,18 @@ function BankNgForm({ error, bankRef, setBankRef, bankAmtSent, setBankAmtSent, b
           </div>
         )}
       </div>
+
       <div style={{ marginBottom: 18 }}>
         <label style={lbl}>Note to Admin <span style={{ color: T.dim, textTransform: "none", fontSize: 10 }}>(optional)</span></label>
         <textarea value={bankNote} onChange={e => setBankNote(e.target.value)} placeholder="Any extra info" rows={3}
           style={{ ...inp, resize: "vertical", lineHeight: 1.6 } as React.CSSProperties} />
       </div>
+
       <button onClick={onSubmit} disabled={loading || bankCompressing}
         style={{ ...btnGreen, opacity: loading || bankCompressing ? 0.38 : 1, marginBottom: 8 }}>
         {loading ? <><Spin /> Submitting…</> : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>upload_file</span>Submit Transfer Proof</>}
       </button>
+
       <button onClick={onBack} style={btnGhost}>
         <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>Back
       </button>
@@ -924,11 +949,12 @@ function SuccessScreen({ type, amount, onHome, onReset }: SuccessScreenProps) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   MAIN COMPONENT
+   MAIN COMPONENT – Moolre RE‑ENABLED
 ══════════════════════════════════════════════════════════════════════════════ */
 export default function DepositPage() {
   const navigate = useNavigate();
 
+  /* ---- Auth guard ----------------------------------------------------- */
   useEffect(() => {
     const t = localStorage.getItem("accessToken") || sessionStorage.getItem("accessToken");
     if (!t) navigate("/login", { replace: true });
@@ -936,7 +962,7 @@ export default function DepositPage() {
 
   const tok = () => localStorage.getItem("accessToken") || sessionStorage.getItem("accessToken") || "";
 
-  /* ── country / gateway ── */
+  /* ---- Country / gateway ------------------------------------------------ */
   const [country,     setCountry]     = useState<Country | null>(null);
   const [gateway,     setGateway]     = useState<"moolre" | "binance" | "bank_ng" | null>(null);
   const [ipDetecting, setIpDetecting] = useState(true);
@@ -969,22 +995,21 @@ export default function DepositPage() {
   const localToGhs = useCallback((amt: number, cur: string) => cur === "GHS" ? amt : amt / rateFor(cur), [rateFor]);
   const quickAmts  = useCallback((cur: string) => [200, 500, 1000, 2000, 5000, 10000, 20000, 50000].map(v => +(v * rateFor(cur)).toFixed(0)), [rateFor]);
 
-  /* ── shared state ── */
+  /* ---- Shared state ---------------------------------------------------- */
   const [amount,  setAmount]  = useState("");
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
   const [info,    setInfo]    = useState("");
   const [step,    setStep]    = useState<"form" | "await" | "proof" | "success" | "done" | "bank_info" | "bank_form" | "bank_success">("form");
 
-  /* ── Moolre state — DISABLED (Moolre payment method turned off). Uncomment to re-enable.
-  const [extRef,      setExtRef]      = useState(""); // Moolre external reference
-  const [moolreRef,   setMoolreRef]   = useState(""); // Moolre's internal reference UUID
-  const [checkoutUrl, setCheckoutUrl] = useState(""); // Moolre hosted page URL
+  /* ---- Moolre state (now enabled) -------------------------------------- */
+  const [extRef,      setExtRef]      = useState(""); // external reference returned by API
+  const [moolreRef,   setMoolreRef]   = useState(""); // internal moolre UUID (if provided)
+  const [checkoutUrl, setCheckoutUrl] = useState(""); // URL to open in a new tab
   const [pollCount,   setPollCount]   = useState(0);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null); // Moolre auto-poll interval ref
-  ── end Moolre state ── */
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  /* ── binance state ── */
+  /* ---- Binance state --------------------------------------------------- */
   const [txid,        setTxid]        = useState("");
   const [cryptoAmt,   setCryptoAmt]   = useState("");
   const [coin,        setCoin]        = useState("USDT");
@@ -994,7 +1019,7 @@ export default function DepositPage() {
   const [userNote,    setUserNote]    = useState("");
   const [bErrs,       setBErrs]       = useState<Record<string, string>>({});
 
-  /* ── bank transfer (NG) state ── */
+  /* ---- Bank NG state --------------------------------------------------- */
   const [bankRef,         setBankRef]         = useState("");
   const [bankAmtSent,     setBankAmtSent]     = useState("");
   const [bankExpected,    setBankExpected]    = useState("");
@@ -1004,7 +1029,7 @@ export default function DepositPage() {
   const [bankCompressing, setBankCompressing] = useState(false);
   const [bankErrs,        setBankErrs]        = useState<Record<string, string>>({});
 
-  /* ── Auto-poll every 10s while on "await" step — DISABLED along with Moolre. Uncomment to re-enable.
+  /* ---- Auto‑poll while awaiting Moolre payment ------------------------ */
   useEffect(() => {
     if (step === "await" && extRef) {
       pollRef.current = setInterval(async () => {
@@ -1024,13 +1049,15 @@ export default function DepositPage() {
             setError("Payment was cancelled. Please start a new deposit.");
           }
           setPollCount(p => p + 1);
-        } catch { }
+        } catch { /* silent */ }
       }, 10_000);
     }
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
   }, [step, extRef, moolreRef]);
-  ── end Moolre auto-poll ── */
 
+  /* ---- Helper to perform POST calls ----------------------------------- */
   const post = async (path: string, body: object) => {
     const res = await fetch(`${API_BASE}${path}`, {
       method: "POST",
@@ -1042,6 +1069,7 @@ export default function DepositPage() {
     return data;
   };
 
+  /* ---- Country / gateway handling ------------------------------------- */
   const handleSelectCountry = useCallback((c: Country) => {
     setCountry(c); setGateway(null); setError(""); setAmount(""); setStep("form");
     if (c.gateways.length === 1) setGateway(c.gateways[0]);
@@ -1052,29 +1080,23 @@ export default function DepositPage() {
     setStep(gw === "bank_ng" ? "bank_info" : "form");
   }, []);
 
-  /* ─────────────────────────────────────────────────────────────────────────
-     MOOLRE HANDLERS — DISABLED. Both functions below are commented out;
-     uncomment together with the Moolre state, components, and render
-     branches above/below to fully restore the Moolre payment method.
-     ─────────────────────────────────────────────────────────────────────────
-
-  // Step 1 — call /init, get checkoutUrl, open it in a new tab, show await screen
+  /* ---- Moolre handlers ------------------------------------------------ */
+  // Step 1 – initialise the payment, open checkout URL, move to “await”
   const handleMoolreInit = async () => {
     setError("");
     const cur      = country!.currency;
     const localAmt = parseFloat(amount);
     const min      = minLocal(cur);
-    if (!localAmt || localAmt < min)
-      return setError(`Minimum deposit: ${country!.symbol}${min.toLocaleString()}`);
+    if (!localAmt || localAmt < min) return setError(`Minimum deposit: ${country!.symbol}${min.toLocaleString()}`);
 
     setLoading(true);
     try {
       const ghsAmount = localToGhs(localAmt, cur);
       const data = await post("/api/wallet/deposit/moolre/init", { amount: ghsAmount });
 
-      const ref        = data?.data?.externalref  ?? "";
-      const mRef       = data?.data?.moolreRef    ?? "";
-      const url        = data?.data?.checkoutUrl  ?? "";
+      const ref = data?.data?.externalref ?? "";
+      const mRef = data?.data?.moolreRef ?? "";
+      const url = data?.data?.checkoutUrl ?? "";
 
       setExtRef(ref);
       setMoolreRef(mRef);
@@ -1082,9 +1104,7 @@ export default function DepositPage() {
       setPollCount(0);
       setInfo("");
 
-      if (url) {
-        window.open(url, "_blank", "noopener,noreferrer");
-      }
+      if (url) window.open(url, "_blank", "noopener,noreferrer");
 
       setStep("await");
     } catch (e: unknown) {
@@ -1094,7 +1114,7 @@ export default function DepositPage() {
     }
   };
 
-  // Step 2 — manual verify button on the await screen
+  // Step 2 – user clicks “Verify” after they’ve approved the MoMo prompt
   const handleVerify = async () => {
     setError(""); setInfo(""); setLoading(true);
     try {
@@ -1104,6 +1124,7 @@ export default function DepositPage() {
       });
       const d = data?.data;
       if (d?.credited) {
+        clearInterval(pollRef.current!);
         setStep("done");
       } else if (d?.txstatus === 2) {
         setError("Payment cancelled. Please start a new deposit.");
@@ -1117,15 +1138,15 @@ export default function DepositPage() {
       setLoading(false);
     }
   };
-  ── end Moolre handlers ── */
 
-  /* ── binance handlers ── */
+  /* ---- Binance handlers ------------------------------------------------ */
   const validateBinance = () => {
     const e: Record<string, string> = {};
     if (!txid.trim() || txid.trim().length < 10) e.txid = "Valid TXID required (min 10 chars)";
     if (!cryptoAmt || isNaN(+cryptoAmt) || +cryptoAmt <= 0) e.cryptoAmt = "Enter the amount you sent";
     if (!expectedGhs || isNaN(+expectedGhs) || +expectedGhs < 1) e.expectedGhs = "Enter expected GH₵ credit";
-    setBErrs(e); return Object.keys(e).length === 0;
+    setBErrs(e);
+    return Object.keys(e).length === 0;
   };
 
   const handleBinanceSubmit = async () => {
@@ -1133,17 +1154,23 @@ export default function DepositPage() {
     setLoading(true); setError("");
     try {
       await post("/api/wallet/deposit/binance/submit", {
-        txid: txid.trim(), cryptoAmount: parseFloat(cryptoAmt), coin, network: cryptoNet,
+        txid: txid.trim(),
+        cryptoAmount: parseFloat(cryptoAmt),
+        coin,
+        network: cryptoNet,
         expectedGhsAmount: parseFloat(expectedGhs),
         senderAddress: senderAddr.trim() || undefined,
         userNote: userNote.trim() || undefined,
       });
       setStep("success");
-    } catch (e: unknown) { setError((e as Error).message); }
-    finally { setLoading(false); }
+    } catch (e: unknown) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  /* ── bank (NG) handlers ── */
+  /* ---- Bank (NG) handlers --------------------------------------------- */
   const handleBankScreenshot = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1152,8 +1179,11 @@ export default function DepositPage() {
       const dataUrl = await compressImageToBase64(file);
       setBankScreenshot(dataUrl);
       setBankErrs(p => ({ ...p, screenshot: "" }));
-    } catch { setBankErrs(p => ({ ...p, screenshot: "Could not process image. Try another file." })); }
-    finally { setBankCompressing(false); }
+    } catch {
+      setBankErrs(p => ({ ...p, screenshot: "Could not process image. Try another file." }));
+    } finally {
+      setBankCompressing(false);
+    }
   };
 
   const validateBank = () => {
@@ -1164,7 +1194,8 @@ export default function DepositPage() {
     else if (amt < MIN_DEPOSIT_NGN)      e.amt = `Minimum deposit is ₦${MIN_DEPOSIT_NGN.toLocaleString()}`;
     if (!bankExpected || isNaN(+bankExpected) || +bankExpected < 1) e.exp = "Enter expected wallet credit";
     if (!bankScreenshot) e.screenshot = "A payment screenshot is required";
-    setBankErrs(e); return Object.keys(e).length === 0;
+    setBankErrs(e);
+    return Object.keys(e).length === 0;
   };
 
   const handleBankSubmit = async () => {
@@ -1180,15 +1211,18 @@ export default function DepositPage() {
         userNote:          bankNote.trim() || undefined,
       });
       setStep("bank_success");
-    } catch (e: unknown) { setError((e as Error).message); }
-    finally { setLoading(false); }
+    } catch (e: unknown) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  /* ── reset ── */
+  /* ---- Reset ----------------------------------------------------------- */
   const reset = useCallback(() => {
-    // if (pollRef.current) clearInterval(pollRef.current); // Moolre disabled
+    if (pollRef.current) clearInterval(pollRef.current);
     setCountry(null); setGateway(null); setAmount(""); setError(""); setInfo("");
-    // setExtRef(""); setMoolreRef(""); setCheckoutUrl(""); setPollCount(0); // Moolre disabled
+    setExtRef(""); setMoolreRef(""); setCheckoutUrl(""); setPollCount(0);
     setTxid(""); setCryptoAmt(""); setCoin("USDT"); setCryptoNet("TRC20");
     setExpectedGhs(""); setSenderAddr(""); setUserNote(""); setBErrs({});
     setBankRef(""); setBankAmtSent(""); setBankExpected(""); setBankSender("");
@@ -1196,15 +1230,14 @@ export default function DepositPage() {
     setStep("form");
   }, []);
 
-  /* ── panel title ── */
+  /* ---- Title for each step -------------------------------------------- */
   const panelTitle = () => {
     if (!gateway) return null;
-    // Moolre disabled — title branch commented out, uncomment to re-enable
-    // if (gateway === "moolre") {
-    //   if (step === "await") return "Complete Your Payment";
-    //   if (step === "done")  return "Deposit Successful";
-    //   return "Mobile Money";
-    // }
+    if (gateway === "moolre") {
+      if (step === "await") return "Complete Your Payment";
+      if (step === "done")  return "Deposit Successful";
+      return "Mobile Money";
+    }
     if (gateway === "binance") {
       if (step === "proof")   return "Payment Proof";
       if (step === "success") return "Under Review";
@@ -1218,40 +1251,38 @@ export default function DepositPage() {
     return null;
   };
 
-  /* ── panel router ── */
+  /* ---- Panel routing --------------------------------------------------- */
   const renderPanel = () => {
     if (!country || !gateway) return null;
 
-    // Moolre disabled — selection branch commented out, uncomment together with the
-    // Moolre state/handlers/components above to fully restore mobile money checkout.
-    // if (gateway === "moolre") {
-    //   if (step === "await") return (
-    //     <MoolreAwait
-    //       error={error}
-    //       info={info}
-    //       amount={amount}
-    //       checkoutUrl={checkoutUrl}
-    //       loading={loading}
-    //       pollCount={pollCount}
-    //       onVerify={handleVerify}
-    //       onReopen={() => { if (checkoutUrl) window.open(checkoutUrl, "_blank", "noopener,noreferrer"); }}
-    //       onStartOver={() => { if (pollRef.current) clearInterval(pollRef.current); setStep("form"); setError(""); setInfo(""); setPollCount(0); }}
-    //     />
-    //   );
-    //   if (step === "done") return (
-    //     <SuccessScreen type="momo" amount={amount} onHome={() => window.location.href = "/"} onReset={reset} />
-    //   );
-    //   return (
-    //     <MoolreForm
-    //       error={error}
-    //       amount={amount} setAmount={setAmount}
-    //       loading={loading}
-    //       country={country}
-    //       rateFor={rateFor} minLocal={minLocal} quickAmts={quickAmts} localToGhs={localToGhs}
-    //       onSubmit={handleMoolreInit}
-    //     />
-    //   );
-    // }
+    if (gateway === "moolre") {
+      if (step === "await") return (
+        <MoolreAwait
+          error={error}
+          info={info}
+          amount={amount}
+          checkoutUrl={checkoutUrl}
+          loading={loading}
+          pollCount={pollCount}
+          onVerify={handleVerify}
+          onReopen={() => { if (checkoutUrl) window.open(checkoutUrl, "_blank", "noopener,noreferrer"); }}
+          onStartOver={() => { if (pollRef.current) clearInterval(pollRef.current); setStep("form"); setError(""); setInfo(""); setPollCount(0); }}
+        />
+      );
+      if (step === "done") return (
+        <SuccessScreen type="momo" amount={amount} onHome={() => window.location.href = "/"} onReset={reset} />
+      );
+      return (
+        <MoolreForm
+          error={error}
+          amount={amount} setAmount={setAmount}
+          loading={loading}
+          country={country}
+          rateFor={rateFor} minLocal={minLocal} quickAmts={quickAmts} localToGhs={localToGhs}
+          onSubmit={handleMoolreInit}
+        />
+      );
+    }
 
     if (gateway === "binance") {
       if (step === "proof") return (
@@ -1303,7 +1334,7 @@ export default function DepositPage() {
     return null;
   };
 
-  /* ── root render ── */
+  /* ---- Main render ----------------------------------------------------- */
   return (
     <>
       <style>{`
@@ -1320,14 +1351,14 @@ export default function DepositPage() {
         ::-webkit-scrollbar{width:4px;}
         ::-webkit-scrollbar-track{background:transparent;}
         ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px;}
-        a:hover{opacity:0.85;}
+                a:hover{opacity:0.85;}
         button:hover:not(:disabled){opacity:0.88;}
       `}</style>
 
       <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "32px 16px 60px", fontFamily: "'Outfit', sans-serif" }}>
         <div style={{ width: "100%", maxWidth: 420 }}>
 
-          {/* Header */}
+          {/* ── Header ── */}
           <div style={{ marginBottom: 20, animation: "_fadeUp 0.4s ease" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
               <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#e02020" }} />
@@ -1343,21 +1374,24 @@ export default function DepositPage() {
             </div>
           </div>
 
-          {/* Trust badges */}
+          {/* ── Trust Badges ── */}
           <div style={{ animation: "_fadeUp 0.45s ease" }}>
             <TrustBadges />
           </div>
 
-          {/* Main card */}
+          {/* ── Main Card ── */}
           <div style={{ background: "#141414", borderRadius: 16, overflow: "visible", border: "1px solid rgba(255,255,255,0.07)", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", animation: "_fadeUp 0.5s ease" }}>
             <div style={{ padding: "20px 20px 24px" }}>
 
+              {/* Country selector */}
               <CountryDropdown country={country} ipDetecting={ipDetecting} onSelect={handleSelectCountry} />
 
+              {/* Payment‑method tabs (if more than one) */}
               {country && country.gateways.length > 1 && (
                 <GatewayTabs country={country} gateway={gateway} onSelect={selectGateway} />
               )}
 
+              {/* Divider + title for the active payment flow */}
               {country && gateway && (
                 <div style={{ marginBottom: 18 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
@@ -1368,12 +1402,15 @@ export default function DepositPage() {
                 </div>
               )}
 
+              {/* Render the appropriate step UI */}
               {renderPanel()}
 
+              {/* Fallback UI when a country is selected but it only has one gateway (loading) */}
               {country && !gateway && country.gateways.length <= 1 && (
                 <div style={{ textAlign: "center", padding: "20px 0", color: "rgba(245,245,240,0.38)", fontSize: 13 }}>Loading payment options…</div>
               )}
 
+              {/* Prompt to select a country when none is chosen yet */}
               {!country && (
                 <div style={{ textAlign: "center", padding: "28px 0 8px", color: "rgba(245,245,240,0.38)", fontSize: 13, lineHeight: 1.7 }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 36, display: "block", marginBottom: 10, opacity: 0.4 }}>public</span>
@@ -1382,19 +1419,20 @@ export default function DepositPage() {
               )}
             </div>
 
+            {/* ── Footer inside card ── */}
             <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
               <span style={{ fontSize: 11, color: "rgba(245,245,240,0.18)", display: "flex", alignItems: "center", gap: 5 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>lock</span>
-                256-bit encrypted · Bet 360
+                256‑bit encrypted · Bet 360
               </span>
               <span style={{ fontSize: 10, color: "rgba(245,245,240,0.14)" }}>Bank · Binance</span>
             </div>
           </div>
 
-          {/* Support */}
+          {/* ── Support panel ── */}
           <SupportPanel />
 
-          {/* Footer */}
+          {/* ── Page footer ── */}
           <div style={{ marginTop: 20, textAlign: "center", fontSize: 11, color: "rgba(245,245,240,0.14)", lineHeight: 1.7, animation: "_fadeUp 0.6s ease" }}>
             By depositing you agree to Bet 360's<br />
             <a href="/terms" style={{ color: "rgba(245,245,240,0.28)", textDecoration: "underline" }}>Terms of Service</a>
