@@ -11,7 +11,7 @@ const BANK_ACCT_NUMBER = "9852760835";
 const MIN_DEPOSIT_NGN  = 40000;
 
 /* ─── Ghana network prefix maps (mirrors backend) ───────────────────────────── */
-const MTN_GH_PREFIXES = ["024", "054", "055", "059"];
+const MTN_GH_PREFIXES = ["024", "025", "053", "054", "055", "059"];
 const ATL_GH_PREFIXES = ["026", "027", "056", "057"];
 const VOD_GH_PREFIXES = ["020", "050"];
 const PREFIX_MAP: Record<string, string[]> = {
