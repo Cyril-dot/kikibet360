@@ -1163,10 +1163,10 @@ export default function DepositPage() {
   }, []);
 
   /* ── Mobile Money handlers ── */
- const handleMomoInit = async () => {
+const handleMomoInit = async () => {
     setError("");
     const localAmt = parseFloat(amount);
-    const min      = minLocal("GHS");
+    const min = minLocal("GHS");
     if (!localAmt || localAmt < min)
       return setError(`Minimum deposit: GH₵${min.toLocaleString()}`);
     if (!momoPhone.trim())
@@ -1183,20 +1183,36 @@ export default function DepositPage() {
       });
 
       const inner       = data?.data ?? data;
-      const ref         = inner?.data?.reference ?? inner?.reference;
-      const displayText = inner?.data?.display_text ?? inner?.display_text ?? "";
+      const txData      = inner?.data ?? inner;
+      const ref         = txData?.reference;
+      const status      = txData?.status;
+      const displayText = txData?.display_text ?? "";
 
       if (!ref) throw new Error("No reference returned. Please try again.");
 
       setMomoReference(ref);
       setMomoDisplayText(displayText);
-      setStep("momo_pending");
+
+      if (status === "pay_offline" || status === "pending") {
+        setStep("momo_pending");
+      } else if (status === "send_otp") {
+        setStep("momo_pending");
+        setOtpSent(false);
+      } else if (status === "success") {
+        setStep("momo_success");
+      } else if (status === "failed" || status === "timeout") {
+        throw new Error(displayText || "Payment failed. Please try again.");
+      } else {
+        // unknown status — still go to pending so user can verify
+        setStep("momo_pending");
+      }
     } catch (e: unknown) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
   };
+  
   const handleMomoVerify = async () => {
     setMomoVerifyError("");
     setMomoVerifying(true);
