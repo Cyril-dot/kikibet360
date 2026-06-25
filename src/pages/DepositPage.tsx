@@ -18,11 +18,11 @@ interface Country {
   flagImg: string;
   currency: string;
   symbol: string;
-  gateways: ("paystack" | "binance" | "bank_ng")[];
+  gateways: ("paystack" | "binance" | "bank_ng" | "momo")[];
 }
 
 const COUNTRIES: Country[] = [
-  { code: "GH", name: "Ghana",         flag: "🇬🇭", flagImg: "https://flagcdn.com/w40/gh.png", currency: "GHS", symbol: "GH₵",  gateways: ["paystack", "binance"] },
+  { code: "GH", name: "Ghana",         flag: "🇬🇭", flagImg: "https://flagcdn.com/w40/gh.png", currency: "GHS", symbol: "GH₵",  gateways: ["paystack", "momo", "binance"] },
   { code: "NG", name: "Nigeria",        flag: "🇳🇬", flagImg: "https://flagcdn.com/w40/ng.png", currency: "NGN", symbol: "₦",    gateways: ["bank_ng", "binance"] },
   { code: "KE", name: "Kenya",          flag: "🇰🇪", flagImg: "https://flagcdn.com/w40/ke.png", currency: "KES", symbol: "KSh",  gateways: ["binance"] },
   { code: "TZ", name: "Tanzania",       flag: "🇹🇿", flagImg: "https://flagcdn.com/w40/tz.png", currency: "TZS", symbol: "TSh",  gateways: ["binance"] },
@@ -42,6 +42,14 @@ const BINANCE_ADDRESS = "TWXJ98mLBTu4MVBRS8ZqtBdvk8D8Frdb6Y";
 const CRYPTO_COINS    = ["USDT", "BTC", "ETH", "BNB", "USDC"];
 const CRYPTO_NETWORKS = ["TRC20", "BEP20", "ERC20", "Arbitrum", "Optimism"];
 
+/** Ghana MoMo providers as required by Paystack */
+const GH_MOMO_PROVIDERS = [
+  { id: "mtn", label: "MTN MoMo",    color: "#FFCC00", textColor: "#000", icon: "📱" },
+  { id: "atl", label: "AirtelTigo",  color: "#E40000", textColor: "#fff", icon: "📱" },
+  { id: "vod", label: "Telecel",     color: "#EE0000", textColor: "#fff", icon: "📱" },
+] as const;
+type MomoProvider = "mtn" | "atl" | "vod";
+
 /* ─── Design Tokens ─────────────────────────────────────────────────────────── */
 const T = {
   bg:       "#0a0a0a",
@@ -59,6 +67,9 @@ const T = {
   blue:     "#3b82f6",
   blueLow:  "rgba(59,130,246,0.1)",
   blueMid:  "rgba(59,130,246,0.25)",
+  purple:     "#a855f7",
+  purpleLow:  "rgba(168,85,247,0.1)",
+  purpleMid:  "rgba(168,85,247,0.25)",
   white:    "#f5f5f0",
   dim:      "rgba(245,245,240,0.38)",
   faint:    "rgba(245,245,240,0.06)",
@@ -86,6 +97,10 @@ const btnBlue: React.CSSProperties = {
 
 const btnGreen: React.CSSProperties = {
   ...btnPrimary, background: "linear-gradient(135deg,#16a34a,#15803d)",
+};
+
+const btnPurple: React.CSSProperties = {
+  ...btnPrimary, background: "linear-gradient(135deg,#7c3aed,#6d28d9)",
 };
 
 const btnGhost: React.CSSProperties = {
@@ -157,9 +172,9 @@ function compressImageToBase64(file: File): Promise<string> {
   });
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════════════════════════
    STABLE SUB-COMPONENTS
-═══════════════════════════════════════════════════════════════════════════════ */
+══════════════════════════════════════════════════════════════════════════════ */
 
 function TrustBadges() {
   return (
@@ -167,9 +182,10 @@ function TrustBadges() {
       <div style={{ fontSize: 10, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8 }}>Trusted Payment Partners</div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {[
-          { label: "Paystack",matIcon: "credit_card",      desc: "Card · Bank" },
-          { label: "Bank",    matIcon: "account_balance",  desc: "Transfer" },
-          { label: "Binance", matIcon: "currency_bitcoin", desc: "Crypto" },
+          { label: "Paystack",   matIcon: "credit_card",      desc: "Card · Bank" },
+          { label: "MoMo",       matIcon: "smartphone",        desc: "MTN · AirtelTigo · Telecel" },
+          { label: "Bank",       matIcon: "account_balance",  desc: "Transfer" },
+          { label: "Binance",    matIcon: "currency_bitcoin", desc: "Crypto" },
         ].map(b => (
           <div key={b.label} style={{ display: "flex", alignItems: "center", gap: 6, background: T.faint, border: `1px solid ${T.border}`, borderRadius: 8, padding: "6px 10px" }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18, color: T.dim }}>{b.matIcon}</span>
@@ -294,8 +310,9 @@ function CountryDropdown({ country, ipDetecting, onSelect }: CountryDropdownProp
           <div style={{ maxHeight: 260, overflowY: "auto" }}>
             {filtered.map(c => {
               const hasPaystack = c.gateways.includes("paystack");
+              const hasMomo     = c.gateways.includes("momo");
               const hasBank     = c.gateways.includes("bank_ng");
-              const badge = hasPaystack
+              const badge = hasPaystack || hasMomo
                 ? { label: "INSTANT", bg: T.blueLow, color: T.blue, border: T.blueMid }
                 : hasBank
                 ? { label: "BANK",    bg: T.greenLow, color: T.green, border: T.greenMid }
@@ -322,15 +339,16 @@ function CountryDropdown({ country, ipDetecting, onSelect }: CountryDropdownProp
 /* ── Gateway Tabs ── */
 interface GatewayTabsProps {
   country: Country;
-  gateway: "paystack" | "binance" | "bank_ng" | null;
-  onSelect: (gw: "paystack" | "binance" | "bank_ng") => void;
+  gateway: "paystack" | "binance" | "bank_ng" | "momo" | null;
+  onSelect: (gw: "paystack" | "binance" | "bank_ng" | "momo") => void;
 }
 function GatewayTabs({ country, gateway, onSelect }: GatewayTabsProps) {
   if (!country || country.gateways.length <= 1) return null;
 
-  type TabDef = { id: "paystack" | "binance" | "bank_ng"; matIcon: string; label: string; sub: string };
+  type TabDef = { id: "paystack" | "binance" | "bank_ng" | "momo"; matIcon: string; label: string; sub: string };
   const allTabs: TabDef[] = [
     { id: "paystack", matIcon: "credit_card",      label: "Paystack",      sub: "Card · Bank · Instant" },
+    { id: "momo",     matIcon: "smartphone",        label: "Mobile Money",  sub: "MTN · AirtelTigo · Telecel" },
     { id: "bank_ng",  matIcon: "account_balance",  label: "Bank Transfer", sub: "Paystack-Titan · Nigeria" },
     { id: "binance",  matIcon: "currency_bitcoin", label: "Crypto",        sub: "USDT · BTC · ETH · BNB" },
   ];
@@ -345,9 +363,10 @@ function GatewayTabs({ country, gateway, onSelect }: GatewayTabsProps) {
           const isPaystack = t.id === "paystack";
           const isCrypto   = t.id === "binance";
           const isBank     = t.id === "bank_ng";
-          const accentClr  = isPaystack ? T.blue : isCrypto ? T.gold : T.green;
-          const accentBg   = isPaystack ? T.blueLow : isCrypto ? T.goldLow : T.greenLow;
-          const accentBd   = isPaystack ? T.blueMid : isCrypto ? "rgba(212,168,67,0.5)" : T.greenMid;
+          const isMomo     = t.id === "momo";
+          const accentClr  = isPaystack ? T.blue : isCrypto ? T.gold : isBank ? T.green : T.purple;
+          const accentBg   = isPaystack ? T.blueLow : isCrypto ? T.goldLow : isBank ? T.greenLow : T.purpleLow;
+          const accentBd   = isPaystack ? T.blueMid : isCrypto ? "rgba(212,168,67,0.5)" : isBank ? T.greenMid : T.purpleMid;
           return (
             <button key={t.id} onClick={() => onSelect(t.id)}
               style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, padding: "13px 14px", background: active ? accentBg : T.raised, border: `1.5px solid ${active ? accentBd : T.border}`, borderRadius: 10, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s" }}>
@@ -431,7 +450,6 @@ function PaystackForm({ error, amount, setAmount, loading, country, rateFor, min
     <div>
       {error && <ErrBox msg={error} />}
       <AmountField amount={amount} setAmount={setAmount} country={country} rateFor={rateFor} minLocal={minLocal} quickAmts={quickAmts} localToGhs={localToGhs} />
-
       <div style={{ background: T.faint, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 14px", marginBottom: 18 }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: T.dim, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 10 }}>How it works</div>
         {[
@@ -445,7 +463,6 @@ function PaystackForm({ error, amount, setAmount, loading, country, rateFor, min
           </div>
         ))}
       </div>
-
       <button onClick={onSubmit} disabled={loading || !amount || local <= 0}
         style={{ ...btnBlue, opacity: loading || !amount || local <= 0 ? 0.38 : 1, marginBottom: 8 }}>
         {loading
@@ -453,7 +470,6 @@ function PaystackForm({ error, amount, setAmount, loading, country, rateFor, min
           : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>open_in_new</span>Pay GH₵{local > 0 ? local.toFixed(2) : "0.00"} via Paystack</>
         }
       </button>
-
       <div style={{ textAlign: "center", fontSize: 11, color: T.dim, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
         <span className="material-symbols-outlined" style={{ fontSize: 13 }}>lock</span>
         Secured by Paystack · 256-bit encrypted
@@ -473,6 +489,200 @@ function PaystackSuccess({ amount, onHome, onReset }: PaystackSuccessProps) {
       <div style={{ fontWeight: 800, fontSize: 26, color: T.green, marginBottom: 4 }}>GH₵{parseFloat(amount || "0").toFixed(2)}</div>
       <div style={{ fontSize: 13, color: T.dim, marginBottom: 22 }}>Added to your Bet 360 wallet</div>
       <button onClick={onHome} style={{ ...btnBlue, marginBottom: 8 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>home</span>Back to Home
+      </button>
+      <button onClick={onReset} style={btnGhost}>
+        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add_circle</span>Make Another Deposit
+      </button>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   MOBILE MONEY COMPONENTS
+══════════════════════════════════════════════════════════════════════════════ */
+
+interface MomoFormProps {
+  error: string;
+  amount: string;
+  setAmount: (v: string) => void;
+  momoPhone: string;
+  setMomoPhone: (v: string) => void;
+  momoProvider: MomoProvider;
+  setMomoProvider: (v: MomoProvider) => void;
+  loading: boolean;
+  country: Country;
+  rateFor: (cur: string) => number;
+  minLocal: (cur: string) => number;
+  quickAmts: (cur: string) => number[];
+  localToGhs: (amt: number, cur: string) => number;
+  onSubmit: () => void;
+}
+function MomoForm({ error, amount, setAmount, momoPhone, setMomoPhone, momoProvider, setMomoProvider, loading, country, rateFor, minLocal, quickAmts, localToGhs, onSubmit }: MomoFormProps) {
+  const local = parseFloat(amount) || 0;
+  return (
+    <div>
+      {error && <ErrBox msg={error} />}
+
+      <AmountField amount={amount} setAmount={setAmount} country={country} rateFor={rateFor} minLocal={minLocal} quickAmts={quickAmts} localToGhs={localToGhs} />
+
+      {/* Provider selector */}
+      <div style={{ marginBottom: 18 }}>
+        <label style={lbl}>Mobile Network</label>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
+          {GH_MOMO_PROVIDERS.map(p => {
+            const active = momoProvider === p.id;
+            return (
+              <button key={p.id} onClick={() => setMomoProvider(p.id)}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "12px 8px", background: active ? T.purpleLow : T.raised, border: `1.5px solid ${active ? T.purple : T.border}`, borderRadius: 10, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s" }}>
+                <span style={{ fontSize: 22 }}>{p.icon}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: active ? T.purple : T.white, lineHeight: 1.2, textAlign: "center" }}>{p.label}</span>
+                {active && (
+                  <span style={{ fontSize: 9, fontWeight: 800, color: T.purple, display: "flex", alignItems: "center", gap: 3 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 11 }}>check_circle</span>SELECTED
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Phone number */}
+      <div style={{ marginBottom: 18 }}>
+        <label style={lbl}>Mobile Money Number <span style={{ color: T.red }}>*</span></label>
+        <div style={{ display: "flex", alignItems: "stretch", background: T.raised, border: `1px solid ${T.border}`, borderRadius: 10, overflow: "hidden" }}>
+          <span style={{ padding: "0 14px", display: "flex", alignItems: "center", color: T.dim, fontSize: 13, fontWeight: 700, borderRight: `1px solid ${T.border}`, background: "rgba(255,255,255,0.03)", flexShrink: 0 }}>🇬🇭 +233</span>
+          <input
+            type="tel"
+            placeholder="0XX XXX XXXX"
+            value={momoPhone}
+            onChange={e => setMomoPhone(e.target.value)}
+            style={{ flex: 1, background: "none", border: "none", outline: "none", color: T.white, fontSize: 16, fontWeight: 600, padding: "11px 14px", fontFamily: "inherit" }}
+          />
+        </div>
+        <div style={{ fontSize: 11, color: T.dim, marginTop: 5, display: "flex", alignItems: "center", gap: 4 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 12 }}>info</span>
+          Enter the number registered with {GH_MOMO_PROVIDERS.find(p => p.id === momoProvider)?.label}.
+        </div>
+      </div>
+
+      {/* How it works */}
+      <div style={{ background: T.purpleLow, border: `1px solid ${T.purpleMid}`, borderRadius: 10, padding: "12px 14px", marginBottom: 18 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: T.purple, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 10 }}>How Mobile Money works</div>
+        {[
+          { icon: "smartphone",   text: "Tap below — a payment prompt will be sent directly to your phone" },
+          { icon: "lock_clock",   text: "Approve the request on your phone within 3 minutes" },
+          { icon: "account_balance_wallet", text: "Your wallet is credited instantly after you approve" },
+        ].map((s, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: i < 2 ? 8 : 0 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16, color: T.purple, flexShrink: 0, marginTop: 1 }}>{s.icon}</span>
+            <span style={{ fontSize: 12, color: T.dim, lineHeight: 1.5 }}>{s.text}</span>
+          </div>
+        ))}
+      </div>
+
+      <button onClick={onSubmit} disabled={loading || !amount || local <= 0 || !momoPhone.trim()}
+        style={{ ...btnPurple, opacity: loading || !amount || local <= 0 || !momoPhone.trim() ? 0.38 : 1, marginBottom: 8 }}>
+        {loading
+          ? <><Spin /> Sending prompt to your phone…</>
+          : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>smartphone</span>Pay GH₵{local > 0 ? local.toFixed(2) : "0.00"} via MoMo</>
+        }
+      </button>
+
+      <div style={{ textAlign: "center", fontSize: 11, color: T.dim, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 13 }}>lock</span>
+        Secured by Paystack · 256-bit encrypted
+      </div>
+    </div>
+  );
+}
+
+/* ── MoMo Pending — awaiting phone approval ── */
+interface MomoPendingProps {
+  momoReference: string;
+  momoDisplayText: string;
+  momoProvider: MomoProvider;
+  amount: string;
+  onVerify: () => void;
+  onReset: () => void;
+  verifying: boolean;
+  verifyError: string;
+}
+function MomoPending({ momoReference, momoDisplayText, momoProvider, amount, onVerify, onReset, verifying, verifyError }: MomoPendingProps) {
+  const providerLabel = GH_MOMO_PROVIDERS.find(p => p.id === momoProvider)?.label ?? "MoMo";
+  const [countdown, setCountdown] = useState(180);
+
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [countdown]);
+
+  const mins = Math.floor(countdown / 60);
+  const secs = countdown % 60;
+
+  return (
+    <div style={{ textAlign: "center", padding: "8px 0" }}>
+      {/* Animated phone icon */}
+      <div style={{ width: 72, height: 72, borderRadius: "50%", margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", background: T.purpleLow, border: `2px solid ${T.purpleMid}`, animation: "_pulse 1.8s ease-in-out infinite" }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 36, color: T.purple }}>smartphone</span>
+      </div>
+
+      <div style={{ fontWeight: 800, fontSize: 18, color: T.white, marginBottom: 6 }}>Check Your Phone!</div>
+      <div style={{ fontSize: 13, color: T.dim, lineHeight: 1.65, marginBottom: 16 }}>
+        A payment prompt for <strong style={{ color: T.white }}>GH₵{parseFloat(amount).toFixed(2)}</strong> has been sent to your {providerLabel} number.<br />
+        Approve it within the time limit.
+      </div>
+
+      {momoDisplayText && (
+        <div style={{ background: T.purpleLow, border: `1px solid ${T.purpleMid}`, borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: T.purple, lineHeight: 1.55 }}>
+          {momoDisplayText}
+        </div>
+      )}
+
+      {/* Countdown */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 20 }}>
+        <div style={{ background: T.raised, border: `1px solid ${countdown < 30 ? T.red : T.border}`, borderRadius: 10, padding: "10px 20px", textAlign: "center" }}>
+          <div style={{ fontSize: 28, fontWeight: 800, color: countdown < 30 ? "#f87171" : T.white, fontVariantNumeric: "tabular-nums" }}>
+            {mins}:{secs.toString().padStart(2, "0")}
+          </div>
+          <div style={{ fontSize: 9, color: T.dim, textTransform: "uppercase", letterSpacing: "0.5px" }}>Time remaining</div>
+        </div>
+      </div>
+
+      {verifyError && <ErrBox msg={verifyError} />}
+
+      <div style={{ fontSize: 11, color: T.dim, marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 13 }}>info</span>
+        Already approved? Tap below to confirm your payment.
+      </div>
+
+      <button onClick={onVerify} disabled={verifying}
+        style={{ ...btnPurple, opacity: verifying ? 0.5 : 1, marginBottom: 8 }}>
+        {verifying ? <><Spin /> Checking payment status…</> : <><span className="material-symbols-outlined" style={{ fontSize: 18 }}>verified</span>I've Approved — Check Status</>}
+      </button>
+
+      <div style={{ fontSize: 10, color: T.dim, marginBottom: 8 }}>Ref: <code style={{ color: "rgba(245,245,240,0.5)", fontSize: 10 }}>{momoReference}</code></div>
+
+      <button onClick={onReset} style={btnGhost}>
+        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>refresh</span>Start Over
+      </button>
+    </div>
+  );
+}
+
+/* ── MoMo Success ── */
+interface MomoSuccessProps { amount: string; onHome: () => void; onReset: () => void; }
+function MomoSuccess({ amount, onHome, onReset }: MomoSuccessProps) {
+  return (
+    <div style={{ textAlign: "center", padding: "12px 0 8px" }}>
+      <div style={{ width: 64, height: 64, borderRadius: "50%", margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", background: T.purpleLow, border: `2px solid ${T.purpleMid}` }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 32, color: T.purple }}>check_circle</span>
+      </div>
+      <div style={{ fontWeight: 800, fontSize: 26, color: T.green, marginBottom: 4 }}>GH₵{parseFloat(amount || "0").toFixed(2)}</div>
+      <div style={{ fontSize: 13, color: T.dim, marginBottom: 22 }}>Mobile Money deposit confirmed!</div>
+      <button onClick={onHome} style={{ ...btnPurple, marginBottom: 8 }}>
         <span className="material-symbols-outlined" style={{ fontSize: 18 }}>home</span>Back to Home
       </button>
       <button onClick={onReset} style={btnGhost}>
@@ -847,7 +1057,6 @@ export default function DepositPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check for Paystack callback (?payment=success)
     const params = new URLSearchParams(window.location.search);
     if (params.get("payment") === "success") {
       setStep("paystack_success");
@@ -863,7 +1072,7 @@ export default function DepositPage() {
 
   /* ── country / gateway ── */
   const [country,     setCountry]     = useState<Country | null>(null);
-  const [gateway,     setGateway]     = useState<"paystack" | "binance" | "bank_ng" | null>(null);
+  const [gateway,     setGateway]     = useState<"paystack" | "binance" | "bank_ng" | "momo" | null>(null);
   const [ipDetecting, setIpDetecting] = useState(true);
   const [rates,       setRates]       = useState<Record<string, number>>({});
 
@@ -898,8 +1107,11 @@ export default function DepositPage() {
   const [amount,  setAmount]  = useState("");
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
-  const [step,    setStep]    = useState<
-    "form" | "proof" | "success" | "bank_info" | "bank_form" | "bank_success" | "paystack_success"
+  const [step, setStep] = useState<
+    | "form" | "proof" | "success"
+    | "bank_info" | "bank_form" | "bank_success"
+    | "paystack_success"
+    | "momo_pending" | "momo_success"
   >("form");
 
   /* ── binance state ── */
@@ -922,6 +1134,14 @@ export default function DepositPage() {
   const [bankCompressing, setBankCompressing] = useState(false);
   const [bankErrs,        setBankErrs]        = useState<Record<string, string>>({});
 
+  /* ── Mobile Money state ── */
+  const [momoPhone,       setMomoPhone]       = useState("");
+  const [momoProvider,    setMomoProvider]    = useState<MomoProvider>("mtn");
+  const [momoReference,   setMomoReference]   = useState("");
+  const [momoDisplayText, setMomoDisplayText] = useState("");
+  const [momoVerifying,   setMomoVerifying]   = useState(false);
+  const [momoVerifyError, setMomoVerifyError] = useState("");
+
   const post = async (path: string, body: object) => {
     const res = await fetch(`${API_BASE}${path}`, {
       method: "POST",
@@ -933,12 +1153,22 @@ export default function DepositPage() {
     return data;
   };
 
+  const get = async (path: string) => {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${tok()}` },
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.message || data?.error || "Request failed.");
+    return data;
+  };
+
   const handleSelectCountry = useCallback((c: Country) => {
     setCountry(c); setGateway(null); setError(""); setAmount(""); setStep("form");
     if (c.gateways.length === 1) setGateway(c.gateways[0]);
   }, []);
 
-  const selectGateway = useCallback((gw: "paystack" | "binance" | "bank_ng") => {
+  const selectGateway = useCallback((gw: "paystack" | "binance" | "bank_ng" | "momo") => {
     setGateway(gw); setError(""); setAmount("");
     setStep(gw === "bank_ng" ? "bank_info" : "form");
   }, []);
@@ -954,16 +1184,12 @@ export default function DepositPage() {
 
     setLoading(true);
     try {
-      // Always send GHS amount to backend
       const ghsAmount = localToGhs(localAmt, cur);
       const data = await post("/api/wallet/deposit/paystack/init", { amount: ghsAmount });
-
-      // Paystack returns { status: true, data: { authorization_url, reference, ... } }
       const inner = data?.data ?? data;
       const authUrl = inner?.data?.authorization_url ?? inner?.authorization_url;
-
       if (authUrl) {
-        window.location.href = authUrl; // redirect to Paystack checkout
+        window.location.href = authUrl;
       } else {
         throw new Error("No authorization URL returned from Paystack.");
       }
@@ -971,7 +1197,71 @@ export default function DepositPage() {
       setError((e as Error).message);
       setLoading(false);
     }
-    // Don't setLoading(false) on success — page is redirecting
+  };
+
+  /* ── Mobile Money handlers ── */
+  const handleMomoInit = async () => {
+    setError("");
+    const localAmt = parseFloat(amount);
+    const min      = minLocal("GHS");
+    if (!localAmt || localAmt < min)
+      return setError(`Minimum deposit: GH₵${min.toLocaleString()}`);
+    if (!momoPhone.trim())
+      return setError("Please enter your Mobile Money phone number.");
+
+    // Normalise phone: strip leading 0, prefix +233
+    let phone = momoPhone.trim().replace(/\s+/g, "");
+    if (phone.startsWith("0")) phone = "+233" + phone.slice(1);
+    else if (!phone.startsWith("+")) phone = "+233" + phone;
+
+    setLoading(true);
+    try {
+      const data = await post("/api/wallet/deposit/paystack-momo/init", {
+        amount:   localAmt,
+        phone,
+        provider: momoProvider,
+      });
+
+      // Paystack response: { status: true, data: { reference, status: "pay_offline", display_text } }
+      const inner = data?.data ?? data;
+      const ref         = inner?.data?.reference ?? inner?.reference;
+      const displayText = inner?.data?.display_text ?? inner?.display_text ?? "";
+
+      if (!ref) throw new Error("No reference returned. Please try again.");
+
+      setMomoReference(ref);
+      setMomoDisplayText(displayText);
+      setStep("momo_pending");
+    } catch (e: unknown) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMomoVerify = async () => {
+    setMomoVerifyError("");
+    setMomoVerifying(true);
+    try {
+      const data = await get(`/api/wallet/deposit/paystack-momo/verify/${momoReference}`);
+      // data.data.data.status or data.data.status
+      const inner  = data?.data ?? data;
+      const txData = inner?.data ?? inner;
+      const status = txData?.status ?? txData?.data?.status;
+
+      if (status === "success") {
+        setStep("momo_success");
+      } else if (status === "failed" || status === "abandoned") {
+        setMomoVerifyError(`Payment ${status}. Please start a new deposit.`);
+      } else {
+        // still pending / pay_offline
+        setMomoVerifyError("Payment not confirmed yet — please approve on your phone and try again.");
+      }
+    } catch (e: unknown) {
+      setMomoVerifyError((e as Error).message);
+    } finally {
+      setMomoVerifying(false);
+    }
   };
 
   /* ── Binance handlers ── */
@@ -1046,8 +1336,9 @@ export default function DepositPage() {
     setExpectedGhs(""); setSenderAddr(""); setUserNote(""); setBErrs({});
     setBankRef(""); setBankAmtSent(""); setBankExpected(""); setBankSender("");
     setBankNote(""); setBankScreenshot(""); setBankErrs({});
+    setMomoPhone(""); setMomoProvider("mtn"); setMomoReference("");
+    setMomoDisplayText(""); setMomoVerifyError("");
     setStep("form");
-    // Clear URL params if any
     window.history.replaceState({}, "", window.location.pathname);
   }, []);
 
@@ -1057,6 +1348,11 @@ export default function DepositPage() {
     if (gateway === "paystack") {
       if (step === "paystack_success") return "Deposit Successful";
       return "Paystack — Instant";
+    }
+    if (gateway === "momo") {
+      if (step === "momo_pending") return "Approve on Phone";
+      if (step === "momo_success") return "Deposit Confirmed";
+      return "Mobile Money";
     }
     if (gateway === "binance") {
       if (step === "proof")   return "Payment Proof";
@@ -1073,7 +1369,6 @@ export default function DepositPage() {
 
   /* ── Panel router ── */
   const renderPanel = () => {
-    // Paystack success — can appear without gateway set (direct URL return)
     if (step === "paystack_success") {
       return <PaystackSuccess amount={amount} onHome={() => window.location.href = "/"} onReset={reset} />;
     }
@@ -1083,12 +1378,38 @@ export default function DepositPage() {
     if (gateway === "paystack") {
       return (
         <PaystackForm
-          error={error}
-          amount={amount} setAmount={setAmount}
-          loading={loading}
-          country={country}
+          error={error} amount={amount} setAmount={setAmount}
+          loading={loading} country={country}
           rateFor={rateFor} minLocal={minLocal} quickAmts={quickAmts} localToGhs={localToGhs}
           onSubmit={handlePaystackInit}
+        />
+      );
+    }
+
+    if (gateway === "momo") {
+      if (step === "momo_pending") return (
+        <MomoPending
+          momoReference={momoReference}
+          momoDisplayText={momoDisplayText}
+          momoProvider={momoProvider}
+          amount={amount}
+          onVerify={handleMomoVerify}
+          onReset={reset}
+          verifying={momoVerifying}
+          verifyError={momoVerifyError}
+        />
+      );
+      if (step === "momo_success") return (
+        <MomoSuccess amount={amount} onHome={() => window.location.href = "/"} onReset={reset} />
+      );
+      return (
+        <MomoForm
+          error={error} amount={amount} setAmount={setAmount}
+          momoPhone={momoPhone} setMomoPhone={setMomoPhone}
+          momoProvider={momoProvider} setMomoProvider={setMomoProvider}
+          loading={loading} country={country}
+          rateFor={rateFor} minLocal={minLocal} quickAmts={quickAmts} localToGhs={localToGhs}
+          onSubmit={handleMomoInit}
         />
       );
     }
@@ -1152,6 +1473,7 @@ export default function DepositPage() {
         body{margin:0;background:#0a0a0a;}
         @keyframes _spin{to{transform:rotate(360deg);}}
         @keyframes _fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+        @keyframes _pulse{0%,100%{box-shadow:0 0 0 0 rgba(168,85,247,0.4);}50%{box-shadow:0 0 0 12px rgba(168,85,247,0);}}
         input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
         input::placeholder,textarea::placeholder{color:rgba(245,245,240,0.2);}
         select option{background:#141414;color:#f5f5f0;}
@@ -1238,7 +1560,7 @@ export default function DepositPage() {
                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>lock</span>
                 256-bit encrypted · Bet 360
               </span>
-              <span style={{ fontSize: 10, color: "rgba(245,245,240,0.14)" }}>Paystack · Bank · Binance</span>
+              <span style={{ fontSize: 10, color: "rgba(245,245,240,0.14)" }}>Paystack · MoMo · Bank · Binance</span>
             </div>
           </div>
 
