@@ -10,6 +10,16 @@ const BANK_ACCT_NAME   = "Chippercash/tijani Samson";
 const BANK_ACCT_NUMBER = "9852760835";
 const MIN_DEPOSIT_NGN  = 40000;
 
+/* ─── Ghana network prefix maps (mirrors backend) ───────────────────────────── */
+const MTN_GH_PREFIXES = ["024", "054", "055", "059"];
+const ATL_GH_PREFIXES = ["026", "027", "056", "057"];
+const VOD_GH_PREFIXES = ["020", "050"];
+const PREFIX_MAP: Record<string, string[]> = {
+  mtn: MTN_GH_PREFIXES,
+  atl: ATL_GH_PREFIXES,
+  vod: VOD_GH_PREFIXES,
+};
+
 /* ─── Types & Data ─────────────────────────────────────────────────────────── */
 interface Country {
   code: string;
@@ -111,6 +121,50 @@ const lbl: React.CSSProperties = {
   color: T.dim, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 6,
 };
 
+/* ─── Logger (client-side, mirrors backend [MoMo] prefix convention) ───────── */
+const log = {
+  info:  (msg: string, data?: unknown) => console.info( `[MoMo][FE] ${msg}`, ...(data !== undefined ? [data] : [])),
+  warn:  (msg: string, data?: unknown) => console.warn( `[MoMo][FE] ${msg}`, ...(data !== undefined ? [data] : [])),
+  error: (msg: string, data?: unknown) => console.error(`[MoMo][FE] ${msg}`, ...(data !== undefined ? [data] : [])),
+  debug: (msg: string, data?: unknown) => console.debug(`[MoMo][FE] ${msg}`, ...(data !== undefined ? [data] : [])),
+};
+
+/* ─── Phone helpers (client-side mirror of backend normalizeGhanaPhone) ─────── */
+function normalizeGhanaPhone(raw: string): string | null {
+  let digits = raw.replace(/[\s\-]/g, "");
+  if (digits.startsWith("+233"))       digits = "0" + digits.slice(4);
+  else if (digits.startsWith("233") && digits.length === 12) digits = "0" + digits.slice(3);
+  return /^0\d{9}$/.test(digits) ? digits : null;
+}
+
+function validateMomoPhone(
+  phone: string,
+  provider: MomoProvider,
+): { normalized: string; error: string | null; prefixWarning: string | null } {
+  const normalized = normalizeGhanaPhone(phone);
+
+  if (!normalized) {
+    return {
+      normalized: "",
+      error: "Invalid phone number. Use format: 0XX XXX XXXX (e.g. 0551234567) or +233XXXXXXXXX.",
+      prefixWarning: null,
+    };
+  }
+
+  const prefix    = normalized.substring(0, 3);
+  const expected  = PREFIX_MAP[provider] ?? [];
+  const mismatch  = !expected.includes(prefix);
+  const provLabel = GH_MOMO_PROVIDERS.find(p => p.id === provider)?.label ?? provider;
+
+  const prefixWarning = mismatch
+    ? `Phone prefix ${prefix} doesn't look like a ${provLabel} number. ` +
+      `${provLabel} prefixes: ${expected.join(", ")}. ` +
+      `Please select the correct network, or the payment will be abandoned by Paystack.`
+    : null;
+
+  return { normalized, error: null, prefixWarning };
+}
+
 /* ─── Small helpers ─────────────────────────────────────────────────────────── */
 function FlagImg({ country, size = 24 }: { country: Country; size?: number }) {
   const [err, setErr] = useState(false);
@@ -137,6 +191,15 @@ function ErrBox({ msg }: { msg: string }) {
   return (
     <div style={{ background: "rgba(224,32,32,0.08)", border: "1px solid rgba(224,32,32,0.28)", borderRadius: 10, padding: "10px 14px", color: "#f87171", fontSize: 12, marginBottom: 16, lineHeight: 1.55, display: "flex", alignItems: "flex-start", gap: 8 }}>
       <span className="material-symbols-outlined" style={{ fontSize: 16, marginTop: 1, flexShrink: 0 }}>warning</span>
+      {msg}
+    </div>
+  );
+}
+
+function WarnBox({ msg }: { msg: string }) {
+  return (
+    <div style={{ background: "rgba(212,168,67,0.08)", border: "1px solid rgba(212,168,67,0.3)", borderRadius: 10, padding: "10px 14px", color: T.gold, fontSize: 12, marginBottom: 12, lineHeight: 1.55, display: "flex", alignItems: "flex-start", gap: 8 }}>
+      <span className="material-symbols-outlined" style={{ fontSize: 16, marginTop: 1, flexShrink: 0 }}>warning_amber</span>
       {msg}
     </div>
   );
@@ -353,7 +416,6 @@ function GatewayTabs({ country, gateway, onSelect }: GatewayTabsProps) {
           const active    = gateway === t.id;
           const isCrypto  = t.id === "binance";
           const isBank    = t.id === "bank_ng";
-          const isMomo    = t.id === "momo";
           const accentClr = isCrypto ? T.gold   : isBank ? T.green   : T.purple;
           const accentBg  = isCrypto ? T.goldLow : isBank ? T.greenLow : T.purpleLow;
           const accentBd  = isCrypto ? "rgba(212,168,67,0.5)" : isBank ? T.greenMid : T.purpleMid;
@@ -427,6 +489,7 @@ function SupportPanel() {
 
 interface MomoFormProps {
   error: string;
+  prefixWarning: string;
   amount: string;
   setAmount: (v: string) => void;
   momoPhone: string;
@@ -441,7 +504,11 @@ interface MomoFormProps {
   localToGhs: (amt: number, cur: string) => number;
   onSubmit: () => void;
 }
-function MomoForm({ error, amount, setAmount, momoPhone, setMomoPhone, momoProvider, setMomoProvider, loading, country, rateFor, minLocal, quickAmts, localToGhs, onSubmit }: MomoFormProps) {
+function MomoForm({
+  error, prefixWarning, amount, setAmount, momoPhone, setMomoPhone,
+  momoProvider, setMomoProvider, loading, country,
+  rateFor, minLocal, quickAmts, localToGhs, onSubmit,
+}: MomoFormProps) {
   const local = parseFloat(amount) || 0;
   return (
     <div>
@@ -471,23 +538,27 @@ function MomoForm({ error, amount, setAmount, momoPhone, setMomoPhone, momoProvi
         </div>
       </div>
 
-      {/* Phone number */}
+      {/* Phone number — FIX: removed "+233" prefix label that caused user confusion.
+          Placeholder and helper text now clearly show both accepted formats.
+          Real-time prefix mismatch warning shown via prefixWarning prop. */}
       <div style={{ marginBottom: 18 }}>
         <label style={lbl}>Mobile Money Number <span style={{ color: T.red }}>*</span></label>
-        <div style={{ display: "flex", alignItems: "stretch", background: T.raised, border: `1px solid ${T.border}`, borderRadius: 10, overflow: "hidden" }}>
-          <span style={{ padding: "0 14px", display: "flex", alignItems: "center", color: T.dim, fontSize: 13, fontWeight: 700, borderRight: `1px solid ${T.border}`, background: "rgba(255,255,255,0.03)", flexShrink: 0 }}>🇬🇭 +233</span>
+        <div style={{ display: "flex", alignItems: "stretch", background: T.raised, border: `1px solid ${prefixWarning ? "rgba(212,168,67,0.5)" : T.border}`, borderRadius: 10, overflow: "hidden" }}>
+          <span style={{ padding: "0 14px", display: "flex", alignItems: "center", color: T.dim, fontSize: 13, fontWeight: 700, borderRight: `1px solid ${T.border}`, background: "rgba(255,255,255,0.03)", flexShrink: 0 }}>🇬🇭</span>
           <input
             type="tel"
             placeholder="0XX XXX XXXX"
             value={momoPhone}
-            onChange={e => setMomoPhone(e.target.value)}
+            onChange={e => setMomoPhone(e.target.value.replace(/[^\d+\s\-]/g, ""))}
             style={{ flex: 1, background: "none", border: "none", outline: "none", color: T.white, fontSize: 16, fontWeight: 600, padding: "11px 14px", fontFamily: "inherit" }}
           />
         </div>
         <div style={{ fontSize: 11, color: T.dim, marginTop: 5, display: "flex", alignItems: "center", gap: 4 }}>
           <span className="material-symbols-outlined" style={{ fontSize: 12 }}>info</span>
-          Enter the number registered with {GH_MOMO_PROVIDERS.find(p => p.id === momoProvider)?.label}.
+          Enter as <strong style={{ color: T.white }}>0XX XXX XXXX</strong> or <strong style={{ color: T.white }}>+233XXXXXXXXX</strong> · registered with {GH_MOMO_PROVIDERS.find(p => p.id === momoProvider)?.label}
         </div>
+        {/* Real-time prefix mismatch warning — shown before user even submits */}
+        {prefixWarning && <WarnBox msg={prefixWarning} />}
       </div>
 
       {/* How it works */}
@@ -495,7 +566,7 @@ function MomoForm({ error, amount, setAmount, momoPhone, setMomoPhone, momoProvi
         <div style={{ fontSize: 10, fontWeight: 700, color: T.purple, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 10 }}>How Mobile Money works</div>
         {[
           { icon: "smartphone",             text: "Tap below — a payment prompt will be sent directly to your phone" },
-          { icon: "lock_clock",             text: "Approve the request on your phone within 3 minutes — or enter the OTP code sent by SMS" },
+          { icon: "lock_clock",             text: "Approve the request on your phone within 3 minutes — or enter the OTP code if your network sends one" },
           { icon: "account_balance_wallet", text: "Your wallet is credited instantly after you approve" },
         ].map((s, i) => (
           <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: i < 2 ? 8 : 0 }}>
@@ -521,7 +592,7 @@ function MomoForm({ error, amount, setAmount, momoPhone, setMomoPhone, momoProvi
   );
 }
 
-/* ── MoMo Pending — awaiting phone approval or OTP entry ── */
+/* ── MoMo Pending ── */
 interface MomoPendingProps {
   momoReference: string;
   momoDisplayText: string;
@@ -557,7 +628,6 @@ function MomoPending({
 
   return (
     <div style={{ textAlign: "center", padding: "8px 0" }}>
-      {/* Animated phone icon */}
       <div style={{ width: 72, height: 72, borderRadius: "50%", margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", background: T.purpleLow, border: `2px solid ${T.purpleMid}`, animation: "_pulse 1.8s ease-in-out infinite" }}>
         <span className="material-symbols-outlined" style={{ fontSize: 36, color: T.purple }}>smartphone</span>
       </div>
@@ -584,7 +654,7 @@ function MomoPending({
         </div>
       </div>
 
-      {/* ── OTP Entry Block ── */}
+      {/* OTP Entry */}
       <div style={{ background: T.raised, border: `1px solid ${T.purpleMid}`, borderRadius: 12, padding: "16px", marginBottom: 20, textAlign: "left" }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: T.purple, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
           <span className="material-symbols-outlined" style={{ fontSize: 14 }}>pin</span>
@@ -608,36 +678,18 @@ function MomoPending({
             value={momoOtp}
             onChange={e => setMomoOtp(e.target.value.replace(/\D/g, ""))}
             style={{
-              flex: 1,
-              background: T.bg,
-              border: `1px solid ${T.border}`,
-              borderRadius: 10,
-              padding: "11px 14px",
-              color: T.white,
-              fontSize: 24,
-              fontWeight: 800,
-              outline: "none",
-              fontFamily: "inherit",
-              letterSpacing: 8,
-              textAlign: "center",
-              boxSizing: "border-box",
+              flex: 1, background: T.bg, border: `1px solid ${T.border}`,
+              borderRadius: 10, padding: "11px 14px", color: T.white,
+              fontSize: 24, fontWeight: 800, outline: "none", fontFamily: "inherit",
+              letterSpacing: 8, textAlign: "center", boxSizing: "border-box",
             }}
           />
           <button
             onClick={onSubmitOtp}
             disabled={otpSubmitting || momoOtp.trim().length < 4}
-            style={{
-              ...btnPurple,
-              width: "auto",
-              padding: "11px 18px",
-              flexShrink: 0,
-              opacity: otpSubmitting || momoOtp.trim().length < 4 ? 0.38 : 1,
-            }}
+            style={{ ...btnPurple, width: "auto", padding: "11px 18px", flexShrink: 0, opacity: otpSubmitting || momoOtp.trim().length < 4 ? 0.38 : 1 }}
           >
-            {otpSubmitting
-              ? <Spin />
-              : <span className="material-symbols-outlined" style={{ fontSize: 18 }}>send</span>
-            }
+            {otpSubmitting ? <Spin /> : <span className="material-symbols-outlined" style={{ fontSize: 18 }}>send</span>}
           </button>
         </div>
       </div>
@@ -1018,7 +1070,7 @@ function BankNgSuccess({ onHome, onReset }: BankNgSuccessProps) {
   );
 }
 
-/* ── Crypto Success Screen ── */
+/* ── Crypto Success ── */
 interface CryptoSuccessProps { onHome: () => void; onReset: () => void; }
 function CryptoSuccess({ onHome, onReset }: CryptoSuccessProps) {
   return (
@@ -1062,24 +1114,39 @@ export default function DepositPage() {
 
   useEffect(() => {
     const detect = async () => {
+      log.info("IP detection: starting");
       try {
         const res  = await fetch("https://ipapi.co/json/");
         const data = await res.json();
         const code = data?.country_code as string;
+        log.info(`IP detection: country_code='${code}'`);
         const found = COUNTRIES.find(c => c.code === code);
         if (found) {
           setCountry(found);
           if (found.gateways.length === 1) setGateway(found.gateways[0]);
+          log.info(`IP detection: matched country='${found.name}' gateways=${JSON.stringify(found.gateways)}`);
+        } else {
+          log.warn(`IP detection: no match for code='${code}'`);
         }
-      } catch { /* silent */ }
-      finally { setIpDetecting(false); }
+      } catch (e) {
+        log.warn("IP detection: failed", e);
+      } finally {
+        setIpDetecting(false);
+      }
     };
     detect();
   }, []);
 
   useEffect(() => {
     fetch("https://open.er-api.com/v6/latest/GHS")
-      .then(r => r.json()).then(d => { if (d?.rates) setRates(d.rates); }).catch(() => {});
+      .then(r => r.json())
+      .then(d => {
+        if (d?.rates) {
+          setRates(d.rates);
+          log.debug("Exchange rates loaded", d.rates);
+        }
+      })
+      .catch(e => log.warn("Exchange rate fetch failed", e));
   }, []);
 
   const rateFor    = useCallback((cur: string) => cur === "GHS" ? 1 : (rates[cur] ?? 1), [rates]);
@@ -1124,6 +1191,7 @@ export default function DepositPage() {
   const [momoDisplayText, setMomoDisplayText] = useState("");
   const [momoVerifying,   setMomoVerifying]   = useState(false);
   const [momoVerifyError, setMomoVerifyError] = useState("");
+  const [momoPrefixWarn,  setMomoPrefixWarn]  = useState("");
 
   /* ── OTP state ── */
   const [momoOtp,       setMomoOtp]       = useState("");
@@ -1131,106 +1199,180 @@ export default function DepositPage() {
   const [otpError,      setOtpError]      = useState("");
   const [otpSent,       setOtpSent]       = useState(false);
 
+  /* ── Live prefix validation: runs on every phone/provider change ── */
+  useEffect(() => {
+    if (!momoPhone.trim()) { setMomoPrefixWarn(""); return; }
+    const { prefixWarning } = validateMomoPhone(momoPhone, momoProvider);
+    setMomoPrefixWarn(prefixWarning ?? "");
+    if (prefixWarning) {
+      log.warn(`Prefix mismatch detected: phone='${momoPhone.slice(0, 3)}****' provider='${momoProvider}'`);
+    }
+  }, [momoPhone, momoProvider]);
+
   const post = async (path: string, body: object) => {
+    log.debug(`POST ${path}`, body);
     const res = await fetch(`${API_BASE}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok()}` },
       body: JSON.stringify(body),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data?.message || data?.error || "Request failed.");
+    if (!res.ok) {
+      log.error(`POST ${path} failed: status=${res.status}`, data);
+      throw new Error(data?.message || data?.error || "Request failed.");
+    }
+    log.debug(`POST ${path} OK`, data);
     return data;
   };
 
   const get = async (path: string) => {
+    log.debug(`GET ${path}`);
     const res = await fetch(`${API_BASE}${path}`, {
       method: "GET",
       headers: { Authorization: `Bearer ${tok()}` },
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data?.message || data?.error || "Request failed.");
+    if (!res.ok) {
+      log.error(`GET ${path} failed: status=${res.status}`, data);
+      throw new Error(data?.message || data?.error || "Request failed.");
+    }
+    log.debug(`GET ${path} OK`, data);
     return data;
   };
 
   const handleSelectCountry = useCallback((c: Country) => {
+    log.info(`Country selected: ${c.name} (${c.code}) gateways=${JSON.stringify(c.gateways)}`);
     setCountry(c); setGateway(null); setError(""); setAmount(""); setStep("form");
     if (c.gateways.length === 1) setGateway(c.gateways[0]);
   }, []);
 
   const selectGateway = useCallback((gw: "binance" | "bank_ng" | "momo") => {
+    log.info(`Gateway selected: ${gw}`);
     setGateway(gw); setError(""); setAmount("");
     setStep(gw === "bank_ng" ? "bank_info" : "form");
   }, []);
 
   /* ── Mobile Money handlers ── */
-const handleMomoInit = async () => {
+  const handleMomoInit = async () => {
     setError("");
+
+    // ── Amount validation ──────────────────────────────────────────────────
     const localAmt = parseFloat(amount);
     const min = minLocal("GHS");
-    if (!localAmt || localAmt < min)
+    if (!localAmt || localAmt < min) {
+      log.warn(`MoMo init rejected: amount=${localAmt} below min=${min}`);
       return setError(`Minimum deposit: GH₵${min.toLocaleString()}`);
-    if (!momoPhone.trim())
-      return setError("Please enter your Mobile Money phone number.");
+    }
 
-    const phone = momoPhone.trim().replace(/\s+/g, "");
+    // ── Phone validation ───────────────────────────────────────────────────
+    if (!momoPhone.trim()) {
+      return setError("Please enter your Mobile Money phone number.");
+    }
+
+    const rawPhone = momoPhone.trim().replace(/\s+/g, "").replace(/-/g, "");
+    const { normalized, error: phoneError, prefixWarning } = validateMomoPhone(rawPhone, momoProvider);
+
+    if (phoneError) {
+      log.warn(`MoMo init rejected: phone validation failed — raw='${rawPhone}' error='${phoneError}'`);
+      return setError(phoneError);
+    }
+
+    // ── Provider prefix hard-block ─────────────────────────────────────────
+    // This is the #1 cause of "abandoned" — user selects wrong network.
+    // We block here rather than just warn so they're forced to fix it.
+    if (prefixWarning) {
+      log.warn(`MoMo init blocked: prefix mismatch — normalized='${normalized?.slice(0,3)}****' provider='${momoProvider}'`);
+      return setError(prefixWarning);
+    }
+
+    log.info(`MoMo init: START — amount=GHS${localAmt} phone='${normalized?.slice(0,3)}****' provider='${momoProvider}'`);
 
     setLoading(true);
     try {
       const data = await post("/api/wallet/deposit/paystack-momo/init", {
         amount:   localAmt,
-        phone,
+        phone:    normalized,   // always send the normalized form
         provider: momoProvider,
       });
 
+      // Unwrap Paystack response: { status, message, data: { reference, status, display_text } }
       const inner       = data?.data ?? data;
       const txData      = inner?.data ?? inner;
       const ref         = txData?.reference;
       const status      = txData?.status;
       const displayText = txData?.display_text ?? "";
 
-      if (!ref) throw new Error("No reference returned. Please try again.");
+      log.info(`MoMo init: Paystack responded — ref='${ref}' data.status='${status}' display_text='${displayText}'`);
+      log.debug("MoMo init: full txData", txData);
+
+      if (!ref) {
+        log.error("MoMo init: no reference in response", data);
+        throw new Error("No reference returned. Please try again.");
+      }
 
       setMomoReference(ref);
       setMomoDisplayText(displayText);
 
       if (status === "pay_offline" || status === "pending") {
+        log.info(`MoMo init: status='${status}' → moving to momo_pending`);
         setStep("momo_pending");
       } else if (status === "send_otp") {
+        log.info("MoMo init: status='send_otp' → moving to momo_pending with OTP entry");
         setStep("momo_pending");
         setOtpSent(false);
       } else if (status === "success") {
+        log.info("MoMo init: status='success' → immediate success");
         setStep("momo_success");
       } else if (status === "failed" || status === "timeout") {
+        log.error(`MoMo init: status='${status}' — charge failed immediately`);
         throw new Error(displayText || "Payment failed. Please try again.");
       } else {
-        // unknown status — still go to pending so user can verify
+        log.warn(`MoMo init: UNEXPECTED status='${status}' — falling through to pending`);
         setStep("momo_pending");
       }
     } catch (e: unknown) {
-      setError((e as Error).message);
+      const msg = (e as Error).message;
+      log.error(`MoMo init: ERROR — ${msg}`, e);
+      setError(msg);
     } finally {
       setLoading(false);
     }
   };
-  
+
   const handleMomoVerify = async () => {
     setMomoVerifyError("");
     setMomoVerifying(true);
+    log.info(`MoMo verify: START — ref='${momoReference}'`);
     try {
       const data   = await get(`/api/wallet/deposit/paystack-momo/verify/${momoReference}`);
+
+      // Paystack verify shape: { status: true, data: { status: "success"|"failed"|"abandoned"|... } }
       const inner  = data?.data ?? data;
       const txData = inner?.data ?? inner;
-      const status = txData?.status ?? txData?.data?.status;
+      // FIX: read status directly from txData — don't double-unwrap
+      const status = txData?.status;
+
+      log.info(`MoMo verify: ref='${momoReference}' data.status='${status}'`);
+      log.debug("MoMo verify: full txData", txData);
 
       if (status === "success") {
+        log.info("MoMo verify: payment confirmed → momo_success");
         setStep("momo_success");
       } else if (status === "failed" || status === "abandoned") {
-        setMomoVerifyError(`Payment ${status}. Please start a new deposit.`);
+        log.warn(`MoMo verify: terminal status='${status}' — user must start over`);
+        setMomoVerifyError(
+          status === "abandoned"
+            ? "Payment expired — you didn't approve within 3 minutes. Please start a new deposit."
+            : "Payment failed. Please start a new deposit."
+        );
       } else {
+        log.info(`MoMo verify: non-terminal status='${status}' — still waiting`);
         setMomoVerifyError("Payment not confirmed yet — please approve on your phone and try again.");
       }
     } catch (e: unknown) {
-      setMomoVerifyError((e as Error).message);
+      const msg = (e as Error).message;
+      log.error(`MoMo verify: ERROR — ${msg}`, e);
+      setMomoVerifyError(msg);
     } finally {
       setMomoVerifying(false);
     }
@@ -1238,19 +1380,38 @@ const handleMomoInit = async () => {
 
   const handleMomoSubmitOtp = async () => {
     setOtpError("");
-    if (momoOtp.trim().length < 4)
+    if (momoOtp.trim().length < 4) {
       return setOtpError("Please enter a valid OTP code (minimum 4 digits).");
+    }
 
+    log.info(`MoMo OTP submit: START — ref='${momoReference}' otp_length=${momoOtp.trim().length}`);
     setOtpSubmitting(true);
     try {
-      await post("/api/wallet/deposit/paystack-momo/submit-otp", {
+      const data = await post("/api/wallet/deposit/paystack-momo/submit-otp", {
         otp:       momoOtp.trim(),
         reference: momoReference,
       });
+
+      const inner  = data?.data ?? data;
+      const txData = inner?.data ?? inner;
+      const status = txData?.status;
+
+      log.info(`MoMo OTP submit: Paystack data.status='${status}' ref='${momoReference}'`);
+
       setOtpSent(true);
       setMomoOtp("");
+
+      // If Paystack immediately confirms success after OTP, jump straight to success
+      if (status === "success") {
+        log.info("MoMo OTP submit: immediate success after OTP → momo_success");
+        setStep("momo_success");
+      } else {
+        log.info(`MoMo OTP submit: status='${status}' — staying on pending, user should verify`);
+      }
     } catch (e: unknown) {
-      setOtpError((e as Error).message);
+      const msg = (e as Error).message;
+      log.error(`MoMo OTP submit: ERROR — ${msg}`, e);
+      setOtpError(msg);
     } finally {
       setOtpSubmitting(false);
     }
@@ -1268,6 +1429,7 @@ const handleMomoInit = async () => {
   const handleBinanceSubmit = async () => {
     if (!validateBinance()) return;
     setLoading(true); setError("");
+    log.info(`Binance submit: txid='${txid.slice(0,10)}…' coin=${coin} net=${cryptoNet} amt=${cryptoAmt}`);
     try {
       await post("/api/wallet/deposit/binance/submit", {
         txid: txid.trim(), cryptoAmount: parseFloat(cryptoAmt), coin, network: cryptoNet,
@@ -1275,22 +1437,30 @@ const handleMomoInit = async () => {
         senderAddress: senderAddr.trim() || undefined,
         userNote: userNote.trim() || undefined,
       });
+      log.info("Binance submit: success");
       setStep("success");
-    } catch (e: unknown) { setError((e as Error).message); }
-    finally { setLoading(false); }
+    } catch (e: unknown) {
+      const msg = (e as Error).message;
+      log.error(`Binance submit: ERROR — ${msg}`);
+      setError(msg);
+    } finally { setLoading(false); }
   };
 
   /* ── Bank (NG) handlers ── */
   const handleBankScreenshot = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    log.debug(`Bank screenshot: compressing file size=${file.size} type=${file.type}`);
     setBankCompressing(true);
     try {
       const dataUrl = await compressImageToBase64(file);
       setBankScreenshot(dataUrl);
       setBankErrs(p => ({ ...p, screenshot: "" }));
-    } catch { setBankErrs(p => ({ ...p, screenshot: "Could not process image. Try another file." })); }
-    finally { setBankCompressing(false); }
+      log.debug(`Bank screenshot: compressed to ${dataUrl.length} chars`);
+    } catch (err) {
+      log.error("Bank screenshot: compression failed", err);
+      setBankErrs(p => ({ ...p, screenshot: "Could not process image. Try another file." }));
+    } finally { setBankCompressing(false); }
   };
 
   const validateBank = () => {
@@ -1307,6 +1477,7 @@ const handleMomoInit = async () => {
   const handleBankSubmit = async () => {
     if (!validateBank()) return;
     setLoading(true); setError("");
+    log.info(`Bank submit: ref='${bankRef.slice(0,10)}…' amt=${bankAmtSent}`);
     try {
       await post("/api/wallet/bank-deposits", {
         transferReference: bankRef.trim(),
@@ -1316,20 +1487,25 @@ const handleMomoInit = async () => {
         screenshotUrl:     bankScreenshot,
         userNote:          bankNote.trim() || undefined,
       });
+      log.info("Bank submit: success");
       setStep("bank_success");
-    } catch (e: unknown) { setError((e as Error).message); }
-    finally { setLoading(false); }
+    } catch (e: unknown) {
+      const msg = (e as Error).message;
+      log.error(`Bank submit: ERROR — ${msg}`);
+      setError(msg);
+    } finally { setLoading(false); }
   };
 
   /* ── Reset ── */
   const reset = useCallback(() => {
+    log.info("DepositPage: reset");
     setCountry(null); setGateway(null); setAmount(""); setError("");
     setTxid(""); setCryptoAmt(""); setCoin("USDT"); setCryptoNet("TRC20");
     setExpectedGhs(""); setSenderAddr(""); setUserNote(""); setBErrs({});
     setBankRef(""); setBankAmtSent(""); setBankExpected(""); setBankSender("");
     setBankNote(""); setBankScreenshot(""); setBankErrs({});
     setMomoPhone(""); setMomoProvider("mtn"); setMomoReference("");
-    setMomoDisplayText(""); setMomoVerifyError("");
+    setMomoDisplayText(""); setMomoVerifyError(""); setMomoPrefixWarn("");
     setMomoOtp(""); setOtpSubmitting(false); setOtpError(""); setOtpSent(false);
     setStep("form");
   }, []);
@@ -1383,7 +1559,9 @@ const handleMomoInit = async () => {
       );
       return (
         <MomoForm
-          error={error} amount={amount} setAmount={setAmount}
+          error={error}
+          prefixWarning={momoPrefixWarn}
+          amount={amount} setAmount={setAmount}
           momoPhone={momoPhone} setMomoPhone={setMomoPhone}
           momoProvider={momoProvider} setMomoProvider={setMomoProvider}
           loading={loading} country={country}
