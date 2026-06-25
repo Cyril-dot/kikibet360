@@ -1163,7 +1163,7 @@ export default function DepositPage() {
   }, []);
 
   /* ── Mobile Money handlers ── */
-  const handleMomoInit = async () => {
+ const handleMomoInit = async () => {
     setError("");
     const localAmt = parseFloat(amount);
     const min      = minLocal("GHS");
@@ -1172,9 +1172,7 @@ export default function DepositPage() {
     if (!momoPhone.trim())
       return setError("Please enter your Mobile Money phone number.");
 
-    let phone = momoPhone.trim().replace(/\s+/g, "");
-    if (phone.startsWith("0")) phone = "+233" + phone.slice(1);
-    else if (!phone.startsWith("+")) phone = "+233" + phone;
+    const phone = momoPhone.trim().replace(/\s+/g, "");
 
     setLoading(true);
     try {
@@ -1199,7 +1197,6 @@ export default function DepositPage() {
       setLoading(false);
     }
   };
-
   const handleMomoVerify = async () => {
     setMomoVerifyError("");
     setMomoVerifying(true);
